@@ -692,6 +692,22 @@ func Model_free(model LlamaModel) {
 	}
 }
 
+// Model_n_embd returns the number of embedding dimensions for the model
+func Model_n_embd(model LlamaModel) int32 {
+	if err := ensureLoaded(); err != nil {
+		panic(err)
+	}
+	return llamaModelNEmbd(model)
+}
+
+// Get_embeddings returns the embeddings for the context
+func Get_embeddings(ctx LlamaContext) *float32 {
+	if err := ensureLoaded(); err != nil {
+		return nil
+	}
+	return llamaGetEmbeddings(ctx)
+}
+
 // Context_default_params returns default context parameters
 func Context_default_params() LlamaContextParams {
 	if err := ensureLoaded(); err != nil {

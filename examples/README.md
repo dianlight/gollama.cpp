@@ -5,17 +5,34 @@ This directory contains various examples demonstrating how to use gollama.cpp fo
 ## Available Examples
 
 ### 1. Simple Chat (`simple-chat/`)
-A basic example showing how to generate text using a GGUF model.
+A comprehensive example showing how to generate text using a GGUF model.
 
 **Features:**
-- Text generation with customizable parameters
-- Basic model loading and context creation
-- Token prediction with configurable limits
+- Text generation and completion with configurable parameters
+- Real-time token generation with streaming output
+- System information display (GPU support, memory mapping, etc.)
+- Detailed progress logging and error handling
+- Support for various text types: creative writing, technical explanations, conversations
+- Performance optimization with configurable threading
 
 **Usage:**
 ```bash
 cd simple-chat
 go run main.go -prompt "The future of AI is"
+
+# Creative writing
+go run main.go -prompt "Once upon a time" -n-predict 150
+
+# Technical explanation
+go run main.go -prompt "How does machine learning work?" -n-predict 100
+
+# Run the interactive demo
+./demo.sh
+
+# Use Makefile shortcuts
+make creative    # Creative writing demo
+make technical   # Technical explanation demo
+make conversation # Conversation starter demo
 ```
 
 ### 2. Embedding Generation (`embedding/`)

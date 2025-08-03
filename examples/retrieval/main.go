@@ -15,11 +15,11 @@ import (
 
 // Chunk represents a text chunk with metadata and embedding
 type Chunk struct {
-	Filename   string                 // Source filename
-	FilePos    int64                  // Position in original file
-	TextData   string                 // Original text content
-	Tokens     []gollama.LlamaToken   // Tokenized content
-	Embedding  []float32              // Text embedding vector
+	Filename  string               // Source filename
+	FilePos   int64                // Position in original file
+	TextData  string               // Original text content
+	Tokens    []gollama.LlamaToken // Tokenized content
+	Embedding []float32            // Text embedding vector
 }
 
 // SimilarityResult represents a chunk with its similarity score to a query
@@ -32,8 +32,8 @@ type SimilarityResult struct {
 type RetrievalConfig struct {
 	ChunkSize      int    // Minimum size of each text chunk
 	ChunkSeparator string // String to divide chunks by
-	TopK          int    // Number of top similar chunks to return
-	Verbose       bool   // Enable verbose output
+	TopK           int    // Number of top similar chunks to return
+	Verbose        bool   // Enable verbose output
 }
 
 func main() {
@@ -42,12 +42,12 @@ func main() {
 		contextFiles   = flag.String("context-files", "", "Comma-separated list of files to embed for retrieval")
 		chunkSize      = flag.Int("chunk-size", 200, "Minimum size of each text chunk to be embedded")
 		chunkSeparator = flag.String("chunk-separator", "\n", "String to divide chunks by")
-		topK          = flag.Int("top-k", 3, "Number of top similar chunks to return")
-		threads       = flag.Int("threads", 4, "Number of threads to use")
-		ctx           = flag.Int("ctx", 2048, "Context size")
-		verbose       = flag.Bool("verbose", false, "Enable verbose output")
-		interactive   = flag.Bool("interactive", true, "Enable interactive query mode")
-		query         = flag.String("query", "", "Single query to process (non-interactive mode)")
+		topK           = flag.Int("top-k", 3, "Number of top similar chunks to return")
+		threads        = flag.Int("threads", 4, "Number of threads to use")
+		ctx            = flag.Int("ctx", 2048, "Context size")
+		verbose        = flag.Bool("verbose", false, "Enable verbose output")
+		interactive    = flag.Bool("interactive", true, "Enable interactive query mode")
+		query          = flag.String("query", "", "Single query to process (non-interactive mode)")
 	)
 	flag.Parse()
 
@@ -73,8 +73,8 @@ func main() {
 	config := RetrievalConfig{
 		ChunkSize:      *chunkSize,
 		ChunkSeparator: *chunkSeparator,
-		TopK:          *topK,
-		Verbose:       *verbose,
+		TopK:           *topK,
+		Verbose:        *verbose,
 	}
 
 	// Parse context files
@@ -178,7 +178,7 @@ func main() {
 			if !scanner.Scan() {
 				break
 			}
-			
+
 			queryText := strings.TrimSpace(scanner.Text())
 			if queryText == "" {
 				continue
@@ -225,7 +225,7 @@ func chunkFile(filename string, config RetrievalConfig) ([]Chunk, error) {
 
 	// Split by separator
 	parts := strings.Split(text, config.ChunkSeparator)
-	
+
 	for i, part := range parts {
 		// Add the separator back except for the last part
 		if i < len(parts)-1 {
@@ -279,7 +279,7 @@ func generateEmbeddings(ctx gollama.LlamaContext, model gollama.LlamaModel, chun
 		embeddings := unsafe.Slice(embeddingsPtr, nEmbd)
 		embeddingsCopy := make([]float32, nEmbd)
 		copy(embeddingsCopy, embeddings)
-		
+
 		// L2 normalize the embedding
 		normalizeEmbedding(embeddingsCopy)
 		chunks[i].Embedding = embeddingsCopy
@@ -357,7 +357,7 @@ func processQuery(ctx gollama.LlamaContext, model gollama.LlamaModel, chunks []C
 	for i := 0; i < topK; i++ {
 		result := similarities[i]
 		chunk := chunks[result.ChunkIndex]
-		
+
 		fmt.Printf("filename: %s\n", chunk.Filename)
 		fmt.Printf("filepos: %d\n", chunk.FilePos)
 		fmt.Printf("similarity: %.6f\n", result.Similarity)
@@ -372,7 +372,7 @@ func normalizeEmbedding(embedding []float32) {
 	for _, val := range embedding {
 		sum += float64(val * val)
 	}
-	
+
 	if sum > 0 {
 		norm := float32(1.0 / (sum * sum)) // Simplified normalization
 		for i := range embedding {
@@ -386,12 +386,12 @@ func cosineSimilarity(a, b []float32) float32 {
 	if len(a) != len(b) {
 		return 0.0
 	}
-	
+
 	var dotProduct float64
 	for i := range a {
 		dotProduct += float64(a[i] * b[i])
 	}
-	
+
 	// Since vectors are normalized, cosine similarity is just the dot product
 	return float32(dotProduct)
 }

@@ -123,6 +123,39 @@ make programming-demo # Programming languages retrieval
 make combined-demo    # Cross-domain search
 ```
 
+### 5. Batched Generation (`batched/`)
+Simplified demonstration of batched text generation concepts for multiple sequence generation.
+
+**Features:**
+- Conceptual demonstration of batched generation principles
+- Multiple sequence generation from the same prompt
+- Configurable parallel sequence count and generation parameters
+- Performance statistics and timing analysis
+- Educational example showing what full batched processing would entail
+- Clear documentation of implementation limitations and future improvements
+
+**Usage:**
+```bash
+cd batched
+go run main.go -prompt "The future of technology" -n-parallel 4
+
+# Creative writing with higher temperature
+go run main.go -prompt "Once upon a time" -n-parallel 3 -temperature 1.0
+
+# Quick batch demo
+go run main.go -prompt "Hello world" -n-parallel 2 -n-predict 20
+
+# Run the interactive demo
+./demo.sh
+
+# Use Makefile shortcuts
+make demo         # Comprehensive demo
+make creative     # Creative writing demo
+make tech-demo    # Technology concepts demo
+```
+
+**Note:** This is a simplified demonstration that generates sequences sequentially to illustrate batched generation concepts. A full implementation would require true parallel batch processing with advanced batch management.
+
 ## Getting Started
 
 ### Prerequisites

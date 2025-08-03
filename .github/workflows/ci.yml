@@ -1,0 +1,396 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  GO_VERSION: '1.21'
+  LLAMA_CPP_BUILD: 'b6076'
+
+jobs:
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go-version: ['1.21', '1.22']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ matrix.go-version }}-
+
+    - name: Install dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential
+
+    - name: Install dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install cmake
+
+    - name: Install dependencies (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        choco install cmake
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run tests
+      run: go test -v ./...
+
+    - name: Run tests with race detection
+      if: matrix.os != 'windows-latest' # Race detector not fully supported on Windows
+      run: go test -race -v ./...
+
+    - name: Run benchmarks
+      run: go test -bench=. -benchmem ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: latest
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Run Gosec Security Scanner
+      uses: securego/gosec@master
+      with:
+        args: './...'
+
+  build-libs:
+    name: Build Libraries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: amd64
+            cmake_flags: -DGGML_CUDA=ON
+          - os: ubuntu-latest
+            platform: linux
+            arch: arm64
+            cmake_flags: -DCMAKE_SYSTEM_PROCESSOR=aarch64
+          - os: macos-latest
+            platform: darwin
+            arch: amd64
+            cmake_flags: -DCMAKE_OSX_ARCHITECTURES=x86_64 -DGGML_METAL=ON
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+            cmake_flags: -DCMAKE_OSX_ARCHITECTURES=arm64 -DGGML_METAL=ON
+          - os: windows-latest
+            platform: windows
+            arch: amd64
+            cmake_flags: -DGGML_CUDA=ON
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Cache llama.cpp
+      uses: actions/cache@v3
+      with:
+        path: build/llama.cpp
+        key: llama-cpp-${{ env.LLAMA_CPP_BUILD }}-${{ matrix.platform }}-${{ matrix.arch }}
+
+    - name: Install dependencies (Ubuntu)
+      if: matrix.platform == 'linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential
+        if [[ "${{ matrix.arch }}" == "arm64" ]]; then
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+        fi
+
+    - name: Install dependencies (macOS)
+      if: matrix.platform == 'darwin'
+      run: |
+        brew install cmake
+
+    - name: Install dependencies (Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        choco install cmake
+
+    - name: Set up CUDA (Linux/Windows)
+      if: contains(matrix.cmake_flags, 'CUDA=ON')
+      uses: Jimver/cuda-toolkit@v0.2.11
+      with:
+        cuda: '12.0'
+
+    - name: Clone llama.cpp
+      run: |
+        if [ ! -d "build/llama.cpp" ]; then
+          mkdir -p build
+          git clone https://github.com/ggml-org/llama.cpp build/llama.cpp
+        fi
+        cd build/llama.cpp
+        git fetch
+        git checkout ${{ env.LLAMA_CPP_BUILD }}
+
+    - name: Build llama.cpp
+      run: |
+        cd build/llama.cpp
+        mkdir -p build-${{ matrix.platform }}-${{ matrix.arch }}
+        cd build-${{ matrix.platform }}-${{ matrix.arch }}
+        cmake .. -DBUILD_SHARED_LIBS=ON ${{ matrix.cmake_flags }}
+        cmake --build . --config Release -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+
+    - name: Copy libraries (Linux/macOS)
+      if: matrix.platform != 'windows'
+      run: |
+        mkdir -p libs/${{ matrix.platform }}_${{ matrix.arch }}
+        find build/llama.cpp/build-${{ matrix.platform }}-${{ matrix.arch }} -name "*.so" -o -name "*.dylib" | head -1 | xargs -I {} cp {} libs/${{ matrix.platform }}_${{ matrix.arch }}/
+
+    - name: Copy libraries (Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        mkdir -p libs/${{ matrix.platform }}_${{ matrix.arch }}
+        find build/llama.cpp/build-${{ matrix.platform }}-${{ matrix.arch }} -name "*.dll" | head -1 | xargs -I {} cp {} libs/${{ matrix.platform }}_${{ matrix.arch }}/
+
+    - name: Upload library artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: libs-${{ matrix.platform }}-${{ matrix.arch }}
+        path: libs/${{ matrix.platform }}_${{ matrix.arch }}/
+
+  build:
+    name: Build Go Bindings
+    runs-on: ubuntu-latest
+    needs: [test, lint, security]
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64  # Windows ARM64 Go support is limited
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Build
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 0
+      run: |
+        mkdir -p build/${{ matrix.goos }}_${{ matrix.goarch }}
+        go build -ldflags="-s -w" -o build/${{ matrix.goos }}_${{ matrix.goarch }}/ ./...
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: build/${{ matrix.goos }}_${{ matrix.goarch }}/
+
+  release:
+    name: Create Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    needs: [build, build-libs]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+
+    - name: Create release packages
+      run: |
+        mkdir -p dist
+        
+        # Extract version from tag
+        VERSION=${GITHUB_REF#refs/tags/v}
+        
+        # Package each platform
+        for platform in linux darwin windows; do
+          for arch in amd64 arm64; do
+            # Skip unsupported combinations
+            if [[ "$platform" == "windows" && "$arch" == "arm64" ]]; then
+              continue
+            fi
+            
+            echo "Packaging $platform-$arch"
+            pkg_name="gollama.cpp-v$VERSION-llamacpp.${{ env.LLAMA_CPP_BUILD }}-$platform-$arch"
+            mkdir -p "dist/$pkg_name"
+            
+            # Copy Go binaries if they exist
+            if [ -d "build-$platform-$arch" ]; then
+              cp -r build-$platform-$arch/* "dist/$pkg_name/"
+            fi
+            
+            # Copy libraries if they exist
+            if [ -d "libs-$platform-$arch" ]; then
+              cp -r libs-$platform-$arch/* "dist/$pkg_name/"
+            fi
+            
+            # Copy documentation
+            cp README.md LICENSE CHANGELOG.md "dist/$pkg_name/"
+            
+            # Create archive
+            cd dist
+            if [[ "$platform" == "windows" ]]; then
+              zip -r "$pkg_name.zip" "$pkg_name"
+            else
+              tar -czf "$pkg_name.tar.gz" "$pkg_name"
+            fi
+            rm -rf "$pkg_name"
+            cd ..
+          done
+        done
+
+    - name: Extract release notes
+      id: extract_notes
+      run: |
+        # Extract release notes from CHANGELOG.md
+        VERSION=${GITHUB_REF#refs/tags/v}
+        sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$d' > release_notes.md
+
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      id: create_release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        body_path: release_notes.md
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Assets
+      run: |
+        for file in dist/*; do
+          if [ -f "$file" ]; then
+            echo "Uploading $file"
+            curl \
+              -X POST \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary @"$file" \
+              "${{ steps.create_release.outputs.upload_url }}?name=$(basename $file)"
+          fi
+        done
+
+  examples:
+    name: Build Examples
+    runs-on: ${{ matrix.os }}
+    needs: [build-libs]
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Download library artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: libs-*
+        merge-multiple: true
+        path: libs/
+
+    - name: Build examples
+      run: |
+        if [ -d "examples" ]; then
+          cd examples
+          go mod download
+          go build ./...
+        fi
+
+  documentation:
+    name: Generate Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Generate Go documentation
+      run: |
+        go doc -all . > docs/API.md || true
+
+    - name: Deploy to GitHub Pages
+      if: github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./docs

@@ -452,7 +452,10 @@ func getLibraryPath() (string, error) {
 	candidates := []string{
 		libName,                     // Current directory
 		"../" + libName,             // Parent directory (for when running from examples/)
+		"../../" + libName,          // Parent directory (for when running from examples/)
 		"/usr/local/lib/" + libName, // System library path
+		"/usr/lib/" + libName,       // Common system library path
+		"/lib/" + libName,           // Another common system library path
 	}
 
 	for _, candidate := range candidates {

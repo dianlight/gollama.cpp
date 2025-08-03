@@ -1,8 +1,10 @@
-package gollama
+package main
 
 import (
 	"testing"
 	"unsafe"
+
+	"github.com/ltarantino/gollama.cpp"
 )
 
 func TestTokenDataArrayFromLogits(t *testing.T) {
@@ -14,7 +16,7 @@ func TestTokenDataArrayFromLogits(t *testing.T) {
 
 	// Call our function with the logits
 	// We don't need a real model since the function doesn't use it currently
-	tokenArray := Token_data_array_from_logits(LlamaModel(0), &logits[0])
+	tokenArray := gollama.Token_data_array_from_logits(gollama.LlamaModel(0), &logits[0])
 
 	if tokenArray == nil {
 		t.Fatal("Token array should not be nil")
@@ -51,8 +53,8 @@ func TestTokenDataArrayFromLogits(t *testing.T) {
 	}
 
 	// Check that we can access the last element (index 255)
-	lastElement := (*LlamaTokenData)(unsafe.Pointer(uintptr(unsafe.Pointer(tokenArray.Data)) + uintptr(255)*unsafe.Sizeof(LlamaTokenData{})))
-	expectedId := LlamaToken(255)
+	lastElement := (*gollama.LlamaTokenData)(unsafe.Pointer(uintptr(unsafe.Pointer(tokenArray.Data)) + uintptr(255)*unsafe.Sizeof(gollama.LlamaTokenData{})))
+	expectedId := gollama.LlamaToken(255)
 	if lastElement.Id != expectedId {
 		t.Errorf("Expected last token ID to be %d, got %d", expectedId, lastElement.Id)
 	}

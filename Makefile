@@ -278,6 +278,20 @@ install-tools:
 	$(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	$(GO) install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
 
+# Download model file
+.PHONY: model_download
+model_download:
+	@echo "Downloading tinyllama-1.1b-chat-v1.0.Q2_K.gguf model"
+	@mkdir -p models
+	@if [ ! -f "models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf" ]; then \
+		echo "Downloading model from Hugging Face..."; \
+		curl -L -o models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf \
+			"https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q2_K.gguf"; \
+		echo "Model downloaded successfully"; \
+	else \
+		echo "Model already exists in models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf"; \
+	fi
+
 # Show version information
 .PHONY: version
 version:
@@ -318,6 +332,7 @@ help:
 	@echo ""
 	@echo "Utilities:"
 	@echo "  deps               Update dependencies"
+	@echo "  model_download     Download tinyllama-1.1b-chat-v1.0.Q2_K.gguf model"
 	@echo "  install-tools      Install development tools"
 	@echo "  version            Show version information"
 	@echo "  help               Show this help"

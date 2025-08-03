@@ -11,7 +11,7 @@ import (
 
 func main() {
 	var (
-		modelPath = flag.String("model", "", "Path to the GGUF model file")
+		modelPath = flag.String("model", "../../models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf", "Path to the GGUF model file")
 		prompt    = flag.String("prompt", "The future of AI is", "Prompt text to generate from")
 		nPredict  = flag.Int("n-predict", 50, "Number of tokens to predict")
 		threads   = flag.Int("threads", 4, "Number of threads to use")

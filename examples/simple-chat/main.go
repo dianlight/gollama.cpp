@@ -132,7 +132,7 @@ func main() {
 		newToken := gollama.Sampler_sample(sampler, context, -1)
 		fmt.Printf("Sampled token: %d\n", newToken)
 
-		// Convert token to text
+		// Convert token to text using improved Token_to_piece function
 		piece := gollama.Token_to_piece(model, newToken, false)
 		fmt.Printf("Token piece: '%s'\n", piece)
 		fmt.Print(piece)

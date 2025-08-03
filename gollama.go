@@ -347,10 +347,10 @@ var (
 	llamaGetModel    func(ctx LlamaContext) LlamaModel
 
 	// Tokenization functions
-	llamaTokenize          func(vocab LlamaVocab, text *byte, textLen int32, tokens *LlamaToken, nTokensMax int32, addSpecial bool, parseSpecial bool) int32
-	llamaTokenToPiece      func(model LlamaModel, token LlamaToken, buf *byte, length int32, lstrip uint8, special uint8) int32
-	llamaVocabTokenToPiece func(vocab LlamaVocab, token LlamaToken, buf *byte, length int32, lstrip uint8, special uint8) int32
-	llamaDetokenize        func(model LlamaModel, tokens *LlamaToken, nTokens int32, text *byte, textLen int32, removeSpecial uint8, unparseSpecial uint8) int32
+	llamaTokenize     func(vocab LlamaVocab, text *byte, textLen int32, tokens *LlamaToken, nTokensMax int32, addSpecial bool, parseSpecial bool) int32
+	llamaTokenToPiece func(vocab LlamaVocab, token LlamaToken, buf *byte, length int32, lstrip int32, special bool) int32
+	llamaDetokenize   func(model LlamaModel, tokens *LlamaToken, nTokens int32, text *byte, textLen int32, removeSpecial bool, unparseSpecial bool) int32
+	llamaVocabGetText func(vocab LlamaVocab, token LlamaToken) *byte
 
 	// Vocab functions
 	llamaModelGetVocab func(model LlamaModel) LlamaVocab
@@ -544,8 +544,8 @@ func registerFunctions() error {
 	// Tokenization functions
 	purego.RegisterLibFunc(&llamaTokenize, libHandle, "llama_tokenize")
 	purego.RegisterLibFunc(&llamaTokenToPiece, libHandle, "llama_token_to_piece")
-	purego.RegisterLibFunc(&llamaVocabTokenToPiece, libHandle, "llama_token_to_piece")
 	purego.RegisterLibFunc(&llamaDetokenize, libHandle, "llama_detokenize")
+	purego.RegisterLibFunc(&llamaVocabGetText, libHandle, "llama_vocab_get_text")
 
 	// Vocab functions
 	purego.RegisterLibFunc(&llamaModelGetVocab, libHandle, "llama_model_get_vocab")
@@ -717,14 +717,6 @@ func Free(ctx LlamaContext) {
 	}
 }
 
-// Helper function to convert bool to uint8 for C interop
-func boolToUint8(b bool) uint8 {
-	if b {
-		return 1
-	}
-	return 0
-}
-
 // Tokenize tokenizes text
 func Tokenize(model LlamaModel, text string, addSpecial, parseSpecial bool) ([]LlamaToken, error) {
 	if err := ensureLoaded(); err != nil {
@@ -764,35 +756,48 @@ func Tokenize(model LlamaModel, text string, addSpecial, parseSpecial bool) ([]L
 	return tokens[:result], nil
 }
 
-// Token_to_piece converts a token to its string representation using vocab
+// Token_to_piece converts a token to its string representation using model
 func Token_to_piece(model LlamaModel, token LlamaToken, special bool) string {
 	if err := ensureLoaded(); err != nil {
 		return ""
 	}
 
-	// Get vocab from model
+	// Validate model handle
+	if model == 0 {
+		return ""
+	}
+
+	// Get the vocabulary from the model
 	vocab := llamaModelGetVocab(model)
-
-	// First call to get buffer size
-	bufSize := llamaVocabTokenToPiece(vocab, token, nil, 0, boolToUint8(false), boolToUint8(special))
-	if bufSize <= 0 {
+	if vocab == 0 {
 		return ""
 	}
 
-	// Second call to get actual string
-	buf := make([]byte, bufSize)
-	result := llamaVocabTokenToPiece(vocab, token, &buf[0], bufSize, boolToUint8(false), boolToUint8(special))
-	if result <= 0 {
+	// Use the simpler llama_vocab_get_text function which directly returns the text
+	textPtr := llamaVocabGetText(vocab, token)
+	if textPtr == nil {
 		return ""
 	}
 
-	// Find the null terminator and return the string
-	for i, b := range buf {
-		if b == 0 {
-			return string(buf[:i])
+	// Convert C string to Go string
+	// We need to find the length of the C string first
+	var length int
+	ptr := uintptr(unsafe.Pointer(textPtr))
+	for {
+		if *(*byte)(unsafe.Pointer(ptr)) == 0 {
+			break
 		}
+		length++
+		ptr++
 	}
-	return string(buf)
+
+	if length == 0 {
+		return ""
+	}
+
+	// Create a Go byte slice from the C string
+	bytes := (*[1 << 30]byte)(unsafe.Pointer(textPtr))[:length:length]
+	return string(bytes)
 }
 
 // Batch_init creates a new batch

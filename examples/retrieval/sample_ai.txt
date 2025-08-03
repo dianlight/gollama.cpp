@@ -1,0 +1,19 @@
+Artificial Intelligence (AI) is a branch of computer science that deals with the creation of intelligent machines that work and react like humans.
+
+Machine Learning is a subset of AI that provides systems the ability to automatically learn and improve from experience without being explicitly programmed.
+
+Deep Learning is a subset of machine learning that uses artificial neural networks with multiple layers to model and understand complex patterns in data.
+
+Natural Language Processing (NLP) is a field of AI that gives computers the ability to understand, interpret, and manipulate human language.
+
+Computer Vision is an interdisciplinary field that deals with how computers can be made to gain high-level understanding from digital images or videos.
+
+Robotics is a branch of engineering that involves the conception, design, manufacture, and operation of robots.
+
+Data Science is an interdisciplinary field that uses scientific methods, processes, algorithms and systems to extract knowledge and insights from structured and unstructured data.
+
+Neural networks are computing systems vaguely inspired by the biological neural networks that constitute animal brains.
+
+Supervised learning is a type of machine learning where the algorithm learns from labeled training data to make predictions on new, unseen data.
+
+Unsupervised learning is a type of machine learning where the algorithm finds patterns in data without being explicitly told what to look for.

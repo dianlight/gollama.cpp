@@ -1,0 +1,19 @@
+Python is a high-level, interpreted programming language with dynamic semantics. Its high-level built-in data structures, combined with dynamic typing and dynamic binding, make it very attractive for Rapid Application Development.
+
+JavaScript is a programming language that conforms to the ECMAScript specification. JavaScript is high-level, often just-in-time compiled, and multi-paradigm.
+
+Go is an open source programming language that makes it easy to build simple, reliable, and efficient software. Go was designed at Google in 2007 to improve programming productivity.
+
+Rust is a multi-paradigm system programming language focused on safety, especially safe concurrency. Rust is syntactically similar to C++, but can guarantee memory safety.
+
+Java is a class-based, object-oriented programming language that is designed to have as few implementation dependencies as possible.
+
+C++ is a general-purpose programming language created as an extension of the C programming language, or "C with Classes".
+
+TypeScript is a programming language developed and maintained by Microsoft. It is a strict syntactical superset of JavaScript and adds optional static type checking.
+
+Swift is a general-purpose, multi-paradigm, compiled programming language developed by Apple Inc. for iOS, iPadOS, macOS, watchOS, and tvOS.
+
+Kotlin is a cross-platform, statically typed, general-purpose programming language with type inference developed by JetBrains.
+
+PHP is a general-purpose scripting language especially suited to web development. It was originally created by Danish-Canadian programmer Rasmus Lerdorf in 1994.

@@ -91,35 +91,36 @@ make draft-comparison  # Compare different draft lengths
 make temperature-demo  # Temperature sampling demo
 ```
 
-### 3. Speculative Decoding (`speculative/`)
-Advanced example demonstrating speculative decoding for accelerated text generation.
+### 4. Document Retrieval (`retrieval/`)
+Comprehensive document retrieval system using embedding-based semantic search.
 
 **Features:**
-- Dual-model speculative decoding with separate target and draft models
-- Same-model demonstration mode for understanding the algorithm
-- Configurable draft length for performance tuning
-- Temperature sampling support with detailed statistics
-- Verbose mode for observing the draft/verify process
-- Performance analysis showing acceptance rates and speedup
+- Multi-document semantic search using embeddings
+- Configurable text chunking with custom separators and sizes
+- Cosine similarity ranking for relevance scoring
+- Interactive query mode for exploratory research
+- Cross-domain search across multiple document types
+- Verbose mode showing internal processing steps
+- Support for various document formats and chunking strategies
 
 **Usage:**
 ```bash
-cd speculative
-go run main.go -prompt "The future of AI is"
+cd retrieval
+go run main.go -context-files "document.txt" -query "search terms"
 
-# With different models for real speedup
-go run main.go -model large.gguf -draft-model small.gguf -prompt "Your prompt"
+# Multiple files with interactive mode
+go run main.go -context-files "file1.txt,file2.txt"
 
-# Demonstration with verbose output
-go run main.go -prompt "Machine learning" -n-draft 8 -verbose
+# Custom chunking and ranking
+go run main.go -context-files "doc.txt" -chunk-size 150 -top-k 5
 
-# Run the interactive demo
+# Run comprehensive demo
 ./demo.sh
 
 # Use Makefile shortcuts
-make demo              # Full demonstration
-make draft-comparison  # Compare different draft lengths
-make temperature-demo  # Temperature sampling demo
+make ai-demo          # AI concepts retrieval
+make programming-demo # Programming languages retrieval
+make combined-demo    # Cross-domain search
 ```
 
 ## Getting Started
@@ -158,14 +159,16 @@ Most examples support these common command-line options:
 
 ## Model Requirements
 
-### Text Generation Examples
+### Text Generation Examples (simple-chat, speculative)
 - Any GGUF model that supports text generation
 - Models like LLaMA, Mistral, CodeLlama, etc.
 
-### Embedding Examples
+### Embedding Examples (embedding, retrieval)
 - GGUF models that support embedding generation
 - Some models are text-generation only and don't provide embeddings
-- Verify your model supports embeddings before using the embedding example
+- Verify your model supports embeddings before using these examples
+- Popular embedding-capable models: all-MiniLM, sentence-transformers models
+- Note: Even some chat models like TinyLlama support embeddings
 
 ## Troubleshooting
 

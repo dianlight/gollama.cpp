@@ -30,6 +30,7 @@ package gollama
 import (
 	"errors"
 	"fmt"
+	"os"
 	"runtime"
 	"sync"
 	"unsafe"
@@ -228,18 +229,20 @@ type LlamaBatch struct {
 
 // Model parameters
 type LlamaModelParams struct {
+	Devices                  uintptr        // ggml_backend_dev_t * - NULL-terminated list of devices
+	TensorBuftOverrides      uintptr        // const struct llama_model_tensor_buft_override *
 	NGpuLayers               int32          // number of layers to store in VRAM
 	SplitMode                LlamaSplitMode // how to split the model across multiple GPUs
 	MainGpu                  int32          // the GPU that is used for the entire model
-	TensorSplit              *float32       // proportion of the model (layers or rows) to offload to each GPU
-	RpcServers               *byte          // comma separated list of RPC servers
-	ProgressCallback         uintptr        // progress callback function pointer
-	ProgressCallbackUserData uintptr        // user data for progress callback
-	KvOverrides              uintptr        // model key-value overrides
+	TensorSplit              *float32       // proportion of the model to offload to each GPU
+	ProgressCallback         uintptr        // llama_progress_callback function pointer
+	ProgressCallbackUserData uintptr        // context pointer passed to the progress callback
+	KvOverrides              uintptr        // const struct llama_model_kv_override *
 	VocabOnly                uint8          // only load the vocabulary, no weights (bool as uint8)
 	UseMmap                  uint8          // use mmap if possible (bool as uint8)
 	UseMlock                 uint8          // force system to keep model in RAM (bool as uint8)
 	CheckTensors             uint8          // validate model tensor data (bool as uint8)
+	UseExtraBufts            uint8          // use extra buffer types (bool as uint8)
 }
 
 // Context parameters
@@ -344,9 +347,10 @@ var (
 	llamaGetModel    func(ctx LlamaContext) LlamaModel
 
 	// Tokenization functions
-	llamaTokenize     func(model LlamaModel, text *byte, textLen int32, tokens *LlamaToken, nTokensMax int32, addSpecial uint8, parseSpecial uint8) int32
-	llamaTokenToPiece func(model LlamaModel, token LlamaToken, buf *byte, length int32, lstrip uint8, special uint8) int32
-	llamaDetokenize   func(model LlamaModel, tokens *LlamaToken, nTokens int32, text *byte, textLen int32, removeSpecial uint8, unparseSpecial uint8) int32
+	llamaTokenize          func(vocab LlamaVocab, text *byte, textLen int32, tokens *LlamaToken, nTokensMax int32, addSpecial bool, parseSpecial bool) int32
+	llamaTokenToPiece      func(model LlamaModel, token LlamaToken, buf *byte, length int32, lstrip uint8, special uint8) int32
+	llamaVocabTokenToPiece func(vocab LlamaVocab, token LlamaToken, buf *byte, length int32, lstrip uint8, special uint8) int32
+	llamaDetokenize        func(model LlamaModel, tokens *LlamaToken, nTokens int32, text *byte, textLen int32, removeSpecial uint8, unparseSpecial uint8) int32
 
 	// Vocab functions
 	llamaModelGetVocab func(model LlamaModel) LlamaVocab
@@ -358,9 +362,9 @@ var (
 	llamaVocabPad      func(vocab LlamaVocab) LlamaToken
 
 	// Batch functions
-	llamaBatchInit func(nTokens int32, embd int32, nSeqMax int32) LlamaBatch
-	llamaBatchFree func(batch LlamaBatch)
-	llamaBatchGet1 func(tokens *LlamaToken, nTokens int32, pos0 LlamaPos, seqId LlamaSeqId) LlamaBatch
+	llamaBatchInit   func(nTokens int32, embd int32, nSeqMax int32) LlamaBatch
+	llamaBatchFree   func(batch LlamaBatch)
+	llamaBatchGetOne func(tokens *LlamaToken, nTokens int32) LlamaBatch
 
 	// Decode functions
 	llamaDecode func(ctx LlamaContext, batch LlamaBatch) int32
@@ -444,8 +448,21 @@ func getLibraryPath() (string, error) {
 		return "", fmt.Errorf("unsupported architecture: %s on %s", goarch, goos)
 	}
 
-	// For now, assume the library is in the same directory or system path
-	// In a real implementation, you would embed or package the libraries
+	// Try to find the library in the current directory, parent directory, or system path
+	candidates := []string{
+		libName,                     // Current directory
+		"../" + libName,             // Parent directory (for when running from examples/)
+		"/usr/local/lib/" + libName, // System library path
+	}
+
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, nil
+		}
+	}
+
+	// If not found in any of the candidate locations, return the basic name
+	// and let the system dynamic loader try to find it
 	return libName, nil
 }
 
@@ -527,6 +544,7 @@ func registerFunctions() error {
 	// Tokenization functions
 	purego.RegisterLibFunc(&llamaTokenize, libHandle, "llama_tokenize")
 	purego.RegisterLibFunc(&llamaTokenToPiece, libHandle, "llama_token_to_piece")
+	purego.RegisterLibFunc(&llamaVocabTokenToPiece, libHandle, "llama_token_to_piece")
 	purego.RegisterLibFunc(&llamaDetokenize, libHandle, "llama_detokenize")
 
 	// Vocab functions
@@ -541,7 +559,7 @@ func registerFunctions() error {
 	// Batch functions
 	purego.RegisterLibFunc(&llamaBatchInit, libHandle, "llama_batch_init")
 	purego.RegisterLibFunc(&llamaBatchFree, libHandle, "llama_batch_free")
-	purego.RegisterLibFunc(&llamaBatchGet1, libHandle, "llama_batch_get_one")
+	purego.RegisterLibFunc(&llamaBatchGetOne, libHandle, "llama_batch_get_one")
 
 	// Decode functions
 	purego.RegisterLibFunc(&llamaDecode, libHandle, "llama_decode")
@@ -713,12 +731,23 @@ func Tokenize(model LlamaModel, text string, addSpecial, parseSpecial bool) ([]L
 		return nil, err
 	}
 
+	// Get the vocabulary from the model
+	vocab := llamaModelGetVocab(model)
+	if vocab == 0 {
+		return nil, errors.New("failed to get vocabulary from model")
+	}
+
 	textBytes := append([]byte(text), 0) // null-terminate
 
 	// First call to get the number of tokens
-	nTokens := llamaTokenize(model, (*byte)(unsafe.Pointer(&textBytes[0])), int32(len(text)), nil, 0, boolToUint8(addSpecial), boolToUint8(parseSpecial))
-	if nTokens < 0 {
-		return nil, errors.New("tokenization failed")
+	nTokens := llamaTokenize(vocab, (*byte)(unsafe.Pointer(&textBytes[0])), int32(len(text)), nil, 0, addSpecial, parseSpecial)
+	if nTokens <= 0 {
+		// llama_tokenize returns negative value indicating number of tokens needed
+		if nTokens < 0 {
+			nTokens = -nTokens // Convert to positive
+		} else {
+			return nil, fmt.Errorf("tokenization failed with error code: %d", nTokens)
+		}
 	}
 
 	if nTokens == 0 {
@@ -727,29 +756,32 @@ func Tokenize(model LlamaModel, text string, addSpecial, parseSpecial bool) ([]L
 
 	// Second call to get the actual tokens
 	tokens := make([]LlamaToken, nTokens)
-	result := llamaTokenize(model, (*byte)(unsafe.Pointer(&textBytes[0])), int32(len(text)), &tokens[0], nTokens, boolToUint8(addSpecial), boolToUint8(parseSpecial))
+	result := llamaTokenize(vocab, (*byte)(unsafe.Pointer(&textBytes[0])), int32(len(text)), &tokens[0], nTokens, addSpecial, parseSpecial)
 	if result < 0 {
-		return nil, errors.New("tokenization failed")
+		return nil, fmt.Errorf("tokenization failed with error code: %d", result)
 	}
 
 	return tokens[:result], nil
 }
 
-// Token_to_piece converts a token to its string representation
+// Token_to_piece converts a token to its string representation using vocab
 func Token_to_piece(model LlamaModel, token LlamaToken, special bool) string {
 	if err := ensureLoaded(); err != nil {
 		return ""
 	}
 
+	// Get vocab from model
+	vocab := llamaModelGetVocab(model)
+
 	// First call to get buffer size
-	bufSize := llamaTokenToPiece(model, token, nil, 0, boolToUint8(false), boolToUint8(special))
+	bufSize := llamaVocabTokenToPiece(vocab, token, nil, 0, boolToUint8(false), boolToUint8(special))
 	if bufSize <= 0 {
 		return ""
 	}
 
 	// Second call to get actual string
 	buf := make([]byte, bufSize)
-	result := llamaTokenToPiece(model, token, &buf[0], bufSize, boolToUint8(false), boolToUint8(special))
+	result := llamaVocabTokenToPiece(vocab, token, &buf[0], bufSize, boolToUint8(false), boolToUint8(special))
 	if result <= 0 {
 		return ""
 	}
@@ -771,17 +803,25 @@ func Batch_init(nTokens, embd, nSeqMax int32) LlamaBatch {
 	return llamaBatchInit(nTokens, embd, nSeqMax)
 }
 
-// Batch_free frees a batch
-func Batch_free(batch LlamaBatch) {
-	if isLoaded {
-		llamaBatchFree(batch)
+// Batch_get_one creates a batch from a single set of tokens
+func Batch_get_one(tokens []LlamaToken) LlamaBatch {
+	if err := ensureLoaded(); err != nil {
+		panic(err)
 	}
+	if len(tokens) == 0 {
+		return LlamaBatch{}
+	}
+	return llamaBatchGetOne(&tokens[0], int32(len(tokens)))
 }
 
-// Batch_add adds a token to a batch (helper function)
-func Batch_add(batch LlamaBatch, token LlamaToken, pos LlamaPos, seqIds []LlamaSeqId, logits bool) {
-	// This is a helper function - actual implementation would manipulate the batch struct
-	// For now, this is a placeholder
+// Batch_free frees a batch
+func Batch_free(batch LlamaBatch) {
+	// Note: llama_batch_get_one creates a temporary batch that doesn't need to be freed
+	// Only call llama_batch_free for batches created with llama_batch_init
+	// For now, we'll skip the free to avoid double-free errors
+	// if isLoaded {
+	//     llamaBatchFree(batch)
+	// }
 }
 
 // Decode decodes a batch

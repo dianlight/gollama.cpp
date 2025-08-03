@@ -89,14 +89,9 @@ func main() {
 	}
 	fmt.Printf("done (%d tokens)\n", len(tokens))
 
-	// Create batch
-	batch := gollama.Batch_init(int32(len(tokens)), 0, 1)
+	// Create batch for the prompt tokens
+	batch := gollama.Batch_get_one(tokens)
 	defer gollama.Batch_free(batch)
-
-	// Add tokens to batch
-	for i, token := range tokens {
-		gollama.Batch_add(batch, token, gollama.LlamaPos(i), []gollama.LlamaSeqId{0}, i == len(tokens)-1)
-	}
 
 	// Process the prompt
 	fmt.Print("Processing prompt... ")
@@ -128,9 +123,8 @@ func main() {
 		piece := gollama.Token_to_piece(model, newToken, false)
 		fmt.Print(piece)
 
-		// Add the token to a new batch
-		batch = gollama.Batch_init(1, 0, 1)
-		gollama.Batch_add(batch, newToken, gollama.LlamaPos(nCur), []gollama.LlamaSeqId{0}, true)
+		// Create a new batch with the single token
+		batch = gollama.Batch_get_one([]gollama.LlamaToken{newToken})
 
 		// Decode the new token
 		if err := gollama.Decode(context, batch); err != nil {

@@ -69,10 +69,24 @@ func main() {
 	// Create context
 	fmt.Print("Creating context... ")
 	ctxParams := gollama.Context_default_params()
+
+	// Print default values
+	fmt.Printf("Default NSeqMax: %d\n", ctxParams.NSeqMax)
+	fmt.Printf("Default NBatch: %d\n", ctxParams.NBatch)
+	fmt.Printf("Default NUbatch: %d\n", ctxParams.NUbatch)
+
 	ctxParams.NCtx = uint32(*ctx)
-	ctxParams.NBatch = 512
+	ctxParams.NBatch = 512 // Use smaller batch size
+	// ctxParams.NUbatch = 512   // Keep default value
+	ctxParams.NSeqMax = 1 // Set max sequences to 1 for simple use case
 	ctxParams.NThreads = int32(*threads)
 	ctxParams.Logits = 1 // true as uint8
+
+	fmt.Printf("Setting context size to: %d\n", *ctx)
+	fmt.Printf("Context params NCtx: %d\n", ctxParams.NCtx)
+	fmt.Printf("Context params NBatch: %d\n", ctxParams.NBatch)
+	fmt.Printf("Context params NUbatch: %d\n", ctxParams.NUbatch)
+	fmt.Printf("Context params NSeqMax: %d\n", ctxParams.NSeqMax)
 
 	context, err := gollama.Init_from_model(model, ctxParams)
 	if err != nil {
@@ -109,18 +123,18 @@ func main() {
 
 	nCur := len(tokens)
 	for i := 0; i < *nPredict && nCur < *ctx; i++ {
-		// Get logits
-		logits := gollama.Get_logits_ith(context, -1)
-		if logits == nil {
-			log.Fatal("Failed to get logits")
-		}
+		// Sample next token directly from the context
+		// The sampler internally handles getting logits and creating token data array
+		fmt.Printf("About to sample token %d using new API\n", i)
+		fmt.Printf("Sampler: %v, Context: %v\n", sampler, context)
 
-		// Sample next token
-		candidates := gollama.Token_data_array_init(model)
-		newToken := gollama.Sampler_sample(sampler, context, candidates)
+		// Sample from the last token in the context (-1)
+		newToken := gollama.Sampler_sample(sampler, context, -1)
+		fmt.Printf("Sampled token: %d\n", newToken)
 
 		// Convert token to text
 		piece := gollama.Token_to_piece(model, newToken, false)
+		fmt.Printf("Token piece: '%s'\n", piece)
 		fmt.Print(piece)
 
 		// Create a new batch with the single token

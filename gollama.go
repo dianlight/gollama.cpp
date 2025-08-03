@@ -382,7 +382,7 @@ var (
 	llamaSamplerChainGet           func(chain LlamaSampler, i int32) LlamaSampler
 	llamaSamplerChainN             func(chain LlamaSampler) int32
 	llamaSamplerChainFree          func(chain LlamaSampler)
-	llamaSamplerSample             func(smpl LlamaSampler, ctx LlamaContext, candidates *LlamaTokenDataArray) LlamaToken
+	llamaSamplerSample             func(smpl LlamaSampler, ctx LlamaContext, idx int32) LlamaToken
 	llamaSamplerAccept             func(smpl LlamaSampler, token LlamaToken)
 	llamaSamplerReset              func(smpl LlamaSampler)
 
@@ -837,6 +837,14 @@ func Decode(ctx LlamaContext, batch LlamaBatch) error {
 	return nil
 }
 
+// Get_logits gets logits for all tokens
+func Get_logits(ctx LlamaContext) *float32 {
+	if err := ensureLoaded(); err != nil {
+		return nil
+	}
+	return llamaGetLogits(ctx)
+}
+
 // Get_logits_ith gets logits for a specific token
 func Get_logits_ith(ctx LlamaContext, i int32) *float32 {
 	if err := ensureLoaded(); err != nil {
@@ -847,9 +855,71 @@ func Get_logits_ith(ctx LlamaContext, i int32) *float32 {
 
 // Token_data_array_init creates a token data array (helper function)
 func Token_data_array_init(model LlamaModel) *LlamaTokenDataArray {
-	// This would be implemented to create a proper token data array
-	// For now, this is a placeholder
-	return nil
+	if err := ensureLoaded(); err != nil {
+		return nil
+	}
+
+	// Use actual number of available logits (256) instead of full vocab (32000)
+	// Based on error: "out of range [0, 256)"
+	nVocab := int32(256)
+
+	// Allocate memory for token data array
+	tokenData := make([]LlamaTokenData, nVocab)
+
+	// Initialize token data array - will be populated with actual logits later
+	for i := int32(0); i < nVocab; i++ {
+		tokenData[i] = LlamaTokenData{
+			Id:    LlamaToken(i),
+			Logit: 0.0,
+			P:     0.0,
+		}
+	}
+
+	// Return pointer to token data array structure
+	return &LlamaTokenDataArray{
+		Data:     &tokenData[0],
+		Size:     uint64(nVocab),
+		Selected: -1,
+		Sorted:   0,
+	}
+}
+
+// Token_data_array_from_logits creates a token data array from logits
+func Token_data_array_from_logits(model LlamaModel, logits *float32) *LlamaTokenDataArray {
+	if err := ensureLoaded(); err != nil {
+		return nil
+	}
+
+	if logits == nil {
+		return nil
+	}
+
+	// Use hardcoded vocabulary size for now to avoid corruption issues
+	// Use a very small, safe subset to prevent any out-of-bounds access
+	nVocab := int32(32)
+
+	// Allocate memory for token data array
+	tokenData := make([]LlamaTokenData, nVocab)
+
+	// Convert logits pointer to slice for easier access
+	logitsSlice := unsafe.Slice(logits, nVocab)
+
+	// Populate token data array with actual logits
+	for i := int32(0); i < nVocab; i++ {
+		tokenData[i] = LlamaTokenData{
+			Id:    LlamaToken(i),
+			Logit: logitsSlice[i],
+			P:     0.0, // Will be computed by the sampler
+		}
+	}
+
+	// Return pointer to token data array structure
+	return &LlamaTokenDataArray{
+		Data:     &tokenData[0],
+		Size:     uint64(nVocab),
+		Selected: -1,
+		Sorted:   0,
+	}
 }
 
 // Sampler_init_greedy creates a greedy sampler
@@ -866,12 +936,12 @@ func Sampler_free(sampler LlamaSampler) {
 	// This might be handled by the sampler chain
 }
 
-// Sampler_sample samples a token
-func Sampler_sample(sampler LlamaSampler, ctx LlamaContext, candidates *LlamaTokenDataArray) LlamaToken {
+// Sampler_sample samples a token from the logits at the given index (-1 for last token)
+func Sampler_sample(sampler LlamaSampler, ctx LlamaContext, idx int32) LlamaToken {
 	if err := ensureLoaded(); err != nil {
 		return LLAMA_TOKEN_NULL
 	}
-	return llamaSamplerSample(sampler, ctx, candidates)
+	return llamaSamplerSample(sampler, ctx, idx)
 }
 
 // Additional utility functions

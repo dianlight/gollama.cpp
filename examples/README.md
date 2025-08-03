@@ -156,6 +156,41 @@ make tech-demo    # Technology concepts demo
 
 **Note:** This is a simplified demonstration that generates sequences sequentially to illustrate batched generation concepts. A full implementation would require true parallel batch processing with advanced batch management.
 
+### 6. Diffusion Generation (`diffusion/`)
+Conceptual demonstration of diffusion-based text generation principles using iterative token refinement.
+
+**Features:**
+- Iterative token refinement through multiple diffusion steps
+- Multiple confidence algorithms (confidence-based, entropy-based, margin-based, random)
+- Visual mode showing real-time generation progress
+- Configurable transfer scheduling and step parameters
+- Educational demonstration of diffusion model concepts
+- Performance analysis and step-by-step verbose output
+
+**Usage:**
+```bash
+cd diffusion
+go run main.go -prompt "The future of AI" -diffusion-steps 10
+
+# Visual mode with real-time progress
+go run main.go -prompt "Machine learning" -diffusion-visual -diffusion-steps 8
+
+# Compare different algorithms
+go run main.go -prompt "Technology advances" -diffusion-algorithm 1 -verbose
+
+# Run the interactive demo
+./demo.sh
+
+# Use Makefile shortcuts
+make demo              # Comprehensive demo
+make visual-demo       # Interactive visual generation
+make confidence-demo   # Confidence-based algorithm
+make entropy-demo      # Entropy-based algorithm
+make interactive       # Interactive prompt input
+```
+
+**Note:** This is a conceptual demonstration of diffusion principles. A full implementation would require specialized diffusion model architectures and non-causal attention mechanisms not available in standard chat models.
+
 ## Getting Started
 
 ### Prerequisites

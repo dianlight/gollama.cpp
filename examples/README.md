@@ -60,6 +60,68 @@ go run main.go -prompt "Hello World!" -output-format json
 ./demo.sh
 ```
 
+### 3. Speculative Decoding (`speculative/`)
+Advanced example demonstrating speculative decoding for accelerated text generation.
+
+**Features:**
+- Dual-model speculative decoding with separate target and draft models
+- Same-model demonstration mode for understanding the algorithm
+- Configurable draft length for performance tuning
+- Temperature sampling support with detailed statistics
+- Verbose mode for observing the draft/verify process
+- Performance analysis showing acceptance rates and speedup
+
+**Usage:**
+```bash
+cd speculative
+go run main.go -prompt "The future of AI is"
+
+# With different models for real speedup
+go run main.go -model large.gguf -draft-model small.gguf -prompt "Your prompt"
+
+# Demonstration with verbose output
+go run main.go -prompt "Machine learning" -n-draft 8 -verbose
+
+# Run the interactive demo
+./demo.sh
+
+# Use Makefile shortcuts
+make demo              # Full demonstration
+make draft-comparison  # Compare different draft lengths
+make temperature-demo  # Temperature sampling demo
+```
+
+### 3. Speculative Decoding (`speculative/`)
+Advanced example demonstrating speculative decoding for accelerated text generation.
+
+**Features:**
+- Dual-model speculative decoding with separate target and draft models
+- Same-model demonstration mode for understanding the algorithm
+- Configurable draft length for performance tuning
+- Temperature sampling support with detailed statistics
+- Verbose mode for observing the draft/verify process
+- Performance analysis showing acceptance rates and speedup
+
+**Usage:**
+```bash
+cd speculative
+go run main.go -prompt "The future of AI is"
+
+# With different models for real speedup
+go run main.go -model large.gguf -draft-model small.gguf -prompt "Your prompt"
+
+# Demonstration with verbose output
+go run main.go -prompt "Machine learning" -n-draft 8 -verbose
+
+# Run the interactive demo
+./demo.sh
+
+# Use Makefile shortcuts
+make demo              # Full demonstration
+make draft-comparison  # Compare different draft lengths
+make temperature-demo  # Temperature sampling demo
+```
+
 ## Getting Started
 
 ### Prerequisites

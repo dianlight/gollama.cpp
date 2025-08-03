@@ -167,7 +167,15 @@ build-llamacpp-darwin-amd64:
 	cd $(LLAMA_CPP_DIR) && \
 	cmake -B build-darwin-amd64 -DCMAKE_OSX_ARCHITECTURES=x86_64 -DGGML_METAL=ON -DBUILD_SHARED_LIBS=ON && \
 	cmake --build build-darwin-amd64 --config Release -j$$(sysctl -n hw.ncpu) && \
-	cp build-darwin-amd64/bin/libllama.dylib ../../$(LIB_DIR)/darwin_amd64/
+	cp build-darwin-amd64/bin/*.dylib ../../$(LIB_DIR)/darwin_amd64/ && \
+	for lib in ../../$(LIB_DIR)/darwin_amd64/*.dylib; do \
+		install_name_tool -id "@rpath/$$(basename $$lib)" "$$lib"; \
+		for dep in ../../$(LIB_DIR)/darwin_amd64/*.dylib; do \
+			if [ "$$lib" != "$$dep" ]; then \
+				install_name_tool -change "$$(otool -L $$lib | grep $$(basename $$dep) | awk '{print $$1}')" "@rpath/$$(basename $$dep)" "$$lib" 2>/dev/null || true; \
+			fi; \
+		done; \
+	done
 
 .PHONY: build-llamacpp-darwin-arm64
 build-llamacpp-darwin-arm64:
@@ -176,7 +184,15 @@ build-llamacpp-darwin-arm64:
 	cd $(LLAMA_CPP_DIR) && \
 	cmake -B build-darwin-arm64 -DCMAKE_OSX_ARCHITECTURES=arm64 -DGGML_METAL=ON -DBUILD_SHARED_LIBS=ON && \
 	cmake --build build-darwin-arm64 --config Release -j$$(sysctl -n hw.ncpu) && \
-	cp build-darwin-arm64/bin/libllama.dylib ../../$(LIB_DIR)/darwin_arm64/
+	cp build-darwin-arm64/bin/*.dylib ../../$(LIB_DIR)/darwin_arm64/ && \
+	for lib in ../../$(LIB_DIR)/darwin_arm64/*.dylib; do \
+		install_name_tool -id "@rpath/$$(basename $$lib)" "$$lib"; \
+		for dep in ../../$(LIB_DIR)/darwin_arm64/*.dylib; do \
+			if [ "$$lib" != "$$dep" ]; then \
+				install_name_tool -change "$$(otool -L $$lib | grep $$(basename $$dep) | awk '{print $$1}')" "@rpath/$$(basename $$dep)" "$$lib" 2>/dev/null || true; \
+			fi; \
+		done; \
+	done
 
 # Linux builds
 .PHONY: build-llamacpp-linux-amd64
@@ -186,7 +202,15 @@ build-llamacpp-linux-amd64:
 	cd $(LLAMA_CPP_DIR) && \
 	cmake -B build-linux-amd64 -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON && \
 	cmake --build build-linux-amd64 --config Release -j$$(nproc) && \
-	cp build-linux-amd64/bin/libllama.so ../../$(LIB_DIR)/linux_amd64/
+	cp build-linux-amd64/bin/lib*.so ../../$(LIB_DIR)/linux_amd64/ && \
+	for lib in ../../$(LIB_DIR)/linux_amd64/*.so; do \
+		patchelf --set-soname "$$(basename $$lib)" "$$lib"; \
+		for dep in ../../$(LIB_DIR)/linux_amd64/*.so; do \
+			if [ "$$lib" != "$$dep" ]; then \
+				patchelf --replace-needed "$$(basename $$dep)" "$$(basename $$dep)" "$$lib" 2>/dev/null || true; \
+			fi; \
+		done; \
+	done
 
 .PHONY: build-llamacpp-linux-arm64
 build-llamacpp-linux-arm64:
@@ -195,7 +219,15 @@ build-llamacpp-linux-arm64:
 	cd $(LLAMA_CPP_DIR) && \
 	cmake -B build-linux-arm64 -DCMAKE_SYSTEM_PROCESSOR=aarch64 -DBUILD_SHARED_LIBS=ON && \
 	cmake --build build-linux-arm64 --config Release -j$$(nproc) && \
-	cp build-linux-arm64/bin/libllama.so ../../$(LIB_DIR)/linux_arm64/
+	cp build-linux-arm64/bin/lib*.so ../../$(LIB_DIR)/linux_arm64/ && \
+	for lib in ../../$(LIB_DIR)/linux_arm64/*.so; do \
+		patchelf --set-soname "$$(basename $$lib)" "$$lib"; \
+		for dep in ../../$(LIB_DIR)/linux_arm64/*.so; do \
+			if [ "$$lib" != "$$dep" ]; then \
+				patchelf --replace-needed "$$(basename $$dep)" "$$(basename $$dep)" "$$lib" 2>/dev/null || true; \
+			fi; \
+		done; \
+	done
 
 # Windows builds (require cross-compilation setup)
 .PHONY: build-llamacpp-windows-amd64
@@ -203,18 +235,18 @@ build-llamacpp-windows-amd64:
 	@echo "Building llama.cpp for Windows x86_64"
 	mkdir -p $(LIB_DIR)/windows_amd64
 	cd $(LLAMA_CPP_DIR) && \
-	cmake -B build-windows-amd64 -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON -DCMAKE_TOOLCHAIN_FILE=cmake/x86_64-w64-mingw32.cmake && \
+	cmake -B build-windows-amd64 -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON -DCMAKE_TOOLCHAIN_FILE=cmake/x64-windows-llvm.cmake && \
 	cmake --build build-windows-amd64 --config Release -j$$(nproc) && \
-	cp build-windows-amd64/bin/llama.dll ../../$(LIB_DIR)/windows_amd64/
+	cp build-windows-amd64/bin/*.dll ../../$(LIB_DIR)/windows_amd64/
 
 .PHONY: build-llamacpp-windows-arm64
 build-llamacpp-windows-arm64:
 	@echo "Building llama.cpp for Windows ARM64"
 	mkdir -p $(LIB_DIR)/windows_arm64
 	cd $(LLAMA_CPP_DIR) && \
-	cmake -B build-windows-arm64 -DBUILD_SHARED_LIBS=ON -DCMAKE_TOOLCHAIN_FILE=cmake/aarch64-w64-mingw32.cmake && \
+	cmake -B build-windows-arm64 -DBUILD_SHARED_LIBS=ON -DCMAKE_TOOLCHAIN_FILE=cmake/arm64-windows-llvm.cmake && \
 	cmake --build build-windows-arm64 --config Release -j$$(nproc) && \
-	cp build-windows-arm64/bin/llama.dll ../../$(LIB_DIR)/windows_arm64/
+	cp build-windows-arm64/bin/*.dll ../../$(LIB_DIR)/windows_arm64/
 
 # Build libraries with GPU support
 .PHONY: build-libs-gpu

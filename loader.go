@@ -161,7 +161,7 @@ func (l *LibraryLoader) loadSharedLibrary(path string) (uintptr, error) {
 	case "windows":
 		// On Windows, we would use LoadLibrary
 		// For now, return an error as Windows support is not fully implemented
-		return 0, fmt.Errorf("Windows support not yet implemented")
+		return 0, fmt.Errorf("support for windows platform not yet implemented")
 	default:
 		// On Unix-like systems, use purego's Dlopen
 		return purego.Dlopen(path, purego.RTLD_NOW|purego.RTLD_GLOBAL)

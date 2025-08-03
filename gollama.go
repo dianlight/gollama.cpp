@@ -467,7 +467,7 @@ func loadLibrary() error {
 	if runtime.GOOS == "windows" {
 		// On Windows, use LoadLibrary via syscall
 		// This would need to be implemented with proper Windows API calls
-		return errors.New("Windows support not yet implemented")
+		return errors.New("support for windows platform not yet implemented")
 	} else {
 		// On Unix-like systems, use purego's Dlopen
 		handle, err = purego.Dlopen(libPath, purego.RTLD_NOW|purego.RTLD_GLOBAL)

@@ -52,8 +52,8 @@ var (
 	ErrBackendInitFailed   = errors.New("backend initialization failed")
 	ErrGPUNotAvailable     = errors.New("GPU not available")
 	ErrCUDANotAvailable    = errors.New("CUDA not available")
-	ErrMetalNotAvailable   = errors.New("Metal not available")
-	ErrVulkanNotAvailable  = errors.New("Vulkan not available")
+	ErrMetalNotAvailable   = errors.New("metal backend not available")
+	ErrVulkanNotAvailable  = errors.New("vulkan backend not available")
 
 	// File I/O errors
 	ErrFileNotFound      = errors.New("file not found")

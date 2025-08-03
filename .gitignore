@@ -5,3 +5,5 @@ models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf
 libs/darwin_*
 libs/linux_*
 libs/windows_*
+examples/gen-docs/test-output/
+examples/gen-docs/validate-test/

@@ -313,15 +313,25 @@ install-tools:
 # Download model file
 .PHONY: model_download
 model_download:
-	@echo "Downloading tinyllama-1.1b-chat-v1.0.Q2_K.gguf model"
+	@echo "Downloading models"
 	@mkdir -p models
 	@if [ ! -f "models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf" ]; then \
-		echo "Downloading model from Hugging Face..."; \
-		curl -L -o models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf \
-			"https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q2_K.gguf"; \
-		echo "Model downloaded successfully"; \
+		echo "Downloading TinyLlama model using llama.cpp hf.sh script..."; \
+		cd $(LLAMA_CPP_DIR) && \
+		./scripts/hf.sh --repo TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF --file tinyllama-1.1b-chat-v1.0.Q2_K.gguf; \
+		mv tinyllama-1.1b-chat-v1.0.Q2_K.gguf ../../models/; \
+		echo "TinyLlama model downloaded successfully"; \
 	else \
-		echo "Model already exists in models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf"; \
+		echo "TinyLlama model already exists in models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf"; \
+	fi
+	@if [ ! -f "models/gritlm-7b_q4_1.gguf" ]; then \
+		echo "Downloading GritLM model using llama.cpp hf.sh script..."; \
+		cd $(LLAMA_CPP_DIR) && \
+		./scripts/hf.sh --repo cohesionet/GritLM-7B_gguf --file gritlm-7b_q4_1.gguf; \
+		mv gritlm-7b_q4_1.gguf ../../models/; \
+		echo "GritLM model downloaded successfully"; \
+	else \
+		echo "GritLM model already exists in models/gritlm-7b_q4_1.gguf"; \
 	fi
 
 # Show version information

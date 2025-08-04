@@ -200,17 +200,20 @@ build-llamacpp-darwin-arm64:
 .PHONY: build-llamacpp-linux-amd64
 build-llamacpp-linux-amd64:
 	@echo "Building llama.cpp for Linux x86_64"
-	@echo "Checking for CUDA SDK availability..."
+	@echo "Checking for GPU SDK availability..."
 	@if [ -d "/usr/local/cuda" ] || [ -d "/opt/cuda" ] || command -v nvcc >/dev/null 2>&1; then \
 		echo "CUDA SDK found - building with CUDA support"; \
-		CUDA_FLAG="-DGGML_CUDA=ON"; \
+		GPU_FLAGS="-DGGML_CUDA=ON"; \
+	elif [ -d "/opt/rocm" ] || [ -d "/usr/local/rocm" ] || command -v hipcc >/dev/null 2>&1; then \
+		echo "ROCm/HIP SDK found - building with AMD GPU support"; \
+		GPU_FLAGS="-DGGML_HIP=ON"; \
 	else \
-		echo "CUDA SDK not found - building CPU-only version"; \
-		CUDA_FLAG="-DGGML_CUDA=OFF"; \
+		echo "No GPU SDK found - building CPU-only version"; \
+		GPU_FLAGS="-DGGML_CUDA=OFF -DGGML_HIP=OFF"; \
 	fi; \
 	mkdir -p $(LIB_DIR)/linux_amd64; \
 	cd $(LLAMA_CPP_DIR) && \
-	cmake -B build-linux-amd64 $$CUDA_FLAG -DBUILD_SHARED_LIBS=ON && \
+	cmake -B build-linux-amd64 $$GPU_FLAGS -DBUILD_SHARED_LIBS=ON && \
 	cmake --build build-linux-amd64 --config Release -j$$(nproc) && \
 	cp build-linux-amd64/bin/lib*.so ../../$(LIB_DIR)/linux_amd64/ && \
 	for lib in ../../$(LIB_DIR)/linux_amd64/*.so; do \
@@ -225,17 +228,20 @@ build-llamacpp-linux-amd64:
 .PHONY: build-llamacpp-linux-arm64
 build-llamacpp-linux-arm64:
 	@echo "Building llama.cpp for Linux ARM64"
-	@echo "Checking for CUDA SDK availability..."
+	@echo "Checking for GPU SDK availability..."
 	@if [ -d "/usr/local/cuda" ] || [ -d "/opt/cuda" ] || command -v nvcc >/dev/null 2>&1; then \
 		echo "CUDA SDK found - building with CUDA support"; \
-		CUDA_FLAG="-DGGML_CUDA=ON"; \
+		GPU_FLAGS="-DGGML_CUDA=ON"; \
+	elif [ -d "/opt/rocm" ] || [ -d "/usr/local/rocm" ] || command -v hipcc >/dev/null 2>&1; then \
+		echo "ROCm/HIP SDK found - building with AMD GPU support"; \
+		GPU_FLAGS="-DGGML_HIP=ON"; \
 	else \
-		echo "CUDA SDK not found - building CPU-only version"; \
-		CUDA_FLAG="-DGGML_CUDA=OFF"; \
+		echo "No GPU SDK found - building CPU-only version"; \
+		GPU_FLAGS="-DGGML_CUDA=OFF -DGGML_HIP=OFF"; \
 	fi; \
 	mkdir -p $(LIB_DIR)/linux_arm64; \
 	cd $(LLAMA_CPP_DIR) && \
-	cmake -B build-linux-arm64 -DCMAKE_SYSTEM_PROCESSOR=aarch64 $$CUDA_FLAG -DBUILD_SHARED_LIBS=ON && \
+	cmake -B build-linux-arm64 -DCMAKE_SYSTEM_PROCESSOR=aarch64 $$GPU_FLAGS -DBUILD_SHARED_LIBS=ON && \
 	cmake --build build-linux-arm64 --config Release -j$$(nproc) && \
 	cp build-linux-arm64/bin/lib*.so ../../$(LIB_DIR)/linux_arm64/ && \
 	for lib in ../../$(LIB_DIR)/linux_arm64/*.so; do \
@@ -272,7 +278,7 @@ build-libs-gpu: clone-llamacpp
 	@echo "Building llama.cpp libraries with GPU support"
 	$(MAKE) build-llamacpp-darwin-amd64  # Metal support
 	$(MAKE) build-llamacpp-darwin-arm64  # Metal support
-	$(MAKE) build-llamacpp-linux-amd64   # CUDA support
+	$(MAKE) build-llamacpp-linux-amd64   # Auto-detect CUDA/HIP support
 	$(MAKE) build-llamacpp-windows-amd64 # CUDA support
 
 # Build CPU-only libraries
@@ -285,10 +291,29 @@ build-libs-cpu: clone-llamacpp
 		echo "Building CPU-only library for $$os/$$arch"; \
 		mkdir -p $(LIB_DIR)/$$os\_$$arch; \
 		cd $(LLAMA_CPP_DIR) && \
-		cmake -B build-$$os-$$arch-cpu -DBUILD_SHARED_LIBS=ON -DGGML_CUDA=OFF -DGGML_METAL=OFF && \
+		cmake -B build-$$os-$$arch-cpu -DBUILD_SHARED_LIBS=ON -DGGML_CUDA=OFF -DGGML_HIP=OFF -DGGML_METAL=OFF && \
 		cmake --build build-$$os-$$arch-cpu --config Release && \
 		cp build-$$os-$$arch-cpu/src/lib* ../../$(LIB_DIR)/$$os\_$$arch/ 2>/dev/null || true; \
 		cp build-$$os-$$arch-cpu/src/*.dll ../../$(LIB_DIR)/$$os\_$$arch/ 2>/dev/null || true; \
+	done
+
+# Force HIP/AMD GPU build for testing (requires ROCm)
+.PHONY: build-llamacpp-linux-amd64-hip
+build-llamacpp-linux-amd64-hip: clone-llamacpp
+	@echo "Building llama.cpp for Linux x86_64 with forced HIP/AMD GPU support"
+	@echo "Note: This requires ROCm SDK to be installed"
+	mkdir -p $(LIB_DIR)/linux_amd64
+	cd $(LLAMA_CPP_DIR) && \
+	cmake -B build-linux-amd64-hip -DGGML_HIP=ON -DGGML_CUDA=OFF -DBUILD_SHARED_LIBS=ON && \
+	cmake --build build-linux-amd64-hip --config Release -j$$(nproc) && \
+	cp build-linux-amd64-hip/bin/lib*.so ../../$(LIB_DIR)/linux_amd64/ && \
+	for lib in ../../$(LIB_DIR)/linux_amd64/*.so; do \
+		patchelf --set-soname "$$(basename $$lib)" "$$lib"; \
+		for dep in ../../$(LIB_DIR)/linux_amd64/*.so; do \
+			if [ "$$lib" != "$$dep" ]; then \
+				patchelf --replace-needed "$$(basename $$dep)" "$$(basename $$dep)" "$$lib" 2>/dev/null || true; \
+			fi; \
+		done; \
 	done
 
 # Package releases
@@ -374,10 +399,11 @@ help:
 	@echo "  clean              Clean all build artifacts"
 	@echo ""
 	@echo "Library building:"
-	@echo "  build-llamacpp-current    Build llama.cpp for current platform"
-	@echo "  build-llamacpp-all        Build llama.cpp for all platforms"
-	@echo "  build-libs-gpu            Build libraries with GPU support"
-	@echo "  build-libs-cpu            Build CPU-only libraries"
+	@echo "  build-llamacpp-current       Build llama.cpp for current platform"
+	@echo "  build-llamacpp-all           Build llama.cpp for all platforms"
+	@echo "  build-libs-gpu               Build libraries with GPU support (auto-detect CUDA/HIP)"
+	@echo "  build-libs-cpu               Build CPU-only libraries"
+	@echo "  build-llamacpp-linux-amd64-hip  Force HIP/AMD GPU build (requires ROCm)"
 	@echo ""
 	@echo "Quality assurance:"
 	@echo "  check              Run all checks (fmt, vet, lint, sec, test)"

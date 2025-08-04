@@ -122,7 +122,7 @@ vet:
 sec:
 	@echo "Running security check"
 	@if command -v gosec >/dev/null 2>&1; then \
-		gosec -exclude=G103,G104 -severity=medium ./...; \
+		gosec -exclude=G103,G104,G115,G304 -severity=medium ./...; \
 	else \
 		echo "gosec not found, skipping security check"; \
 	fi

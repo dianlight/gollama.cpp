@@ -180,6 +180,12 @@ func main() {
 	if config.Threads > math.MaxInt32 || config.Threads < math.MinInt32 {
 		log.Fatalf("threads count %d is out of range for int32", config.Threads)
 	}
+	if config.ContextSize > math.MaxUint32 || config.ContextSize < 0 {
+		log.Fatalf("context size %d is out of range for uint32", config.ContextSize)
+	}
+	if config.MaxLength > math.MaxUint32 || config.MaxLength < 0 {
+		log.Fatalf("max length %d is out of range for uint32", config.MaxLength)
+	}
 	contextParams.NCtx = uint32(config.ContextSize)
 	contextParams.NBatch = uint32(config.MaxLength)
 	contextParams.NThreads = int32(config.Threads)

@@ -1,6 +1,7 @@
 package gollama
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -73,13 +74,88 @@ func TestLibraryLoader_LoadSharedLibrary(t *testing.T) {
 	})
 }
 
-func TestLibraryLoader_ExtractEmbeddedLibrary(t *testing.T) {
+func TestLibraryLoader_ExtractEmbeddedLibraries(t *testing.T) {
 	loader := &LibraryLoader{}
 
-	t.Run("Non-existent embedded library", func(t *testing.T) {
-		_, err := loader.extractEmbeddedLibrary("nonexistent.so")
+	t.Run("Non-existent embedded libraries", func(t *testing.T) {
+		_, err := loader.extractEmbeddedLibraries()
+		// The test may succeed if libraries are actually present in the embedded filesystem
 		if err == nil {
-			t.Error("Expected error for non-existent library, but got none")
+			t.Log("extractEmbeddedLibraries succeeded - embedded libraries are present")
+			// Clean up if extraction succeeded
+			if loader.tempDir != "" {
+				os.RemoveAll(loader.tempDir)
+				loader.tempDir = ""
+			}
+		} else {
+			t.Logf("extractEmbeddedLibraries failed as expected when no libraries present: %v", err)
+		}
+	})
+
+	t.Run("Platform-specific library sets", func(t *testing.T) {
+		// Test that the function knows about expected libraries for current platform
+		goos := runtime.GOOS
+		goarch := runtime.GOARCH
+
+		// Define expected library patterns for verification
+		expectedPatterns := map[string]map[string][]string{
+			"darwin": {
+				"amd64": {"libggml.dylib", "libllama.dylib"},
+				"arm64": {"libggml.dylib", "libllama.dylib"},
+			},
+			"linux": {
+				"amd64": {"libggml.so", "libllama.so"},
+				"arm64": {"libggml.so", "libllama.so"},
+			},
+			"windows": {
+				"amd64": {"ggml.dll", "llama.dll"},
+				"arm64": {"ggml.dll", "llama.dll"},
+			},
+		}
+
+		if patterns, exists := expectedPatterns[goos]; exists {
+			if archPatterns, exists := patterns[goarch]; exists {
+				// The function should fail (no embedded files), but it should know the platform
+				mainLibPath, err := loader.extractEmbeddedLibraries()
+				if err == nil {
+					t.Log("extractEmbeddedLibraries succeeded - libraries may be present")
+
+					// Verify that main library path is correct
+					expectedMainLib, _ := loader.getLibraryName()
+					if filepath.Base(mainLibPath) != expectedMainLib {
+						t.Errorf("Main library path mismatch: got %s, expected to end with %s", mainLibPath, expectedMainLib)
+					}
+
+					// Verify temporary directory contains expected files
+					if loader.tempDir != "" {
+						files, err := os.ReadDir(loader.tempDir)
+						if err == nil {
+							t.Logf("Extracted %d files to %s", len(files), loader.tempDir)
+							for _, file := range files {
+								t.Logf("  - %s", file.Name())
+							}
+						}
+
+						// Clean up
+						os.RemoveAll(loader.tempDir)
+						loader.tempDir = ""
+					}
+				} else {
+					// Verify the error message indicates missing libraries, not unsupported platform
+					if err.Error() == fmt.Sprintf("unsupported OS: %s", goos) ||
+						err.Error() == fmt.Sprintf("unsupported architecture %s for OS %s", goarch, goos) {
+						t.Errorf("Platform should be supported: %s_%s", goos, goarch)
+					} else {
+						t.Logf("Expected failure for missing libraries: %v", err)
+					}
+				}
+
+				t.Logf("Platform %s_%s expects libraries: %v", goos, goarch, archPatterns)
+			} else {
+				t.Logf("Architecture %s not defined for platform %s", goarch, goos)
+			}
+		} else {
+			t.Logf("Platform %s not in expected patterns", goos)
 		}
 	})
 }
@@ -298,7 +374,7 @@ func TestGlobalFunctions(t *testing.T) {
 	})
 }
 
-func TestLibraryLoader_ExtractEmbeddedLibraryWriteFailure(t *testing.T) {
+func TestLibraryLoader_ExtractEmbeddedLibrariesWriteFailure(t *testing.T) {
 	loader := &LibraryLoader{}
 
 	t.Run("Write to read-only directory", func(t *testing.T) {
@@ -318,11 +394,11 @@ func TestLibraryLoader_ExtractEmbeddedLibraryWriteFailure(t *testing.T) {
 
 		// This test is OS-dependent and may not work reliably
 		// We'll just verify the function doesn't panic
-		_, err = loader.extractEmbeddedLibrary("test.so")
+		_, err = loader.extractEmbeddedLibraries()
 		if err == nil {
-			t.Log("extractEmbeddedLibrary succeeded unexpectedly")
+			t.Log("extractEmbeddedLibraries succeeded unexpectedly")
 		} else {
-			t.Logf("extractEmbeddedLibrary failed as expected: %v", err)
+			t.Logf("extractEmbeddedLibraries failed as expected: %v", err)
 		}
 	})
 }

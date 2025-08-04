@@ -421,6 +421,7 @@ help:
 	@echo "  model_download     Download tinyllama-1.1b-chat-v1.0.Q2_K.gguf model"
 	@echo "  install-tools      Install development tools"
 	@echo "  version            Show version information"
+	@echo "  gpu-info           Show GPU detection information"
 	@echo "  help               Show this help"
 	@echo ""
 	@echo "Variables:"
@@ -428,3 +429,53 @@ help:
 	@echo "  LLAMA_CPP_BUILD=$(LLAMA_CPP_BUILD)"
 	@echo "  GOOS=$(GOOS)"
 	@echo "  GOARCH=$(GOARCH)"
+
+# Show GPU detection information
+.PHONY: gpu-info
+gpu-info:
+	@echo "GPU Detection Information:"
+	@echo "========================="
+	@echo ""
+	@echo "CUDA Detection:"
+	@if command -v nvcc >/dev/null 2>&1; then \
+		echo "  ✅ nvcc found: $$(nvcc --version | grep 'release' | awk '{print $$6}')"; \
+		echo "  📍 Location: $$(which nvcc)"; \
+	else \
+		echo "  ❌ nvcc not found in PATH"; \
+	fi
+	@if [ -n "$$CUDA_PATH" ]; then \
+		echo "  📍 CUDA_PATH: $$CUDA_PATH"; \
+	else \
+		echo "  ❌ CUDA_PATH not set"; \
+	fi
+	@echo ""
+	@echo "HIP Detection:"
+	@if command -v hipconfig >/dev/null 2>&1; then \
+		echo "  ✅ hipconfig found: $$(hipconfig --version 2>/dev/null || echo 'version unknown')"; \
+		echo "  📍 Location: $$(which hipconfig)"; \
+		if [ -x "$$(which hipconfig)" ]; then \
+			echo "  🎯 Platform: $$(hipconfig --platform 2>/dev/null || echo 'unknown')"; \
+		fi \
+	else \
+		echo "  ❌ hipconfig not found in PATH"; \
+	fi
+	@if [ -n "$$ROCM_PATH" ]; then \
+		echo "  📍 ROCM_PATH: $$ROCM_PATH"; \
+	else \
+		echo "  ❌ ROCM_PATH not set"; \
+	fi
+	@echo ""
+	@echo "Current Platform: $(GOOS)/$(GOARCH)"
+	@echo ""
+	@echo "Build Configuration (for $(GOOS)-$(GOARCH)):"
+	@if [ "$(GOOS)" = "darwin" ]; then \
+		echo "  🍎 Metal: Always enabled on macOS"; \
+	elif [ "$(GOOS)" = "linux" ] || [ "$(GOOS)" = "windows" ]; then \
+		if command -v nvcc >/dev/null 2>&1 || [ -n "$$CUDA_PATH" ]; then \
+			echo "  🚀 CUDA: Will be enabled"; \
+		elif command -v hipconfig >/dev/null 2>&1 || [ -n "$$ROCM_PATH" ]; then \
+			echo "  🔥 HIP: Will be enabled"; \
+		else \
+			echo "  💻 CPU: Will be used (no GPU SDK detected)"; \
+		fi \
+	fi

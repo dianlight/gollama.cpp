@@ -116,26 +116,34 @@ jobs:
     strategy:
       matrix:
         include:
+          # Linux builds with auto-detection for CUDA/HIP/CPU-only
           - os: ubuntu-latest
             platform: linux
             arch: amd64
-            cmake_flags: -DGGML_CUDA=ON
+            gpu_type: auto-detect
+            description: "Auto-detect CUDA/HIP or CPU-only"
           - os: ubuntu-latest
             platform: linux
             arch: arm64
-            cmake_flags: -DCMAKE_SYSTEM_PROCESSOR=aarch64
+            gpu_type: auto-detect
+            description: "Auto-detect CUDA/HIP or CPU-only"
+          # macOS builds with Metal support
           - os: macos-latest
             platform: darwin
             arch: amd64
-            cmake_flags: -DCMAKE_OSX_ARCHITECTURES=x86_64 -DGGML_METAL=ON
+            gpu_type: metal
+            description: "Metal GPU acceleration"
           - os: macos-latest
             platform: darwin
             arch: arm64
-            cmake_flags: -DCMAKE_OSX_ARCHITECTURES=arm64 -DGGML_METAL=ON
+            gpu_type: metal
+            description: "Metal GPU acceleration"
+          # Windows builds with CUDA support
           - os: windows-latest
             platform: windows
             arch: amd64
-            cmake_flags: -DGGML_CUDA=ON
+            gpu_type: cuda
+            description: "CUDA GPU acceleration"
     
     steps:
     - name: Checkout code
@@ -155,6 +163,8 @@ jobs:
         if [[ "${{ matrix.arch }}" == "arm64" ]]; then
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
         fi
+        # Note: CUDA and ROCm SDKs are auto-detected by the Makefile
+        # No need to install them in CI as they're optional
 
     - name: Install dependencies (macOS)
       if: matrix.platform == 'darwin'
@@ -166,8 +176,8 @@ jobs:
       run: |
         choco install cmake
 
-    - name: Set up CUDA (Linux/Windows)
-      if: contains(matrix.cmake_flags, 'CUDA=ON')
+    - name: Set up CUDA (Windows only)
+      if: matrix.platform == 'windows' && matrix.gpu_type == 'cuda'
       uses: Jimver/cuda-toolkit@7263c89f6aa4f1c5247a0947b8e9f8eedfce66a5 # v0.2.26
       with:
         cuda: '12.0.0'
@@ -176,6 +186,7 @@ jobs:
       env:
         LLAMA_CPP_BUILD: ${{ env.LLAMA_CPP_BUILD }}
       run: |
+        echo "Building for ${{ matrix.platform }}-${{ matrix.arch }} with ${{ matrix.description }}"
         make clone-llamacpp
         make build-llamacpp-${{ matrix.platform }}-${{ matrix.arch }}
 
@@ -184,6 +195,41 @@ jobs:
       with:
         name: libs-${{ matrix.platform }}-${{ matrix.arch }}
         path: libs/${{ matrix.platform }}_${{ matrix.arch }}/
+
+  test-hip:
+    name: Test HIP Support
+    runs-on: ubuntu-latest
+    needs: build-libs
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'test-hip')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+    
+    - name: Install ROCm (HIP) SDK
+      run: |
+        wget -q -O - https://repo.radeon.com/rocm/rocm.gpg.key | sudo apt-key add -
+        echo 'deb [arch=amd64] https://repo.radeon.com/rocm/apt/debian/ ubuntu main' | sudo tee /etc/apt/sources.list.d/rocm.list
+        sudo apt-get update
+        sudo apt-get install -y rocm-dev hip-dev
+        echo "/opt/rocm/bin" >> $GITHUB_PATH
+        echo "ROCM_PATH=/opt/rocm" >> $GITHUB_ENV
+    
+    - name: Test HIP detection
+      run: |
+        echo "Testing HIP detection and build configuration..."
+        make clone-llamacpp
+        # This should detect HIP and configure build accordingly
+        cd build/llama.cpp/build-linux-amd64
+        if cmake --version >/dev/null 2>&1; then
+          cmake .. -DGGML_HIP=ON 2>&1 | tee hip-config.log
+          if grep -q "HIP found" hip-config.log; then
+            echo "✅ HIP detected successfully"
+          else
+            echo "❌ HIP detection failed"
+            exit 1
+          fi
+        fi
 
   build:
     name: Build Go Bindings
@@ -234,7 +280,7 @@ jobs:
     name: Create Release
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    needs: [build, build-libs]
+    needs: [build, build-libs, test-hip]
     
     steps:
     - name: Checkout code

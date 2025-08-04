@@ -108,14 +108,34 @@ func main() {
 
 ### GPU Configuration
 
-```go
-// Enable Metal on macOS
-params := gollama.Context_default_params()
-params.n_gpu_layers = 32 // Offload layers to GPU
+Gollama.cpp automatically detects available GPU hardware and configures the optimal backend:
 
-// Enable CUDA on Linux/Windows
+```go
+// Automatic GPU detection and configuration
+params := gollama.Context_default_params()
+params.n_gpu_layers = 32 // Offload layers to GPU (if available)
+
+// Platform-specific optimizations:
+// - macOS: Uses Metal when available
+// - Linux: Prefers CUDA > HIP > CPU
+// - Windows: Prefers CUDA > CPU
 params.split_mode = gollama.LLAMA_SPLIT_MODE_LAYER
 ```
+
+#### GPU Support Matrix
+
+| Platform | GPU Type | Backend | Status |
+|----------|----------|---------|--------|
+| macOS | Apple Silicon | Metal | ✅ Supported |
+| macOS | Intel/AMD | CPU only | ✅ Supported |
+| Linux | NVIDIA | CUDA | ✅ Auto-detected |
+| Linux | AMD | HIP/ROCm | ✅ Auto-detected |
+| Linux | Intel/Other | CPU | ✅ Fallback |
+| Windows | NVIDIA | CUDA | ✅ Auto-detected |
+| Windows | AMD | HIP | ✅ Auto-detected |
+| Windows | Intel/Other | CPU | ✅ Fallback |
+
+The build system automatically detects available GPU SDKs and enables the appropriate backends during compilation. No manual configuration required!
 
 ### Model Loading Options
 
@@ -146,22 +166,32 @@ gollama.Sampler_chain_add(chain, gollama.Sampler_init_temp(0.8))
 
 - Go 1.21 or later
 - Make
+- CMake 3.15 or later
 - Platform-specific build tools:
   - **macOS**: Xcode Command Line Tools
-  - **Linux**: GCC, CUDA SDK (for NVIDIA), ROCm (for AMD)
-  - **Windows**: Visual Studio or MinGW-w64, CUDA SDK (for NVIDIA)
+  - **Linux**: GCC or Clang
+  - **Windows**: Visual Studio 2019+ or MinGW-w64
+
+### Optional GPU SDKs (Auto-detected)
+
+The build system automatically detects and enables GPU support when available:
+
+- **NVIDIA CUDA**: CUDA Toolkit 11.8+ (auto-detected via `nvcc` or `CUDA_PATH`)
+- **AMD HIP/ROCm**: ROCm 5.0+ (auto-detected via `hipconfig` or `ROCM_PATH`)
+- **Apple Metal**: Automatically available on macOS with Xcode
 
 ### Build Commands
 
 ```bash
-# Build for current platform
+# Build for current platform with automatic GPU detection
 make build
+
+# Build libraries only (useful for development)
+make clone-llamacpp
+make build-llamacpp-linux-amd64  # Detects CUDA/HIP automatically
 
 # Build for all platforms
 make build-all
-
-# Build with GPU support
-make build-gpu
 
 # Run tests
 make test
@@ -169,6 +199,17 @@ make test
 # Generate release packages
 make release
 ```
+
+### GPU Detection Logic
+
+The Makefile implements intelligent GPU detection:
+
+1. **CUDA Detection**: Checks for `nvcc` compiler and CUDA toolkit
+2. **HIP Detection**: Checks for `hipconfig` and ROCm installation  
+3. **Priority Order**: CUDA > HIP > CPU (on Linux/Windows)
+4. **Metal**: Always enabled on macOS when Xcode is available
+
+No manual configuration or environment variables required!
 
 ## Version Compatibility
 

@@ -115,13 +115,44 @@ make build-llamacpp-windows-amd64
 ```
 
 #### GPU-Specific Builds
-```bash
-# Build with GPU acceleration (CUDA, Metal, etc.)
-make build-libs-gpu
 
-# Build CPU-only versions
-make build-libs-cpu
+The build system automatically detects available GPU SDKs and enables the appropriate backends:
+
+```bash
+# Automatic GPU detection and build
+make build-llamacpp-linux-amd64    # Detects CUDA/HIP automatically
+make build-llamacpp-darwin-arm64   # Enables Metal automatically
+make build-llamacpp-windows-amd64  # Detects CUDA automatically
+
+# Force specific GPU backend (override detection)
+make build-llamacpp-linux-amd64 FORCE_CUDA=1
+make build-llamacpp-linux-amd64 FORCE_HIP=1
+make build-llamacpp-linux-amd64 FORCE_CPU=1
+
+# Check what GPU backend was detected
+make gpu-info
 ```
+
+#### GPU Detection Logic
+
+The Makefile implements intelligent GPU detection:
+
+1. **CUDA Detection**: 
+   - Checks for `nvcc` compiler in PATH
+   - Checks `CUDA_PATH` environment variable
+   - Validates CUDA toolkit installation
+
+2. **HIP Detection**:
+   - Checks for `hipconfig` tool in PATH  
+   - Checks `ROCM_PATH` environment variable
+   - Validates ROCm installation
+
+3. **Metal Detection**:
+   - Automatically enabled on macOS with Xcode
+   - No additional configuration required
+
+4. **Priority Order** (Linux/Windows):
+   - CUDA > HIP > CPU fallback
 
 ### 3. Build Go Bindings
 

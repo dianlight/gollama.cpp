@@ -1,14 +1,18 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:base",
+    "config:recommended",
     ":dependencyDashboard",
     ":semanticCommits",
     ":separatePatchReleases"
   ],
-  "schedule": ["before 4am on monday"],
+  "schedule": [
+    "before 4am on monday"
+  ],
   "timezone": "America/New_York",
-  "labels": ["dependencies"],
+  "labels": [
+    "dependencies"
+  ],
   "assignees": [],
   "reviewers": [],
   "prHourlyLimit": 2,
@@ -16,49 +20,79 @@
   "branchConcurrentLimit": 20,
   "packageRules": [
     {
-      "matchManagers": ["gomod"],
+      "matchManagers": [
+        "gomod"
+      ],
       "groupName": "Go dependencies",
-      "addLabels": ["go", "dependencies"],
-      "schedule": ["before 4am on monday"],
+      "addLabels": [
+        "go",
+        "dependencies"
+      ],
+      "schedule": [
+        "before 4am on monday"
+      ],
       "minimumReleaseAge": "3 days"
     },
     {
-      "matchPackageNames": ["go"],
+      "matchPackageNames": [
+        "go"
+      ],
       "groupName": "Go version",
-      "addLabels": ["go-version"],
-      "schedule": ["before 4am on the first day of the month"],
+      "addLabels": [
+        "go-version"
+      ],
+      "schedule": [
+        "before 4am on the first day of the month"
+      ],
       "minimumReleaseAge": "30 days"
     },
     {
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "groupName": "GitHub Actions",
-      "addLabels": ["github-actions", "dependencies"],
-      "schedule": ["before 4am on monday"],
+      "addLabels": [
+        "github-actions",
+        "dependencies"
+      ],
+      "schedule": [
+        "before 4am on monday"
+      ],
       "minimumReleaseAge": "3 days",
       "pinDigests": true
     },
     {
-      "matchDepTypes": ["devDependencies"],
+      "matchDepTypes": [
+        "devDependencies"
+      ],
       "automerge": true,
       "automergeType": "pr",
-      "requiredStatusChecks": null
+      "ignoreTests": true
     },
     {
-      "matchUpdateTypes": ["patch"],
+      "matchUpdateTypes": [
+        "patch"
+      ],
       "automerge": true,
       "automergeType": "pr",
-      "requiredStatusChecks": null
+      "ignoreTests": true
     }
   ],
   "vulnerabilityAlerts": {
     "enabled": true,
-    "schedule": ["at any time"],
-    "addLabels": ["security"]
+    "schedule": [
+      "at any time"
+    ],
+    "addLabels": [
+      "security"
+    ]
   },
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": ["^\\.github/workflows/.*\\.ya?ml$"],
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.*\\.ya?ml$/"
+      ],
       "matchStrings": [
         "LLAMA_CPP_BUILD: ['\"]?(?<currentValue>[^'\"\\s]+)['\"]?"
       ],

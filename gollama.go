@@ -45,7 +45,7 @@ const (
 	// LlamaCppBuild is the llama.cpp build number this version is based on
 	LlamaCppBuild = "b6076"
 	// FullVersion combines both version numbers
-	FullVersion = "1.0.0" + Version + "-llamacpp." + LlamaCppBuild
+	FullVersion = "v" + Version + "-llamacpp." + LlamaCppBuild
 )
 
 // Platform-specific library names

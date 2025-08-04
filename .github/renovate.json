@@ -1,0 +1,85 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:base",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":separatePatchReleases"
+  ],
+  "schedule": ["before 4am on monday"],
+  "timezone": "America/New_York",
+  "labels": ["dependencies"],
+  "assignees": [],
+  "reviewers": [],
+  "prHourlyLimit": 2,
+  "prConcurrentLimit": 10,
+  "branchConcurrentLimit": 20,
+  "packageRules": [
+    {
+      "matchManagers": ["gomod"],
+      "groupName": "Go dependencies",
+      "addLabels": ["go", "dependencies"],
+      "schedule": ["before 4am on monday"],
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "matchPackageNames": ["go"],
+      "groupName": "Go version",
+      "addLabels": ["go-version"],
+      "schedule": ["before 4am on the first day of the month"],
+      "minimumReleaseAge": "30 days"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "addLabels": ["github-actions", "dependencies"],
+      "schedule": ["before 4am on monday"],
+      "minimumReleaseAge": "3 days",
+      "pinDigests": true
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "automerge": true,
+      "automergeType": "pr",
+      "requiredStatusChecks": null
+    },
+    {
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "requiredStatusChecks": null
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "schedule": ["at any time"],
+    "addLabels": ["security"]
+  },
+  "golang": {
+    "minimumGoVersion": "1.21"
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["^\\.github/workflows/.*\\.ya?ml$"],
+      "matchStrings": [
+        "LLAMA_CPP_BUILD: ['\"]?(?<currentValue>[^'\"\\s]+)['\"]?"
+      ],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "ggml-org/llama.cpp",
+      "extractVersionTemplate": "^(?<version>.*)$"
+    }
+  ],
+  "ignoreDeps": [],
+  "ignorePaths": [
+    "build/**",
+    "libs/**",
+    "models/**"
+  ],
+  "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "to {{newVersion}}",
+  "commitMessageSuffix": "",
+  "prTitle": "chore(deps): update {{depName}} to {{newVersion}}",
+  "prBodyTemplate": "{{{header}}}{{{table}}}{{{notes}}}{{{changelogs}}}",
+  "rebaseWhen": "conflicted"
+}

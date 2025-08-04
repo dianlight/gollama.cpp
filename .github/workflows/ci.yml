@@ -197,7 +197,7 @@ jobs:
         find build/llama.cpp/build-${{ matrix.platform }}-${{ matrix.arch }} -name "*.dll" | head -1 | xargs -I {} cp {} libs/${{ matrix.platform }}_${{ matrix.arch }}/
 
     - name: Upload library artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: libs-${{ matrix.platform }}-${{ matrix.arch }}
         path: libs/${{ matrix.platform }}_${{ matrix.arch }}/
@@ -244,7 +244,7 @@ jobs:
         go build -ldflags="-s -w" -o build/${{ matrix.goos }}_${{ matrix.goarch }}/ ./...
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-${{ matrix.goos }}-${{ matrix.goarch }}
         path: build/${{ matrix.goos }}_${{ matrix.goarch }}/

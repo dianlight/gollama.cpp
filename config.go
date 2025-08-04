@@ -422,16 +422,16 @@ func ApplyConfig(config *Config) error {
 		globalLoader.mutex.Lock()
 		// Force reload with new path
 		if globalLoader.loaded {
-			globalLoader.UnloadLibrary()
+			_ = globalLoader.UnloadLibrary() // Ignore error during configuration
 		}
 		globalLoader.mutex.Unlock()
 	}
 
 	// Apply logging configuration
-	if config.EnableLogging {
-		// This would be implemented once we have the actual logging functions
-		// llamaLogSet(logCallback, nil)
-	}
+	// TODO: Implement logging configuration once we have the actual logging functions
+	// if config.EnableLogging {
+	//     llamaLogSet(logCallback, nil)
+	// }
 
 	return nil
 }

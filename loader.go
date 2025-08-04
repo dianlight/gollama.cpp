@@ -75,14 +75,14 @@ func (l *LibraryLoader) UnloadLibrary() error {
 	// Close library handle
 	if l.handle != 0 {
 		if runtime.GOOS != "windows" {
-			purego.Dlclose(l.handle)
+			_ = purego.Dlclose(l.handle) // Ignore error during cleanup
 		}
 		// On Windows, we would use FreeLibrary, but purego doesn't expose this
 	}
 
 	// Clean up temporary files
 	if l.tempDir != "" {
-		os.RemoveAll(l.tempDir)
+		_ = os.RemoveAll(l.tempDir) // Ignore error during cleanup
 	}
 
 	l.handle = 0
@@ -154,7 +154,7 @@ func (l *LibraryLoader) extractEmbeddedLibraries() (string, error) {
 	// Read the embedded directory to find all library files
 	dirEntries, err := embeddedLibs.ReadDir(embeddedDir)
 	if err != nil {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir) // Ignore error during cleanup
 		return "", fmt.Errorf("no embedded libraries directory found for platform %s_%s: %w", goos, goarch, err)
 	}
 
@@ -182,14 +182,14 @@ func (l *LibraryLoader) extractEmbeddedLibraries() (string, error) {
 		tempLibPath := filepath.Join(tempDir, fileName)
 		err = os.WriteFile(tempLibPath, data, 0755)
 		if err != nil {
-			os.RemoveAll(tempDir)
+			_ = os.RemoveAll(tempDir) // Ignore error during cleanup
 			return "", fmt.Errorf("failed to write temp library %s: %w", fileName, err)
 		}
 		extractedCount++
 	}
 
 	if extractedCount == 0 {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir) // Ignore error during cleanup
 		return "", fmt.Errorf("no embedded libraries found for platform %s_%s", goos, goarch)
 	}
 
@@ -242,5 +242,5 @@ func RegisterFunction(fptr interface{}, name string) error {
 
 // Cleanup function to be called when the program exits
 func Cleanup() {
-	globalLoader.UnloadLibrary()
+	_ = globalLoader.UnloadLibrary() // Ignore error during cleanup
 }

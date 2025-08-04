@@ -511,7 +511,7 @@ func loadLibrary() error {
 
 	// Register all function pointers
 	if err := registerFunctions(); err != nil {
-		purego.Dlclose(handle)
+		_ = purego.Dlclose(handle) // Ignore error during cleanup
 		return fmt.Errorf("failed to register functions: %w", err)
 	}
 
@@ -858,13 +858,13 @@ func Token_to_piece(model LlamaModel, token LlamaToken, special bool) string {
 	// Convert C string to Go string
 	// We need to find the length of the C string first
 	var length int
-	ptr := uintptr(unsafe.Pointer(textPtr))
 	for {
-		if *(*byte)(unsafe.Pointer(ptr)) == 0 {
+		// Use unsafe.Add to safely advance the pointer
+		bytePtr := (*byte)(unsafe.Add(unsafe.Pointer(textPtr), length))
+		if *bytePtr == 0 {
 			break
 		}
 		length++
-		ptr++
 	}
 
 	if length == 0 {

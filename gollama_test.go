@@ -114,7 +114,7 @@ func TestContextParams(t *testing.T) {
 // Benchmark basic operations
 func BenchmarkGetLibraryPath(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		getLibraryPath()
+		_, _ = getLibraryPath() // Ignore return values in benchmark
 	}
 }
 

@@ -253,7 +253,7 @@ jobs:
       if: matrix.platform == 'windows' && matrix.gpu_type == 'cuda'
       uses: Jimver/cuda-toolkit@v0.2.26 # v0.2.26
       with:
-        cuda: '12.6'
+        cuda: '12.9.1'
         method: 'network'
         use-github-cache: true
         use-local-cache: true

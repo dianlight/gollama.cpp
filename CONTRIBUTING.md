@@ -107,6 +107,72 @@ export GOLLAMA_TEST_MODEL=/path/to/test/model.gguf
 
 ## Making Changes
 
+### Platform-Specific Development
+
+Gollama.cpp uses a **platform-specific architecture** with Go build tags. When contributing:
+
+#### Build Tags and Platform Support
+
+We use the following build tag strategy:
+- **`!windows`**: Unix-like systems (Linux, macOS) using purego
+- **`windows`**: Windows systems using native syscalls
+
+#### Platform-Specific Files
+
+When working on platform support:
+
+1. **Unix-like platforms** (`platform_unix.go`):
+   ```go
+   //go:build !windows
+   
+   package gollama
+   
+   import "github.com/ebitengine/purego"
+   
+   func loadLibraryPlatform(libPath string) (uintptr, error) {
+       return purego.Dlopen(libPath, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+   }
+   ```
+
+2. **Windows platforms** (`platform_windows.go`):
+   ```go
+   //go:build windows
+   
+   package gollama
+   
+   import "syscall"
+   
+   func loadLibraryPlatform(libPath string) (uintptr, error) {
+       // Windows-specific implementation using LoadLibraryW
+   }
+   ```
+
+#### Testing Platform Changes
+
+Always test platform-specific code:
+
+```bash
+# Test current platform
+go test -v -run TestPlatformSpecific ./...
+
+# Test cross-compilation for all platforms
+make test-cross-compile
+
+# Test specific platform (without running)
+GOOS=windows GOARCH=amd64 go test -c ./...
+GOOS=linux GOARCH=arm64 go test -c ./...
+GOOS=darwin GOARCH=arm64 go test -c ./...
+```
+
+#### Windows Development Guidelines
+
+When contributing Windows support:
+
+1. Use native Windows APIs via `syscall` package
+2. Implement proper error handling for Windows-specific errors
+3. Test both compilation and runtime on Windows when possible
+4. Ensure cross-compilation works from other platforms
+
 ### Branch Naming
 
 Use descriptive branch names:

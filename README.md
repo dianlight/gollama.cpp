@@ -17,17 +17,43 @@ A high-performance Go binding for [llama.cpp](https://github.com/ggml-org/llama.
 
 ## Supported Platforms
 
-### macOS
+Gollama.cpp uses a **platform-specific architecture** with build tags to ensure optimal compatibility and performance across all operating systems.
+
+### ✅ Fully Supported Platforms
+
+#### macOS
 - **CPU**: Intel x64, Apple Silicon (ARM64)
 - **GPU**: Metal (Apple Silicon)
+- **Status**: Full feature support with purego
+- **Build Tags**: Uses `!windows` build tag
 
-### Linux
+#### Linux
 - **CPU**: x86_64, ARM64
 - **GPU**: NVIDIA (CUDA), AMD (HIP/ROCm)
+- **Status**: Full feature support with purego
+- **Build Tags**: Uses `!windows` build tag
 
-### Windows
-- **CPU**: x86_64, ARM64
-- **GPU**: NVIDIA (CUDA), AMD (HIP)
+### 🚧 In Development
+
+#### Windows
+- **CPU**: x86_64, ARM64 
+- **GPU**: NVIDIA (CUDA), AMD (HIP) - planned
+- **Status**: **Build compatibility implemented**, runtime support in development
+- **Build Tags**: Uses `windows` build tag with syscall-based library loading
+- **Current State**: 
+  - ✅ Compiles without errors on Windows
+  - ✅ Cross-compilation from other platforms works
+  - 🚧 Runtime functionality being implemented
+  - 🚧 GPU acceleration being added
+
+### Platform-Specific Implementation Details
+
+Our platform abstraction layer uses Go build tags to provide:
+
+- **Unix-like systems** (`!windows`): Uses [purego](https://github.com/ebitengine/purego) for dynamic library loading
+- **Windows** (`windows`): Uses native Windows syscalls (`LoadLibraryW`, `FreeLibrary`, `GetProcAddress`)
+- **Cross-compilation**: Supports building for any platform from any platform
+- **Automatic detection**: Runtime platform capability detection
 
 ## Installation
 
@@ -36,6 +62,36 @@ go get github.com/dianlight/gollama.cpp
 ```
 
 The Go module includes pre-built llama.cpp libraries for all supported platforms. No additional installation required!
+
+## Cross-Platform Development
+
+### Build Compatibility Matrix
+
+Our CI system tests compilation across all platforms:
+
+| Target Platform | Build From Linux | Build From macOS | Build From Windows |
+|------------------|:----------------:|:----------------:|:------------------:|
+| Linux (amd64)    | ✅               | ✅               | ✅                 |
+| Linux (arm64)    | ✅               | ✅               | ✅                 |
+| macOS (amd64)    | ✅               | ✅               | ✅                 |
+| macOS (arm64)    | ✅               | ✅               | ✅                 |
+| Windows (amd64)  | ✅               | ✅               | ✅                 |
+| Windows (arm64)  | ✅               | ✅               | ✅                 |
+
+### Development Workflow
+
+```bash
+# Test cross-compilation for all platforms
+make test-cross-compile
+
+# Build for specific platform
+GOOS=windows GOARCH=amd64 go build ./...
+GOOS=linux GOARCH=arm64 go build ./...
+GOOS=darwin GOARCH=arm64 go build ./...
+
+# Run platform-specific tests
+go test -v -run TestPlatformSpecific ./...
+```
 
 ## Quick Start
 

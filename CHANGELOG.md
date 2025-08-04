@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Platform-specific architecture** with Go build tags for improved cross-platform support
+- Windows compilation compatibility using native syscalls (`LoadLibraryW`, `FreeLibrary`)
+- Cross-platform compilation testing in CI pipeline
+- Platform capability detection functions (`isPlatformSupported`, `getPlatformError`)
+- Dedicated platform-specific test suite (`TestPlatformSpecific`)
+- Enhanced Makefile with cross-compilation targets (`test-cross-compile`, `test-compile-*`)
+- Comprehensive platform migration documentation
 - Initial Go binding for llama.cpp using purego
 - Cross-platform support (macOS, Linux, Windows)
 - CPU and GPU acceleration support
@@ -17,10 +24,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions CI/CD pipeline
 - Automated release system
 
+### Changed
+- **Breaking internal change**: Migrated from direct purego imports to platform-specific abstraction layer
+- Separated platform-specific code into `platform_unix.go` and `platform_windows.go` with appropriate build tags
+- Updated CI to test cross-compilation for all platforms (Windows, Linux, macOS on both amd64 and arm64)
+- Enhanced documentation to reflect platform-specific implementation details
+
+### Fixed
+- **Windows CI compilation errors**: Fixed undefined `purego.Dlopen`, `purego.RTLD_NOW`, `purego.RTLD_GLOBAL`, and `purego.Dlclose` symbols
+- Cross-compilation now works from any platform to any platform
+- Platform detection properly handles unsupported/incomplete platforms
+
 ### Features
 - Pure Go implementation (no CGO required)
 - Metal support for macOS (Apple Silicon and Intel)
-- CUDA support for NVIDIA GPUs
+- CUDA support for NVIDIA GPUs  
 - HIP support for AMD GPUs
 - Memory mapping and locking options
 - Batch processing capabilities
@@ -30,9 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Token manipulation utilities
 
 ### Platform Support
-- **macOS**: Intel x64, Apple Silicon (ARM64) with Metal
-- **Linux**: x86_64, ARM64 with CUDA/HIP
-- **Windows**: x86_64, ARM64 with CUDA
+- **macOS**: ✅ Intel x64, Apple Silicon (ARM64) with Metal - **Fully supported**
+- **Linux**: ✅ x86_64, ARM64 with CUDA/HIP - **Fully supported**  
+- **Windows**: 🚧 x86_64, ARM64 with CUDA - **Build compatibility implemented, runtime support in development**
+
+### Technical Details
+- **Unix-like platforms** (Linux, macOS): Use purego for dynamic library loading
+- **Windows platform**: Use native Windows syscalls for library management
+- **Build tags**: `!windows` for Unix-like, `windows` for Windows-specific code
+- **Zero runtime overhead**: Platform abstraction has no performance impact
 
 ## [1.0.0-llamacpp.b6076] - 2025-01-XX
 

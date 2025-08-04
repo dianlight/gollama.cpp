@@ -89,6 +89,43 @@ test-race: deps build-llamacpp-current
 	@echo "Running tests with race detection"
 	$(GO) test -race -v ./...
 
+# Run platform-specific tests
+.PHONY: test-platform
+test-platform:
+	@echo "Running platform-specific tests"
+	$(GO) test -v -run TestPlatformSpecific ./...
+
+# Test cross-compilation for all platforms
+.PHONY: test-cross-compile
+test-cross-compile:
+	@echo "Testing cross-compilation for all platforms..."
+	@for platform in $(PLATFORMS); do \
+		GOOS=$$(echo $$platform | cut -d'/' -f1); \
+		GOARCH=$$(echo $$platform | cut -d'/' -f2); \
+		echo "Building for $$GOOS/$$GOARCH..."; \
+		env GOOS=$$GOOS GOARCH=$$GOARCH $(GO) build -v ./... || exit 1; \
+	done
+	@echo "All cross-compilation tests passed!"
+
+# Test compilation for specific platform  
+.PHONY: test-compile-windows
+test-compile-windows:
+	@echo "Testing Windows compilation"
+	GOOS=windows GOARCH=amd64 $(GO) build -v ./...
+	GOOS=windows GOARCH=arm64 $(GO) build -v ./...
+
+.PHONY: test-compile-linux  
+test-compile-linux:
+	@echo "Testing Linux compilation"
+	GOOS=linux GOARCH=amd64 $(GO) build -v ./...
+	GOOS=linux GOARCH=arm64 $(GO) build -v ./...
+
+.PHONY: test-compile-darwin
+test-compile-darwin:
+	@echo "Testing macOS compilation" 
+	GOOS=darwin GOARCH=amd64 $(GO) build -v ./...
+	GOOS=darwin GOARCH=arm64 $(GO) build -v ./...
+
 # Benchmark
 .PHONY: bench
 bench: deps build-llamacpp-current

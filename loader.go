@@ -180,7 +180,7 @@ func (l *LibraryLoader) extractEmbeddedLibraries() (string, error) {
 
 		// Write library to temporary file
 		tempLibPath := filepath.Join(tempDir, fileName)
-		err = os.WriteFile(tempLibPath, data, 0755)
+		err = os.WriteFile(tempLibPath, data, 0600)
 		if err != nil {
 			_ = os.RemoveAll(tempDir) // Ignore error during cleanup
 			return "", fmt.Errorf("failed to write temp library %s: %w", fileName, err)

@@ -30,6 +30,7 @@ package gollama
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"runtime"
 	"sync"
@@ -808,7 +809,11 @@ func Tokenize(model LlamaModel, text string, addSpecial, parseSpecial bool) ([]L
 	textBytes := append([]byte(text), 0) // null-terminate
 
 	// First call to get the number of tokens
-	nTokens := llamaTokenize(vocab, (*byte)(unsafe.Pointer(&textBytes[0])), int32(len(text)), nil, 0, addSpecial, parseSpecial)
+	textLen := len(text)
+	if textLen > math.MaxInt32 {
+		return nil, fmt.Errorf("text too long: %d characters, maximum supported: %d", textLen, math.MaxInt32)
+	}
+	nTokens := llamaTokenize(vocab, (*byte)(unsafe.Pointer(&textBytes[0])), int32(textLen), nil, 0, addSpecial, parseSpecial)
 	if nTokens <= 0 {
 		// llama_tokenize returns negative value indicating number of tokens needed
 		if nTokens < 0 {
@@ -824,7 +829,7 @@ func Tokenize(model LlamaModel, text string, addSpecial, parseSpecial bool) ([]L
 
 	// Second call to get the actual tokens
 	tokens := make([]LlamaToken, nTokens)
-	result := llamaTokenize(vocab, (*byte)(unsafe.Pointer(&textBytes[0])), int32(len(text)), &tokens[0], nTokens, addSpecial, parseSpecial)
+	result := llamaTokenize(vocab, (*byte)(unsafe.Pointer(&textBytes[0])), int32(textLen), &tokens[0], nTokens, addSpecial, parseSpecial)
 	if result < 0 {
 		return nil, fmt.Errorf("tokenization failed with error code: %d", result)
 	}
@@ -892,7 +897,11 @@ func Batch_get_one(tokens []LlamaToken) LlamaBatch {
 	if len(tokens) == 0 {
 		return LlamaBatch{}
 	}
-	return llamaBatchGetOne(&tokens[0], int32(len(tokens)))
+	tokensLen := len(tokens)
+	if tokensLen > math.MaxInt32 {
+		panic(fmt.Errorf("too many tokens: %d, maximum supported: %d", tokensLen, math.MaxInt32))
+	}
+	return llamaBatchGetOne(&tokens[0], int32(tokensLen))
 }
 
 // Batch_free frees a batch
@@ -959,9 +968,12 @@ func Token_data_array_init(model LlamaModel) *LlamaTokenDataArray {
 	}
 
 	// Return pointer to token data array structure
+	if nVocab < 0 {
+		panic(fmt.Errorf("invalid vocabulary size: %d", nVocab))
+	}
 	return &LlamaTokenDataArray{
 		Data:     &tokenData[0],
-		Size:     uint64(nVocab),
+		Size:     uint64(uint32(nVocab)), // Safe conversion since nVocab is int32
 		Selected: -1,
 		Sorted:   0,
 	}
@@ -997,9 +1009,12 @@ func Token_data_array_from_logits(model LlamaModel, logits *float32) *LlamaToken
 	}
 
 	// Return pointer to token data array structure
+	if nVocab < 0 {
+		panic(fmt.Errorf("invalid vocabulary size: %d", nVocab))
+	}
 	return &LlamaTokenDataArray{
 		Data:     &tokenData[0],
-		Size:     uint64(nVocab),
+		Size:     uint64(uint32(nVocab)), // Safe conversion since nVocab is int32
 		Selected: -1,
 		Sorted:   0,
 	}

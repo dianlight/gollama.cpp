@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -368,6 +369,9 @@ func main() {
 		// Simulate tokenized prompt (fake token IDs)
 		tokens := make([]gollama.LlamaToken, len(strings.Fields(*prompt))+2) // +2 for BOS/EOS
 		for i := range tokens {
+			if 1000+i > math.MaxInt32 {
+				log.Fatalf("token ID %d is out of range for LlamaToken", 1000+i)
+			}
 			tokens[i] = gollama.LlamaToken(1000 + i) // fake token IDs
 		}
 
@@ -407,6 +411,12 @@ func main() {
 	// Create context
 	fmt.Print("Creating context... ")
 	ctxParams := gollama.Context_default_params()
+	if *ctx > math.MaxUint32 || *ctx < 0 {
+		log.Fatalf("context size %d is out of range for uint32", *ctx)
+	}
+	if *threads > math.MaxInt32 || *threads < math.MinInt32 {
+		log.Fatalf("threads count %d is out of range for int32", *threads)
+	}
 	ctxParams.NCtx = uint32(*ctx)
 	ctxParams.NBatch = 512
 	ctxParams.NSeqMax = 1
@@ -461,7 +471,14 @@ func main() {
 	fmt.Printf("done (%.2fs)\n", evalTime.Seconds())
 
 	// Get logits for the last token
-	logits := gollama.Get_logits_ith(context, int32(len(tokens)-1))
+	tokensLen := len(tokens)
+	if tokensLen == 0 {
+		log.Fatal("No tokens to get logits for")
+	}
+	if tokensLen-1 > math.MaxInt32 {
+		log.Fatalf("token index %d is out of range for int32", tokensLen-1)
+	}
+	logits := gollama.Get_logits_ith(context, int32(tokensLen-1))
 	if logits == nil {
 		log.Fatalf("Failed to get logits")
 	}

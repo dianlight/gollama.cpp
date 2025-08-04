@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"time"
@@ -103,6 +104,12 @@ func main() {
 	// Create target context
 	fmt.Print("Creating target context... ")
 	ctxParamsTgt := gollama.Context_default_params()
+	if *ctx > math.MaxUint32 || *ctx < 0 {
+		log.Fatalf("context size %d is out of range for uint32", *ctx)
+	}
+	if *threads > math.MaxInt32 || *threads < math.MinInt32 {
+		log.Fatalf("threads count %d is out of range for int32", *threads)
+	}
 	ctxParamsTgt.NCtx = uint32(*ctx)
 	ctxParamsTgt.NThreads = int32(*threads)
 	ctxParamsTgt.NThreadsBatch = int32(*threads)
@@ -118,6 +125,12 @@ func main() {
 	// Create draft context
 	fmt.Print("Creating draft context... ")
 	ctxParamsDft := gollama.Context_default_params()
+	if *ctx > math.MaxUint32 || *ctx < 0 {
+		log.Fatalf("context size %d is out of range for uint32", *ctx)
+	}
+	if *threads > math.MaxInt32 || *threads < math.MinInt32 {
+		log.Fatalf("threads count %d is out of range for int32", *threads)
+	}
 	ctxParamsDft.NCtx = uint32(*ctx)
 	ctxParamsDft.NThreads = int32(*threads)
 	ctxParamsDft.NThreadsBatch = int32(*threads)

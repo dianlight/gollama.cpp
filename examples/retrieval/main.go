@@ -5,12 +5,13 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"sort"
 	"strings"
 	"unsafe"
 
-	"gollama"
+	"github.com/dianlight/gollama.cpp"
 )
 
 // Chunk represents a text chunk with metadata and embedding
@@ -105,6 +106,12 @@ func main() {
 	// Create context with embeddings enabled
 	fmt.Print("Creating context... ")
 	ctxParams := gollama.Context_default_params()
+	if *ctx > math.MaxUint32 || *ctx < 0 {
+		log.Fatalf("context size %d is out of range for uint32", *ctx)
+	}
+	if *threads > math.MaxInt32 || *threads < math.MinInt32 {
+		log.Fatalf("threads count %d is out of range for int32", *threads)
+	}
 	ctxParams.NCtx = uint32(*ctx)
 	ctxParams.NThreads = int32(*threads)
 	ctxParams.NThreadsBatch = int32(*threads)

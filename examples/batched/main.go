@@ -7,6 +7,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
+	"math"
 	"time"
 ) // BatchedConfig holds configuration for batched generation
 type BatchedConfig struct {
@@ -44,6 +46,9 @@ func main() {
 
 	// Convert types
 	config.Temperature = float32(temperature)
+	if topK > math.MaxInt32 || topK < math.MinInt32 {
+		log.Fatalf("top-k value %d is out of range for int32", topK)
+	}
 	config.TopK = int32(topK)
 	config.TopP = float32(topP)
 

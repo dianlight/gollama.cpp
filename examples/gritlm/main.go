@@ -15,6 +15,9 @@ const embeddingInstruction = "<|embed|>"
 // addSequenceToBatch adds a sequence of tokens to a batch
 func addSequenceToBatch(batch *gollama.LlamaBatch, tokens []gollama.LlamaToken, seqId gollama.LlamaSeqId) {
 	for i, token := range tokens {
+		if i >= math.MaxInt32 {
+			log.Fatalf("token index %d is out of range for int32", i)
+		}
 		if int32(i) < batch.NTokens {
 			// Access batch data directly (unsafe but necessary for this example)
 			tokensPtr := (*[1 << 20]gollama.LlamaToken)(unsafe.Pointer(batch.Token))
@@ -23,13 +26,20 @@ func addSequenceToBatch(batch *gollama.LlamaBatch, tokens []gollama.LlamaToken, 
 			logitsPtr := (*[1 << 20]int8)(unsafe.Pointer(batch.Logits))
 
 			tokensPtr[i] = token
+			if i > math.MaxInt32 {
+				log.Fatalf("position %d is out of range for LlamaPos", i)
+			}
 			posPtr[i] = gollama.LlamaPos(i)
 			seqIdPtr[i] = &seqId
 			// Enable outputs for all tokens in embedding mode
 			logitsPtr[i] = 1
 		}
 	}
-	batch.NTokens = int32(len(tokens))
+	tokensLen := len(tokens)
+	if tokensLen > math.MaxInt32 {
+		log.Fatalf("too many tokens: %d, maximum supported: %d", tokensLen, math.MaxInt32)
+	}
+	batch.NTokens = int32(tokensLen)
 }
 
 // normalizeEmbedding normalizes an embedding vector using L2 norm
@@ -119,7 +129,11 @@ func main() {
 		log.Fatalf("Failed to tokenize: %v", err)
 	}
 
-	nToks := int32(len(tokens))
+	tokensLen := len(tokens)
+	if tokensLen > math.MaxInt32 {
+		log.Fatalf("too many tokens: %d, maximum supported: %d", tokensLen, math.MaxInt32)
+	}
+	nToks := int32(tokensLen)
 	if nToks == 0 {
 		log.Fatalf("Empty tokenization")
 	}

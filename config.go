@@ -89,7 +89,13 @@ func DefaultConfig() *Config {
 
 // LoadConfig loads configuration from a JSON file
 func LoadConfig(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
+	// Validate path to prevent directory traversal attacks
+	cleanPath := filepath.Clean(path)
+	if strings.Contains(cleanPath, "..") {
+		return nil, fmt.Errorf("invalid path: path traversal detected")
+	}
+	
+	data, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
@@ -208,7 +214,7 @@ func LoadConfigFromEnv() *Config {
 func (c *Config) SaveConfig(path string) error {
 	// Ensure directory exists
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -217,7 +223,7 @@ func (c *Config) SaveConfig(path string) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, 0600); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 

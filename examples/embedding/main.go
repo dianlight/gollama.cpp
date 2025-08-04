@@ -25,6 +25,9 @@ func addSequenceToBatch(batch *gollama.LlamaBatch, tokens []gollama.LlamaToken, 
 	for i, token := range tokens {
 		// We need to manually populate the batch since there's no direct helper
 		// This is a simplified version - in a real implementation you'd want proper batch management
+		if i >= math.MaxInt32 {
+			log.Fatalf("token index %d is out of range for int32", i)
+		}
 		if int32(i) < batch.NTokens {
 			// Access batch data directly (unsafe but necessary for this example)
 			tokensPtr := (*[1 << 20]gollama.LlamaToken)(unsafe.Pointer(batch.Token))
@@ -33,13 +36,20 @@ func addSequenceToBatch(batch *gollama.LlamaBatch, tokens []gollama.LlamaToken, 
 			logitsPtr := (*[1 << 20]int8)(unsafe.Pointer(batch.Logits))
 
 			tokensPtr[i] = token
+			if i > math.MaxInt32 {
+				log.Fatalf("position %d is out of range for LlamaPos", i)
+			}
 			posPtr[i] = gollama.LlamaPos(i)
 			// Set sequence ID (simplified)
 			seqIdPtr[i] = &seqId
 			logitsPtr[i] = 1 // Enable logits for last token
 		}
 	}
-	batch.NTokens = int32(len(tokens))
+	tokensLen := len(tokens)
+	if tokensLen > math.MaxInt32 {
+		log.Fatalf("too many tokens: %d, maximum supported: %d", tokensLen, math.MaxInt32)
+	}
+	batch.NTokens = int32(tokensLen)
 }
 
 // normalizeEmbedding normalizes an embedding vector using L2 norm (Euclidean)
@@ -112,6 +122,12 @@ func main() {
 
 	// Create context with embeddings enabled
 	ctxParams := gollama.Context_default_params()
+	if *ctx > math.MaxUint32 || *ctx < 0 {
+		log.Fatalf("context size %d is out of range for uint32", *ctx)
+	}
+	if *threads > math.MaxInt32 || *threads < math.MinInt32 {
+		log.Fatalf("threads count %d is out of range for int32", *threads)
+	}
 	ctxParams.NCtx = uint32(*ctx)
 	ctxParams.NThreads = int32(*threads)
 	ctxParams.NThreadsBatch = int32(*threads)
@@ -163,10 +179,17 @@ func main() {
 		}
 
 		// Create batch
-		batch := gollama.Batch_init(int32(len(tokens)), 0, 1)
+		tokensLen := len(tokens)
+		if tokensLen > math.MaxInt32 {
+			log.Fatalf("too many tokens: %d, maximum supported: %d", tokensLen, math.MaxInt32)
+		}
+		batch := gollama.Batch_init(int32(tokensLen), 0, 1)
 		defer gollama.Batch_free(batch)
 
 		// Add tokens to batch
+		if i > math.MaxInt32 {
+			log.Fatalf("sequence index %d is out of range for int32", i)
+		}
 		addSequenceToBatch(&batch, tokens, gollama.LlamaSeqId(i))
 
 		// Decode to get embeddings

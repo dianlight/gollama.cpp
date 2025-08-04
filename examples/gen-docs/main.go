@@ -514,7 +514,7 @@ func (dg *DocumentationGenerator) writeFlagCategories(w *bufio.Writer) {
 
 // GeneratePerExampleDocs generates individual documentation files for each example
 func (dg *DocumentationGenerator) GeneratePerExampleDocs(outputDir string) error {
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0750); err != nil {
 		return err
 	}
 
@@ -604,7 +604,7 @@ func main() {
 	fmt.Printf("found %d examples\n", len(generator.Examples))
 
 	// Create output directory
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0750); err != nil {
 		log.Fatalf("Failed to create output directory: %v", err)
 	}
 

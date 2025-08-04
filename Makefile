@@ -308,7 +308,7 @@ release-current: clean build build-llamacpp-current
 install-tools:
 	@echo "Installing development tools"
 	$(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	$(GO) install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+	$(GO) install github.com/securego/gosec/v2/cmd/gosec@latest
 
 # Download model file
 .PHONY: model_download

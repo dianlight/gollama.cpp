@@ -161,11 +161,11 @@ build-llamacpp-all: clone-llamacpp
 
 # macOS builds
 .PHONY: build-llamacpp-darwin-amd64
-build-llamacpp-darwin-amd64:
+build-llamacpp-darwin-amd64: clone-llamacpp
 	@echo "Building llama.cpp for macOS x86_64"
 	mkdir -p $(LIB_DIR)/darwin_amd64
 	cd $(LLAMA_CPP_DIR) && \
-	cmake -B build-darwin-amd64 -DCMAKE_OSX_ARCHITECTURES=x86_64 -DGGML_METAL=ON -DBUILD_SHARED_LIBS=ON \
+	cmake -B build-darwin-amd64 -DCMAKE_OSX_ARCHITECTURES=x86_64 -DGGML_METAL=ON -DBUILD_SHARED_LIBS=ON -DLLAMA_CURL=OFF \
 		-DCMAKE_C_FLAGS="-target x86_64-apple-darwin -march=x86-64" \
 		-DCMAKE_CXX_FLAGS="-target x86_64-apple-darwin -march=x86-64" && \
 	cmake --build build-darwin-amd64 --config Release -j$$(sysctl -n hw.ncpu) && \
@@ -180,11 +180,11 @@ build-llamacpp-darwin-amd64:
 	done
 
 .PHONY: build-llamacpp-darwin-arm64
-build-llamacpp-darwin-arm64:
+build-llamacpp-darwin-arm64: clone-llamacpp
 	@echo "Building llama.cpp for macOS ARM64"
 	mkdir -p $(LIB_DIR)/darwin_arm64
 	cd $(LLAMA_CPP_DIR) && \
-	cmake -B build-darwin-arm64 -DCMAKE_OSX_ARCHITECTURES=arm64 -DGGML_METAL=ON -DBUILD_SHARED_LIBS=ON && \
+	cmake -B build-darwin-arm64 -DCMAKE_OSX_ARCHITECTURES=arm64 -DGGML_METAL=ON -DBUILD_SHARED_LIBS=ON -DLLAMA_CURL=OFF && \
 	cmake --build build-darwin-arm64 --config Release -j$$(sysctl -n hw.ncpu) && \
 	cp build-darwin-arm64/bin/*.dylib ../../$(LIB_DIR)/darwin_arm64/ && \
 	for lib in ../../$(LIB_DIR)/darwin_arm64/*.dylib; do \
@@ -198,7 +198,7 @@ build-llamacpp-darwin-arm64:
 
 # Linux builds
 .PHONY: build-llamacpp-linux-amd64
-build-llamacpp-linux-amd64:
+build-llamacpp-linux-amd64: clone-llamacpp
 	@echo "Building llama.cpp for Linux x86_64"
 	@echo "Checking for GPU SDK availability..."
 	@if [ -d "/usr/local/cuda" ] || [ -d "/opt/cuda" ] || command -v nvcc >/dev/null 2>&1; then \
@@ -213,7 +213,7 @@ build-llamacpp-linux-amd64:
 	fi; \
 	mkdir -p $(LIB_DIR)/linux_amd64; \
 	cd $(LLAMA_CPP_DIR) && \
-	cmake -B build-linux-amd64 $$GPU_FLAGS -DBUILD_SHARED_LIBS=ON && \
+	cmake -B build-linux-amd64 $$GPU_FLAGS -DBUILD_SHARED_LIBS=ON -DLLAMA_CURL=OFF && \
 	cmake --build build-linux-amd64 --config Release -j$$(nproc) && \
 	cp build-linux-amd64/bin/lib*.so ../../$(LIB_DIR)/linux_amd64/ && \
 	for lib in ../../$(LIB_DIR)/linux_amd64/*.so; do \
@@ -226,7 +226,7 @@ build-llamacpp-linux-amd64:
 	done
 
 .PHONY: build-llamacpp-linux-arm64
-build-llamacpp-linux-arm64:
+build-llamacpp-linux-arm64: clone-llamacpp
 	@echo "Building llama.cpp for Linux ARM64"
 	@echo "Checking for GPU SDK availability..."
 	@if [ -d "/usr/local/cuda" ] || [ -d "/opt/cuda" ] || command -v nvcc >/dev/null 2>&1; then \
@@ -241,7 +241,7 @@ build-llamacpp-linux-arm64:
 	fi; \
 	mkdir -p $(LIB_DIR)/linux_arm64; \
 	cd $(LLAMA_CPP_DIR) && \
-	cmake -B build-linux-arm64 -DCMAKE_SYSTEM_PROCESSOR=aarch64 $$GPU_FLAGS -DBUILD_SHARED_LIBS=ON && \
+	cmake -B build-linux-arm64 -DCMAKE_SYSTEM_PROCESSOR=aarch64 $$GPU_FLAGS -DBUILD_SHARED_LIBS=ON -DLLAMA_CURL=OFF && \
 	cmake --build build-linux-arm64 --config Release -j$$(nproc) && \
 	cp build-linux-arm64/bin/lib*.so ../../$(LIB_DIR)/linux_arm64/ && \
 	for lib in ../../$(LIB_DIR)/linux_arm64/*.so; do \
@@ -255,20 +255,20 @@ build-llamacpp-linux-arm64:
 
 # Windows builds (require cross-compilation setup)
 .PHONY: build-llamacpp-windows-amd64
-build-llamacpp-windows-amd64:
+build-llamacpp-windows-amd64: clone-llamacpp
 	@echo "Building llama.cpp for Windows x86_64"
 	mkdir -p $(LIB_DIR)/windows_amd64
 	cd $(LLAMA_CPP_DIR) && \
-	cmake -B build-windows-amd64 -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON -DCMAKE_TOOLCHAIN_FILE=cmake/x64-windows-llvm.cmake && \
+	cmake -B build-windows-amd64 -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON -DLLAMA_CURL=OFF -DCMAKE_TOOLCHAIN_FILE=cmake/x64-windows-llvm.cmake && \
 	cmake --build build-windows-amd64 --config Release -j$$(nproc) && \
 	cp build-windows-amd64/bin/*.dll ../../$(LIB_DIR)/windows_amd64/
 
 .PHONY: build-llamacpp-windows-arm64
-build-llamacpp-windows-arm64:
+build-llamacpp-windows-arm64: clone-llamacpp
 	@echo "Building llama.cpp for Windows ARM64"
 	mkdir -p $(LIB_DIR)/windows_arm64
 	cd $(LLAMA_CPP_DIR) && \
-	cmake -B build-windows-arm64 -DBUILD_SHARED_LIBS=ON -DCMAKE_TOOLCHAIN_FILE=cmake/arm64-windows-llvm.cmake && \
+	cmake -B build-windows-arm64 -DBUILD_SHARED_LIBS=ON -DLLAMA_CURL=OFF -DCMAKE_TOOLCHAIN_FILE=cmake/arm64-windows-llvm.cmake && \
 	cmake --build build-windows-arm64 --config Release -j$$(nproc) && \
 	cp build-windows-arm64/bin/*.dll ../../$(LIB_DIR)/windows_arm64/
 
@@ -291,7 +291,7 @@ build-libs-cpu: clone-llamacpp
 		echo "Building CPU-only library for $$os/$$arch"; \
 		mkdir -p $(LIB_DIR)/$$os\_$$arch; \
 		cd $(LLAMA_CPP_DIR) && \
-		cmake -B build-$$os-$$arch-cpu -DBUILD_SHARED_LIBS=ON -DGGML_CUDA=OFF -DGGML_HIP=OFF -DGGML_METAL=OFF && \
+		cmake -B build-$$os-$$arch-cpu -DBUILD_SHARED_LIBS=ON -DGGML_CUDA=OFF -DGGML_HIP=OFF -DGGML_METAL=OFF -DLLAMA_CURL=OFF && \
 		cmake --build build-$$os-$$arch-cpu --config Release && \
 		cp build-$$os-$$arch-cpu/src/lib* ../../$(LIB_DIR)/$$os\_$$arch/ 2>/dev/null || true; \
 		cp build-$$os-$$arch-cpu/src/*.dll ../../$(LIB_DIR)/$$os\_$$arch/ 2>/dev/null || true; \
@@ -304,7 +304,7 @@ build-llamacpp-linux-amd64-hip: clone-llamacpp
 	@echo "Note: This requires ROCm SDK to be installed"
 	mkdir -p $(LIB_DIR)/linux_amd64
 	cd $(LLAMA_CPP_DIR) && \
-	cmake -B build-linux-amd64-hip -DGGML_HIP=ON -DGGML_CUDA=OFF -DBUILD_SHARED_LIBS=ON && \
+	cmake -B build-linux-amd64-hip -DGGML_HIP=ON -DGGML_CUDA=OFF -DBUILD_SHARED_LIBS=ON -DLLAMA_CURL=OFF && \
 	cmake --build build-linux-amd64-hip --config Release -j$$(nproc) && \
 	cp build-linux-amd64-hip/bin/lib*.so ../../$(LIB_DIR)/linux_amd64/ && \
 	for lib in ../../$(LIB_DIR)/linux_amd64/*.so; do \

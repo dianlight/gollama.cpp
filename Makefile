@@ -202,9 +202,13 @@ build-llamacpp-darwin-amd64: clone-llamacpp
 	@echo "Building llama.cpp for macOS x86_64"
 	mkdir -p $(LIB_DIR)/darwin_amd64
 	cd $(LLAMA_CPP_DIR) && \
-	cmake -B build-darwin-amd64 -DCMAKE_OSX_ARCHITECTURES=x86_64 -DGGML_METAL=ON -DBUILD_SHARED_LIBS=ON -DLLAMA_CURL=OFF \
-		-DCMAKE_C_FLAGS="-target x86_64-apple-darwin -march=x86-64" \
-		-DCMAKE_CXX_FLAGS="-target x86_64-apple-darwin -march=x86-64" && \
+	cmake -B build-darwin-amd64 \
+		-DCMAKE_OSX_ARCHITECTURES=x86_64 \
+		-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15 \
+		-DGGML_METAL=ON \
+		-DGGML_NATIVE=OFF \
+		-DBUILD_SHARED_LIBS=ON \
+		-DLLAMA_CURL=OFF && \
 	cmake --build build-darwin-amd64 --config Release -j$$(sysctl -n hw.ncpu) && \
 	cp build-darwin-amd64/bin/*.dylib ../../$(LIB_DIR)/darwin_amd64/ && \
 	for lib in ../../$(LIB_DIR)/darwin_amd64/*.dylib; do \

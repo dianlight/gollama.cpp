@@ -35,7 +35,39 @@ make technical   # Technical explanation demo
 make conversation # Conversation starter demo
 ```
 
-### 2. Embedding Generation (`embedding/`)
+### 2. Simple Chat with Library Loader (`simple-chat-with-loader/`)
+A comprehensive example that combines dynamic library loading with text generation capabilities.
+
+**Features:**
+- **Dynamic Library Loading**: Automatically extracts and loads embedded llama.cpp libraries
+- **Library Lifecycle Management**: Proper loading and unloading of shared libraries with cleanup
+- **Cross-platform Support**: Works on macOS, Linux, and Windows with platform detection
+- **Embedded Library Extraction**: Pre-compiled libraries embedded in the binary for portability
+- **Combined Functionality**: Full integration of library management and text generation
+- **Resource Management**: Automatic cleanup of temporary files and library handles
+- **Error Handling**: Comprehensive error handling for both library loading and model operations
+
+**Usage:**
+```bash
+cd simple-chat-with-loader
+go run main.go -prompt "The future of AI is"
+
+# Test library loading specifically
+go run main.go -prompt "Testing library loader" -n-predict 20
+
+# Creative writing with loader
+go run main.go -prompt "Once upon a time" -n-predict 150
+
+# Run the comprehensive demo
+./demo.sh
+
+# Use Makefile shortcuts
+make test-loader  # Test library loading functionality
+make creative     # Creative writing demo with loader
+make technical    # Technical explanation demo with loader
+```
+
+### 3. Embedding Generation (`embedding/`)
 Demonstrates how to generate high-dimensional embedding vectors from text.
 
 **Features:**
@@ -60,7 +92,7 @@ go run main.go -prompt "Hello World!" -output-format json
 ./demo.sh
 ```
 
-### 3. Speculative Decoding (`speculative/`)
+### 4. Speculative Decoding (`speculative/`)
 Advanced example demonstrating speculative decoding for accelerated text generation.
 
 **Features:**
@@ -91,7 +123,7 @@ make draft-comparison  # Compare different draft lengths
 make temperature-demo  # Temperature sampling demo
 ```
 
-### 4. Document Retrieval (`retrieval/`)
+### 5. Document Retrieval (`retrieval/`)
 Comprehensive document retrieval system using embedding-based semantic search.
 
 **Features:**
@@ -123,7 +155,7 @@ make programming-demo # Programming languages retrieval
 make combined-demo    # Cross-domain search
 ```
 
-### 5. Batched Generation (`batched/`)
+### 6. Batched Generation (`batched/`)
 Simplified demonstration of batched text generation concepts for multiple sequence generation.
 
 **Features:**
@@ -156,7 +188,7 @@ make tech-demo    # Technology concepts demo
 
 **Note:** This is a simplified demonstration that generates sequences sequentially to illustrate batched generation concepts. A full implementation would require true parallel batch processing with advanced batch management.
 
-### 6. Diffusion Generation (`diffusion/`)
+### 7. Diffusion Generation (`diffusion/`)
 Conceptual demonstration of diffusion-based text generation principles using iterative token refinement.
 
 **Features:**

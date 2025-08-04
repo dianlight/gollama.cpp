@@ -11,3 +11,4 @@ examples/gritlm/gritlm
 examples/simple-chat/simple-chat
 examples/embedding/embedding
 examples/eval-callback/eval-callback
+examples/simple-chat-with-loader/simple-chat-with-loader

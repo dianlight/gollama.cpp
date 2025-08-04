@@ -55,9 +55,6 @@
     "schedule": ["at any time"],
     "addLabels": ["security"]
   },
-  "golang": {
-    "minimumGoVersion": "1.21"
-  },
   "customManagers": [
     {
       "customType": "regex",

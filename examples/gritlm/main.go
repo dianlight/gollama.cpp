@@ -37,12 +37,12 @@ func normalizeEmbedding(input []float32, output []float32) {
 	if len(input) != len(output) {
 		return
 	}
-	
+
 	var sum float64 = 0
 	for _, val := range input {
 		sum += float64(val * val)
 	}
-	
+
 	norm := math.Sqrt(sum)
 	if norm > 0 {
 		for i := range input {
@@ -109,10 +109,10 @@ func main() {
 	// Test just one simple sentence first
 	sentence := "Hello world"
 	fmt.Printf("Generating embedding for: %s\n", sentence)
-	
+
 	// Prepare input with instruction
 	inputString := embeddingInstruction + sentence
-	
+
 	// Tokenize the full input
 	tokens, err := gollama.Tokenize(model, inputString, true, false)
 	if err != nil {
@@ -128,16 +128,16 @@ func main() {
 
 	// Create batch
 	batch := gollama.Batch_init(nToks, 0, 1)
-	
+
 	// Add tokens to batch
 	addSequenceToBatch(&batch, tokens, gollama.LlamaSeqId(0))
 
 	// Clear previous kv_cache values (irrelevant for embeddings)
 	gollama.Memory_clear(ctx, true)
 	gollama.Set_causal_attn(ctx, false)
-	
+
 	fmt.Printf("About to decode...\n")
-	
+
 	// Run the model
 	err = gollama.Decode(ctx, batch)
 	if err != nil {
@@ -154,7 +154,7 @@ func main() {
 
 	// Get embedding dimensions
 	nEmbd := gollama.Model_n_embd(model)
-	
+
 	// Convert to Go slice
 	embeddings := unsafe.Slice(embPtr, nEmbd)
 	embeddingsCopy := make([]float32, nEmbd)
@@ -163,10 +163,10 @@ func main() {
 	// Normalize the embedding (L2 norm)
 	embNorm := make([]float32, nEmbd)
 	normalizeEmbedding(embeddingsCopy, embNorm)
-	
+
 	fmt.Printf("Successfully generated embedding!\n")
 	fmt.Printf("Embedding dimension: %d\n", len(embNorm))
-	fmt.Printf("First 5 values: %.6f %.6f %.6f %.6f %.6f\n", 
+	fmt.Printf("First 5 values: %.6f %.6f %.6f %.6f %.6f\n",
 		embNorm[0], embNorm[1], embNorm[2], embNorm[3], embNorm[4])
 
 	fmt.Println("Basic embedding generation completed successfully!")

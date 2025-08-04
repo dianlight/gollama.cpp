@@ -371,14 +371,14 @@ var (
 	llamaEncode func(ctx LlamaContext, batch LlamaBatch) int32
 
 	// Logits and embeddings
-	llamaGetLogits     func(ctx LlamaContext) *float32
-	llamaGetLogitsIth  func(ctx LlamaContext, i int32) *float32
-	llamaGetEmbeddings func(ctx LlamaContext) *float32
+	llamaGetLogits        func(ctx LlamaContext) *float32
+	llamaGetLogitsIth     func(ctx LlamaContext, i int32) *float32
+	llamaGetEmbeddings    func(ctx LlamaContext) *float32
 	llamaGetEmbeddingsIth func(ctx LlamaContext, i int32) *float32
-	llamaSetCausalAttn func(ctx LlamaContext, causal bool) int32
-	llamaSetEmbeddings func(ctx LlamaContext, embeddings bool)
-	llamaMemoryClear   func(memory LlamaMemory, reset bool) bool
-	llamaGetMemory     func(ctx LlamaContext) LlamaMemory
+	llamaSetCausalAttn    func(ctx LlamaContext, causal bool) int32
+	llamaSetEmbeddings    func(ctx LlamaContext, embeddings bool)
+	llamaMemoryClear      func(memory LlamaMemory, reset bool) bool
+	llamaGetMemory        func(ctx LlamaContext) LlamaMemory
 
 	// Sampling functions
 	llamaSamplerChainDefaultParams func() LlamaSamplerChainParams
@@ -455,12 +455,18 @@ func getLibraryPath() (string, error) {
 
 	// Try to find the library in the current directory, parent directory, or system path
 	candidates := []string{
-		libName,                     // Current directory
-		"../" + libName,             // Parent directory (for when running from examples/)
-		"../../" + libName,          // Parent directory (for when running from examples/)
-		"/usr/local/lib/" + libName, // System library path
-		"/usr/lib/" + libName,       // Common system library path
-		"/lib/" + libName,           // Another common system library path
+		libName,                         // Current directory
+		"libs/darwin_arm64/" + libName,  // macOS
+		"libs/darwin_amd64/" + libName,  // macOS
+		"libs/linux_arm64/" + libName,   // Linux ARM64
+		"libs/linux_amd64/" + libName,   // Linux AMD64
+		"libs/windows_amd64/" + libName, // Windows AMD64
+		"libs/windows_arm64/" + libName, // Windows ARM64
+		"../" + libName,                 // Parent directory (for when running from examples/)
+		"../../" + libName,              // Parent directory (for when running from examples/)
+		"/usr/local/lib/" + libName,     // System library path
+		"/usr/lib/" + libName,           // Common system library path
+		"/lib/" + libName,               // Another common system library path
 	}
 
 	for _, candidate := range candidates {

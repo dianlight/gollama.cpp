@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/ltarantino/gollama.cpp"
+	"github.com/dianlight/gollama.cpp"
 )
 
 // DraftSequence represents a draft sequence for speculative decoding

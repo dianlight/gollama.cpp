@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ltarantino/gollama.cpp"
+	"github.com/dianlight/gollama.cpp"
 )
 
 // EvalCallbackData simulates the callback data structure from the C++ example

@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/ltarantino/gollama.cpp"
+	"github.com/dianlight/gollama.cpp"
 )
 
 func main() {

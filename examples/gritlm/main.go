@@ -7,7 +7,7 @@ import (
 	"os"
 	"unsafe"
 
-	gollama "github.com/ltarantino/gollama.cpp"
+	gollama "github.com/dianlight/gollama.cpp"
 )
 
 const embeddingInstruction = "<|embed|>"

@@ -1,8 +1,8 @@
 # Gollama.cpp
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/ltarantino/gollama.cpp.svg)](https://pkg.go.dev/github.com/ltarantino/gollama.cpp)
+[![Go Reference](https://pkg.go.dev/badge/github.com/dianlight/gollama.cpp.svg)](https://pkg.go.dev/github.com/dianlight/gollama.cpp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Release](https://img.shields.io/github/v/release/ltarantino/gollama.cpp.svg)](https://github.com/ltarantino/gollama.cpp/releases)
+[![Release](https://img.shields.io/github/v/release/ltarantino/gollama.cpp.svg)](https://github.com/dianlight/gollama.cpp/releases)
 
 A high-performance Go binding for [llama.cpp](https://github.com/ggml-org/llama.cpp) using [purego](https://github.com/ebitengine/purego) for cross-platform compatibility without CGO.
 
@@ -32,7 +32,7 @@ A high-performance Go binding for [llama.cpp](https://github.com/ggml-org/llama.
 ## Installation
 
 ```bash
-go get github.com/ltarantino/gollama.cpp
+go get github.com/dianlight/gollama.cpp
 ```
 
 The Go module includes pre-built llama.cpp libraries for all supported platforms. No additional installation required!
@@ -46,7 +46,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/ltarantino/gollama.cpp"
+    "github.com/dianlight/gollama.cpp"
 )
 
 func main() {
@@ -186,7 +186,7 @@ For example: `v1.0.0-llamacpp.b6076` uses llama.cpp build b6076.
 
 ## Documentation
 
-- [API Reference](https://pkg.go.dev/github.com/ltarantino/gollama.cpp)
+- [API Reference](https://pkg.go.dev/github.com/dianlight/gollama.cpp)
 - [Examples](./examples/)
 - [Build Guide](./docs/BUILD.md)
 - [GPU Setup](./docs/GPU.md)
@@ -221,5 +221,5 @@ This license is compatible with llama.cpp's MIT license.
 
 ## Support
 
-- [Issues](https://github.com/ltarantino/gollama.cpp/issues) - Bug reports and feature requests
-- [Discussions](https://github.com/ltarantino/gollama.cpp/discussions) - Questions and community support
+- [Issues](https://github.com/dianlight/gollama.cpp/issues) - Bug reports and feature requests
+- [Discussions](https://github.com/dianlight/gollama.cpp/discussions) - Questions and community support

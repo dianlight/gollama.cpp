@@ -64,7 +64,7 @@ The fastest way to build gollama.cpp:
 
 ```bash
 # Clone the repository
-git clone https://github.com/ltarantino/gollama.cpp
+git clone https://github.com/dianlight/gollama.cpp
 cd gollama.cpp
 
 # Build everything (Go bindings + llama.cpp libraries)
@@ -79,7 +79,7 @@ make test
 ### 1. Clone and Setup
 
 ```bash
-git clone https://github.com/ltarantino/gollama.cpp
+git clone https://github.com/dianlight/gollama.cpp
 cd gollama.cpp
 
 # Download Go dependencies

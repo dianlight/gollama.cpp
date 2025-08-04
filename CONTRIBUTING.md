@@ -49,7 +49,7 @@ Before contributing, ensure you have:
 
 3. Add the upstream repository:
    ```bash
-   git remote add upstream https://github.com/ltarantino/gollama.cpp
+   git remote add upstream https://github.com/dianlight/gollama.cpp
    ```
 
 4. Install dependencies:

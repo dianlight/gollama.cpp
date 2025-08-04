@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ltarantino/gollama.cpp"
+	"github.com/dianlight/gollama.cpp"
 )
 
 // FlagInfo represents a command-line flag

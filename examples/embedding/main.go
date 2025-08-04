@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/ltarantino/gollama.cpp"
+	"github.com/dianlight/gollama.cpp"
 )
 
 // splitLines splits a string into lines based on a separator

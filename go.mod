@@ -1,4 +1,4 @@
-module github.com/ltarantino/gollama.cpp
+module github.com/dianlight/gollama.cpp
 
 go 1.21
 

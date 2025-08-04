@@ -255,7 +255,7 @@ jobs:
       with:
         cuda: '12.9.1'
         method: 'network'
-        use-github-cache: true
+        use-github-cache: false
         use-local-cache: true
         log-file-suffix: 'cuda-install.log'
         sub-packages: '["nvcc", "cudart", "thrust", "cufft", "curand", "cusolver", "cusparse", "cublas"]'

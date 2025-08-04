@@ -374,6 +374,11 @@ var (
 	llamaGetLogits     func(ctx LlamaContext) *float32
 	llamaGetLogitsIth  func(ctx LlamaContext, i int32) *float32
 	llamaGetEmbeddings func(ctx LlamaContext) *float32
+	llamaGetEmbeddingsIth func(ctx LlamaContext, i int32) *float32
+	llamaSetCausalAttn func(ctx LlamaContext, causal bool) int32
+	llamaSetEmbeddings func(ctx LlamaContext, embeddings bool)
+	llamaMemoryClear   func(memory LlamaMemory, reset bool) bool
+	llamaGetMemory     func(ctx LlamaContext) LlamaMemory
 
 	// Sampling functions
 	llamaSamplerChainDefaultParams func() LlamaSamplerChainParams
@@ -572,6 +577,11 @@ func registerFunctions() error {
 	purego.RegisterLibFunc(&llamaGetLogits, libHandle, "llama_get_logits")
 	purego.RegisterLibFunc(&llamaGetLogitsIth, libHandle, "llama_get_logits_ith")
 	purego.RegisterLibFunc(&llamaGetEmbeddings, libHandle, "llama_get_embeddings")
+	purego.RegisterLibFunc(&llamaGetEmbeddingsIth, libHandle, "llama_get_embeddings_ith")
+	purego.RegisterLibFunc(&llamaSetCausalAttn, libHandle, "llama_set_causal_attn")
+	purego.RegisterLibFunc(&llamaSetEmbeddings, libHandle, "llama_set_embeddings")
+	purego.RegisterLibFunc(&llamaMemoryClear, libHandle, "llama_memory_clear")
+	purego.RegisterLibFunc(&llamaGetMemory, libHandle, "llama_get_memory")
 
 	// Sampling functions
 	purego.RegisterLibFunc(&llamaSamplerChainDefaultParams, libHandle, "llama_sampler_chain_default_params")
@@ -708,6 +718,47 @@ func Get_embeddings(ctx LlamaContext) *float32 {
 	return llamaGetEmbeddings(ctx)
 }
 
+// Get_embeddings_ith returns the embeddings for the ith sequence in the context
+func Get_embeddings_ith(ctx LlamaContext, i int32) *float32 {
+	if err := ensureLoaded(); err != nil {
+		return nil
+	}
+	return llamaGetEmbeddingsIth(ctx, i)
+}
+
+// Set_causal_attn sets whether to use causal attention
+func Set_causal_attn(ctx LlamaContext, causal bool) {
+	if err := ensureLoaded(); err != nil {
+		return
+	}
+	llamaSetCausalAttn(ctx, causal)
+}
+
+// Set_embeddings sets whether to extract embeddings
+func Set_embeddings(ctx LlamaContext, embeddings bool) {
+	if err := ensureLoaded(); err != nil {
+		return
+	}
+	llamaSetEmbeddings(ctx, embeddings)
+}
+
+// Memory_clear clears the KV cache
+func Memory_clear(ctx LlamaContext, reset bool) bool {
+	if err := ensureLoaded(); err != nil {
+		return false
+	}
+	memory := llamaGetMemory(ctx)
+	return llamaMemoryClear(memory, reset)
+}
+
+// Get_memory returns the memory handle for the context
+func Get_memory(ctx LlamaContext) LlamaMemory {
+	if err := ensureLoaded(); err != nil {
+		return 0
+	}
+	return llamaGetMemory(ctx)
+}
+
 // Context_default_params returns default context parameters
 func Context_default_params() LlamaContextParams {
 	if err := ensureLoaded(); err != nil {
@@ -840,12 +891,14 @@ func Batch_get_one(tokens []LlamaToken) LlamaBatch {
 
 // Batch_free frees a batch
 func Batch_free(batch LlamaBatch) {
-	// Note: llama_batch_get_one creates a temporary batch that doesn't need to be freed
+	if err := ensureLoaded(); err != nil {
+		return
+	}
 	// Only call llama_batch_free for batches created with llama_batch_init
-	// For now, we'll skip the free to avoid double-free errors
-	// if isLoaded {
-	//     llamaBatchFree(batch)
-	// }
+	// Batches created with llama_batch_get_one don't need to be freed
+	if batch.Token != nil {
+		llamaBatchFree(batch)
+	}
 }
 
 // Decode decodes a batch

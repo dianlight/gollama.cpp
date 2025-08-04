@@ -1,9 +1,13 @@
 build/
 dist/
 .DS_Store
-models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf
+models/*.gguf
 libs/darwin_*
 libs/linux_*
 libs/windows_*
 examples/gen-docs/test-output/
 examples/gen-docs/validate-test/
+examples/gritlm/gritlm
+examples/simple-chat/simple-chat
+examples/embedding/embedding
+examples/eval-callback/eval-callback

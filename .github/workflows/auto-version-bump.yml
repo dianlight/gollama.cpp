@@ -1,0 +1,71 @@
+name: Auto-increment version on llama.cpp update
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'Makefile'
+      - '.github/workflows/ci.yml'
+      - 'CONTRIBUTING.md'
+      - 'docs/BUILD.md'
+
+jobs:
+  auto-increment-version:
+    if: startsWith(github.head_ref, 'renovate/') && contains(github.event.pull_request.title, 'llama.cpp')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+    - name: Checkout PR branch
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        ref: ${{ github.head_ref }}
+        fetch-depth: 0
+
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+
+    - name: Check if llama.cpp was updated and increment version
+      run: |
+        # Extract current version from Makefile
+        CURRENT_VERSION=$(grep "^VERSION ?=" Makefile | sed 's/VERSION ?= //')
+        echo "Current version: $CURRENT_VERSION"
+        
+        # Parse version parts
+        IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+        echo "Parsed version: MAJOR=$MAJOR, MINOR=$MINOR, PATCH=$PATCH"
+        
+        # Increment minor version and reset patch to 0
+        NEW_MINOR=$((MINOR + 1))
+        NEW_VERSION="$MAJOR.$NEW_MINOR.0"
+        echo "New version: $NEW_VERSION"
+        
+        # Update VERSION in Makefile
+        sed -i "s/^VERSION ?= .*/VERSION ?= $NEW_VERSION/" Makefile
+        
+        # Update Version in gollama.go
+        sed -i "s/Version = \"[^\"]*\"/Version = \"$NEW_VERSION\"/" gollama.go
+        
+        # Verify the changes
+        echo "Updated Makefile VERSION:"
+        grep "^VERSION ?=" Makefile
+        echo "Updated gollama.go Version:"
+        grep -E "^\s*Version = " gollama.go
+        
+        # Check if there are changes to commit
+        if git diff --quiet; then
+          echo "No version changes needed"
+          exit 0
+        fi
+        
+        # Commit the version bump
+        git add Makefile gollama.go
+        git commit -m "chore: bump version to $NEW_VERSION for llama.cpp update"
+        git push origin ${{ github.head_ref }}
+        
+        echo "Version bumped from $CURRENT_VERSION to $NEW_VERSION"

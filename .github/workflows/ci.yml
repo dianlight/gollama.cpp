@@ -151,7 +151,7 @@ jobs:
       if: matrix.platform == 'linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake build-essential
+        sudo apt-get install -y cmake build-essential patchelf
         if [[ "${{ matrix.arch }}" == "arm64" ]]; then
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
         fi
@@ -172,35 +172,12 @@ jobs:
       with:
         cuda: '12.0.0'
 
-    - name: Clone llama.cpp
+    - name: Clone and build llama.cpp using Makefile
+      env:
+        LLAMA_CPP_BUILD: ${{ env.LLAMA_CPP_BUILD }}
       run: |
-        if [ ! -d "build/llama.cpp" ]; then
-          mkdir -p build
-          git clone https://github.com/ggml-org/llama.cpp build/llama.cpp
-        fi
-        cd build/llama.cpp
-        git fetch
-        git checkout ${{ env.LLAMA_CPP_BUILD }}
-
-    - name: Build llama.cpp
-      run: |
-        cd build/llama.cpp
-        mkdir -p build-${{ matrix.platform }}-${{ matrix.arch }}
-        cd build-${{ matrix.platform }}-${{ matrix.arch }}
-        cmake .. -DBUILD_SHARED_LIBS=ON ${{ matrix.cmake_flags }}
-        cmake --build . --config Release -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
-
-    - name: Copy libraries (Linux/macOS)
-      if: matrix.platform != 'windows'
-      run: |
-        mkdir -p libs/${{ matrix.platform }}_${{ matrix.arch }}
-        find build/llama.cpp/build-${{ matrix.platform }}-${{ matrix.arch }} -name "*.so" -o -name "*.dylib" | head -1 | xargs -I {} cp {} libs/${{ matrix.platform }}_${{ matrix.arch }}/
-
-    - name: Copy libraries (Windows)
-      if: matrix.platform == 'windows'
-      run: |
-        mkdir -p libs/${{ matrix.platform }}_${{ matrix.arch }}
-        find build/llama.cpp/build-${{ matrix.platform }}-${{ matrix.arch }} -name "*.dll" | head -1 | xargs -I {} cp {} libs/${{ matrix.platform }}_${{ matrix.arch }}/
+        make clone-llamacpp
+        make build-llamacpp-${{ matrix.platform }}-${{ matrix.arch }}
 
     - name: Upload library artifacts
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -245,9 +222,7 @@ jobs:
         GOOS: ${{ matrix.goos }}
         GOARCH: ${{ matrix.goarch }}
         CGO_ENABLED: 0
-      run: |
-        mkdir -p build/${{ matrix.goos }}_${{ matrix.goarch }}
-        go build -ldflags="-s -w" -o build/${{ matrix.goos }}_${{ matrix.goarch }}/ ./...
+      run: make build
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -370,12 +345,7 @@ jobs:
         path: libs/
 
     - name: Build examples
-      run: |
-        if [ -d "examples" ]; then
-          cd examples
-          go mod download
-          go build ./...
-        fi
+      run: make build-examples
 
   documentation:
     name: Generate Documentation

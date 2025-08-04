@@ -128,31 +128,17 @@ func (l *LibraryLoader) extractEmbeddedLibraries() (string, error) {
 	goos := runtime.GOOS
 	goarch := runtime.GOARCH
 
-	// Define expected libraries for each platform
-	libsByPlatform := map[string]map[string][]string{
-		"darwin": {
-			"amd64": {"libggml.dylib", "libggml-base.dylib", "libggml-blas.dylib", "libggml-cpu.dylib", "libggml-metal.dylib", "libllama.dylib", "libmtmd.dylib"},
-			"arm64": {"libggml.dylib", "libggml-base.dylib", "libggml-blas.dylib", "libggml-cpu.dylib", "libggml-metal.dylib", "libllama.dylib", "libmtmd.dylib"},
-		},
-		"linux": {
-			"amd64": {"libggml.so", "libggml-base.so", "libggml-blas.so", "libggml-cpu.so", "libggml-cuda.so", "libllama.so", "libmtmd.so"},
-			"arm64": {"libggml.so", "libggml-base.so", "libggml-blas.so", "libggml-cpu.so", "libllama.so", "libmtmd.so"},
-		},
-		"windows": {
-			"amd64": {"ggml.dll", "ggml-base.dll", "ggml-blas.dll", "ggml-cpu.dll", "ggml-cuda.dll", "llama.dll", "mtmd.dll"},
-			"arm64": {"ggml.dll", "ggml-base.dll", "ggml-blas.dll", "ggml-cpu.dll", "llama.dll", "mtmd.dll"},
-		},
-	}
-
-	// Get libraries for current platform
-	platformLibs, exists := libsByPlatform[goos]
-	if !exists {
+	// Define file extensions for each platform
+	var libExtension string
+	switch goos {
+	case "darwin":
+		libExtension = ".dylib"
+	case "linux":
+		libExtension = ".so"
+	case "windows":
+		libExtension = ".dll"
+	default:
 		return "", fmt.Errorf("unsupported OS: %s", goos)
-	}
-
-	archLibs, exists := platformLibs[goarch]
-	if !exists {
-		return "", fmt.Errorf("unsupported architecture %s for OS %s", goarch, goos)
 	}
 
 	// Create temporary directory
@@ -165,22 +151,39 @@ func (l *LibraryLoader) extractEmbeddedLibraries() (string, error) {
 	embeddedDir := fmt.Sprintf("libs/%s_%s", goos, goarch)
 	extractedCount := 0
 
-	for _, libName := range archLibs {
-		embeddedPath := fmt.Sprintf("%s/%s", embeddedDir, libName)
+	// Read the embedded directory to find all library files
+	dirEntries, err := embeddedLibs.ReadDir(embeddedDir)
+	if err != nil {
+		os.RemoveAll(tempDir)
+		return "", fmt.Errorf("no embedded libraries directory found for platform %s_%s: %w", goos, goarch, err)
+	}
+
+	// Extract all files with the appropriate extension
+	for _, entry := range dirEntries {
+		if entry.IsDir() {
+			continue
+		}
+
+		fileName := entry.Name()
+		if filepath.Ext(fileName) != libExtension {
+			continue
+		}
+
+		embeddedPath := fmt.Sprintf("%s/%s", embeddedDir, fileName)
 
 		// Try to read the embedded file
 		data, err := embeddedLibs.ReadFile(embeddedPath)
 		if err != nil {
-			// Skip missing files (some may be optional)
+			// Skip files that can't be read
 			continue
 		}
 
 		// Write library to temporary file
-		tempLibPath := filepath.Join(tempDir, libName)
+		tempLibPath := filepath.Join(tempDir, fileName)
 		err = os.WriteFile(tempLibPath, data, 0755)
 		if err != nil {
 			os.RemoveAll(tempDir)
-			return "", fmt.Errorf("failed to write temp library %s: %w", libName, err)
+			return "", fmt.Errorf("failed to write temp library %s: %w", fileName, err)
 		}
 		extractedCount++
 	}

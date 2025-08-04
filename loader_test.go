@@ -93,67 +93,57 @@ func TestLibraryLoader_ExtractEmbeddedLibraries(t *testing.T) {
 	})
 
 	t.Run("Platform-specific library sets", func(t *testing.T) {
-		// Test that the function knows about expected libraries for current platform
+		// Test that the function dynamically finds all libraries for current platform
 		goos := runtime.GOOS
 		goarch := runtime.GOARCH
 
-		// Define expected library patterns for verification
-		expectedPatterns := map[string]map[string][]string{
-			"darwin": {
-				"amd64": {"libggml.dylib", "libllama.dylib"},
-				"arm64": {"libggml.dylib", "libllama.dylib"},
-			},
-			"linux": {
-				"amd64": {"libggml.so", "libllama.so"},
-				"arm64": {"libggml.so", "libllama.so"},
-			},
-			"windows": {
-				"amd64": {"ggml.dll", "llama.dll"},
-				"arm64": {"ggml.dll", "llama.dll"},
-			},
+		// Define expected file extensions for each platform
+		expectedExtensions := map[string]string{
+			"darwin":  ".dylib",
+			"linux":   ".so",
+			"windows": ".dll",
 		}
 
-		if patterns, exists := expectedPatterns[goos]; exists {
-			if archPatterns, exists := patterns[goarch]; exists {
-				// The function should fail (no embedded files), but it should know the platform
-				mainLibPath, err := loader.extractEmbeddedLibraries()
-				if err == nil {
-					t.Log("extractEmbeddedLibraries succeeded - libraries may be present")
+		if expectedExt, exists := expectedExtensions[goos]; exists {
+			// The function should dynamically extract all files with the correct extension
+			mainLibPath, err := loader.extractEmbeddedLibraries()
+			if err == nil {
+				t.Log("extractEmbeddedLibraries succeeded - libraries may be present")
 
-					// Verify that main library path is correct
-					expectedMainLib, _ := loader.getLibraryName()
-					if filepath.Base(mainLibPath) != expectedMainLib {
-						t.Errorf("Main library path mismatch: got %s, expected to end with %s", mainLibPath, expectedMainLib)
-					}
-
-					// Verify temporary directory contains expected files
-					if loader.tempDir != "" {
-						files, err := os.ReadDir(loader.tempDir)
-						if err == nil {
-							t.Logf("Extracted %d files to %s", len(files), loader.tempDir)
-							for _, file := range files {
-								t.Logf("  - %s", file.Name())
-							}
-						}
-
-						// Clean up
-						os.RemoveAll(loader.tempDir)
-						loader.tempDir = ""
-					}
-				} else {
-					// Verify the error message indicates missing libraries, not unsupported platform
-					if err.Error() == fmt.Sprintf("unsupported OS: %s", goos) ||
-						err.Error() == fmt.Sprintf("unsupported architecture %s for OS %s", goarch, goos) {
-						t.Errorf("Platform should be supported: %s_%s", goos, goarch)
-					} else {
-						t.Logf("Expected failure for missing libraries: %v", err)
-					}
+				// Verify that main library path is correct
+				expectedMainLib, _ := loader.getLibraryName()
+				if filepath.Base(mainLibPath) != expectedMainLib {
+					t.Errorf("Main library path mismatch: got %s, expected to end with %s", mainLibPath, expectedMainLib)
 				}
 
-				t.Logf("Platform %s_%s expects libraries: %v", goos, goarch, archPatterns)
+				// Verify temporary directory contains files with correct extension
+				if loader.tempDir != "" {
+					files, err := os.ReadDir(loader.tempDir)
+					if err == nil {
+						t.Logf("Extracted %d files to %s", len(files), loader.tempDir)
+						for _, file := range files {
+							fileName := file.Name()
+							if filepath.Ext(fileName) != expectedExt {
+								t.Errorf("Unexpected file extension for %s, expected %s", fileName, expectedExt)
+							}
+							t.Logf("  - %s", fileName)
+						}
+					}
+
+					// Clean up
+					os.RemoveAll(loader.tempDir)
+					loader.tempDir = ""
+				}
 			} else {
-				t.Logf("Architecture %s not defined for platform %s", goarch, goos)
+				// Verify the error message indicates missing libraries, not unsupported platform
+				if err.Error() == fmt.Sprintf("unsupported OS: %s", goos) {
+					t.Errorf("Platform should be supported: %s", goos)
+				} else {
+					t.Logf("Expected failure for missing libraries: %v", err)
+				}
 			}
+
+			t.Logf("Platform %s_%s expects files with extension: %s", goos, goarch, expectedExt)
 		} else {
 			t.Logf("Platform %s not in expected patterns", goos)
 		}

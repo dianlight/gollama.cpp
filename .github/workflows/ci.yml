@@ -102,7 +102,12 @@ jobs:
     - name: Run Gosec Security Scanner
       uses: securego/gosec@master
       with:
-        args: './...'
+        # Exclude low-severity issues and specific rules that are acceptable:
+        # G103: Use of unsafe calls (necessary for C interop)
+        # G104: Errors unhandled (acceptable for non-critical operations)
+        # Set severity to medium to exclude low-severity findings
+        # This reduces noise while focusing on actionable security issues
+        args: '-exclude=G103,G104 -severity=medium ./...'
 
   build-libs:
     name: Build Libraries

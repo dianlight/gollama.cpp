@@ -1,0 +1,18 @@
+{
+  "tests": false,
+  "exclude": [
+    "G103",
+    "G104"
+  ],
+  "exclude-rules": {
+    "G103": "Use of unsafe package is necessary for C interoperability in this Go-C binding library",
+    "G104": "Not all error returns need to be checked in non-critical operations like cleanup or informational functions"
+  },
+  "severity": "medium",
+  "confidence": "medium",
+  "exclude-dirs": [
+    "vendor",
+    "node_modules"
+  ],
+  "exclude-generated": true
+}

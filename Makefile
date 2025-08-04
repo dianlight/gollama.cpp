@@ -165,7 +165,9 @@ build-llamacpp-darwin-amd64:
 	@echo "Building llama.cpp for macOS x86_64"
 	mkdir -p $(LIB_DIR)/darwin_amd64
 	cd $(LLAMA_CPP_DIR) && \
-	cmake -B build-darwin-amd64 -DCMAKE_OSX_ARCHITECTURES=x86_64 -DGGML_METAL=ON -DBUILD_SHARED_LIBS=ON && \
+	cmake -B build-darwin-amd64 -DCMAKE_OSX_ARCHITECTURES=x86_64 -DGGML_METAL=ON -DBUILD_SHARED_LIBS=ON \
+		-DCMAKE_C_FLAGS="-target x86_64-apple-darwin -march=x86-64" \
+		-DCMAKE_CXX_FLAGS="-target x86_64-apple-darwin -march=x86-64" && \
 	cmake --build build-darwin-amd64 --config Release -j$$(sysctl -n hw.ncpu) && \
 	cp build-darwin-amd64/bin/*.dylib ../../$(LIB_DIR)/darwin_amd64/ && \
 	for lib in ../../$(LIB_DIR)/darwin_amd64/*.dylib; do \
@@ -198,9 +200,17 @@ build-llamacpp-darwin-arm64:
 .PHONY: build-llamacpp-linux-amd64
 build-llamacpp-linux-amd64:
 	@echo "Building llama.cpp for Linux x86_64"
-	mkdir -p $(LIB_DIR)/linux_amd64
+	@echo "Checking for CUDA SDK availability..."
+	@if [ -d "/usr/local/cuda" ] || [ -d "/opt/cuda" ] || command -v nvcc >/dev/null 2>&1; then \
+		echo "CUDA SDK found - building with CUDA support"; \
+		CUDA_FLAG="-DGGML_CUDA=ON"; \
+	else \
+		echo "CUDA SDK not found - building CPU-only version"; \
+		CUDA_FLAG="-DGGML_CUDA=OFF"; \
+	fi; \
+	mkdir -p $(LIB_DIR)/linux_amd64; \
 	cd $(LLAMA_CPP_DIR) && \
-	cmake -B build-linux-amd64 -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON && \
+	cmake -B build-linux-amd64 $$CUDA_FLAG -DBUILD_SHARED_LIBS=ON && \
 	cmake --build build-linux-amd64 --config Release -j$$(nproc) && \
 	cp build-linux-amd64/bin/lib*.so ../../$(LIB_DIR)/linux_amd64/ && \
 	for lib in ../../$(LIB_DIR)/linux_amd64/*.so; do \
@@ -215,9 +225,17 @@ build-llamacpp-linux-amd64:
 .PHONY: build-llamacpp-linux-arm64
 build-llamacpp-linux-arm64:
 	@echo "Building llama.cpp for Linux ARM64"
-	mkdir -p $(LIB_DIR)/linux_arm64
+	@echo "Checking for CUDA SDK availability..."
+	@if [ -d "/usr/local/cuda" ] || [ -d "/opt/cuda" ] || command -v nvcc >/dev/null 2>&1; then \
+		echo "CUDA SDK found - building with CUDA support"; \
+		CUDA_FLAG="-DGGML_CUDA=ON"; \
+	else \
+		echo "CUDA SDK not found - building CPU-only version"; \
+		CUDA_FLAG="-DGGML_CUDA=OFF"; \
+	fi; \
+	mkdir -p $(LIB_DIR)/linux_arm64; \
 	cd $(LLAMA_CPP_DIR) && \
-	cmake -B build-linux-arm64 -DCMAKE_SYSTEM_PROCESSOR=aarch64 -DBUILD_SHARED_LIBS=ON && \
+	cmake -B build-linux-arm64 -DCMAKE_SYSTEM_PROCESSOR=aarch64 $$CUDA_FLAG -DBUILD_SHARED_LIBS=ON && \
 	cmake --build build-linux-arm64 --config Release -j$$(nproc) && \
 	cp build-linux-arm64/bin/lib*.so ../../$(LIB_DIR)/linux_arm64/ && \
 	for lib in ../../$(LIB_DIR)/linux_arm64/*.so; do \

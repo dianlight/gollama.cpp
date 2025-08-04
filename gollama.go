@@ -527,16 +527,19 @@ func registerFunctions() error {
 	purego.RegisterLibFunc(&llamaBackendFree, libHandle, "llama_backend_free")
 	purego.RegisterLibFunc(&llamaLogSet, libHandle, "llama_log_set")
 
-	// Model functions
-	purego.RegisterLibFunc(&llamaModelDefaultParams, libHandle, "llama_model_default_params")
-	purego.RegisterLibFunc(&llamaModelLoadFromFile, libHandle, "llama_model_load_from_file")
-	purego.RegisterLibFunc(&llamaModelLoadFromSplits, libHandle, "llama_model_load_from_splits")
+	// Model functions - Skip functions that use structs on non-Darwin platforms
+	if runtime.GOOS == "darwin" {
+		purego.RegisterLibFunc(&llamaModelDefaultParams, libHandle, "llama_model_default_params")
+		purego.RegisterLibFunc(&llamaContextDefaultParams, libHandle, "llama_context_default_params")
+		purego.RegisterLibFunc(&llamaSamplerChainDefaultParams, libHandle, "llama_sampler_chain_default_params")
+		purego.RegisterLibFunc(&llamaModelLoadFromFile, libHandle, "llama_model_load_from_file")
+		purego.RegisterLibFunc(&llamaModelLoadFromSplits, libHandle, "llama_model_load_from_splits")
+		purego.RegisterLibFunc(&llamaInitFromModel, libHandle, "llama_init_from_model")
+	}
 	purego.RegisterLibFunc(&llamaModelSaveToFile, libHandle, "llama_model_save_to_file")
 	purego.RegisterLibFunc(&llamaModelFree, libHandle, "llama_model_free")
 
 	// Context functions
-	purego.RegisterLibFunc(&llamaContextDefaultParams, libHandle, "llama_context_default_params")
-	purego.RegisterLibFunc(&llamaInitFromModel, libHandle, "llama_init_from_model")
 	purego.RegisterLibFunc(&llamaFree, libHandle, "llama_free")
 
 	// Model info functions
@@ -571,14 +574,18 @@ func registerFunctions() error {
 	purego.RegisterLibFunc(&llamaVocabNl, libHandle, "llama_vocab_nl")
 	purego.RegisterLibFunc(&llamaVocabPad, libHandle, "llama_vocab_pad")
 
-	// Batch functions
-	purego.RegisterLibFunc(&llamaBatchInit, libHandle, "llama_batch_init")
-	purego.RegisterLibFunc(&llamaBatchFree, libHandle, "llama_batch_free")
-	purego.RegisterLibFunc(&llamaBatchGetOne, libHandle, "llama_batch_get_one")
+	// Batch functions - Skip functions that use structs on non-Darwin platforms
+	if runtime.GOOS == "darwin" {
+		purego.RegisterLibFunc(&llamaBatchInit, libHandle, "llama_batch_init")
+		purego.RegisterLibFunc(&llamaBatchGetOne, libHandle, "llama_batch_get_one")
+		purego.RegisterLibFunc(&llamaBatchFree, libHandle, "llama_batch_free")
+	}
 
-	// Decode functions
-	purego.RegisterLibFunc(&llamaDecode, libHandle, "llama_decode")
-	purego.RegisterLibFunc(&llamaEncode, libHandle, "llama_encode")
+	// Decode functions - Skip functions that use structs on non-Darwin platforms
+	if runtime.GOOS == "darwin" {
+		purego.RegisterLibFunc(&llamaDecode, libHandle, "llama_decode")
+		purego.RegisterLibFunc(&llamaEncode, libHandle, "llama_encode")
+	}
 
 	// Logits and embeddings
 	purego.RegisterLibFunc(&llamaGetLogits, libHandle, "llama_get_logits")
@@ -590,9 +597,10 @@ func registerFunctions() error {
 	purego.RegisterLibFunc(&llamaMemoryClear, libHandle, "llama_memory_clear")
 	purego.RegisterLibFunc(&llamaGetMemory, libHandle, "llama_get_memory")
 
-	// Sampling functions
-	purego.RegisterLibFunc(&llamaSamplerChainDefaultParams, libHandle, "llama_sampler_chain_default_params")
-	purego.RegisterLibFunc(&llamaSamplerChainInit, libHandle, "llama_sampler_chain_init")
+	// Sampling functions - Skip functions that use structs on non-Darwin platforms
+	if runtime.GOOS == "darwin" {
+		purego.RegisterLibFunc(&llamaSamplerChainInit, libHandle, "llama_sampler_chain_init")
+	}
 	purego.RegisterLibFunc(&llamaSamplerChainAdd, libHandle, "llama_sampler_chain_add")
 	purego.RegisterLibFunc(&llamaSamplerChainGet, libHandle, "llama_sampler_chain_get")
 	purego.RegisterLibFunc(&llamaSamplerChainN, libHandle, "llama_sampler_chain_n")
@@ -685,13 +693,78 @@ func Model_default_params() LlamaModelParams {
 	if err := ensureLoaded(); err != nil {
 		panic(err) // In a real implementation, handle this better
 	}
-	return llamaModelDefaultParams()
+
+	if runtime.GOOS == "darwin" {
+		return llamaModelDefaultParams()
+	}
+
+	// For non-Darwin platforms, return a default struct since we can't call the C function
+	return LlamaModelParams{
+		NGpuLayers:   0,
+		SplitMode:    LLAMA_SPLIT_MODE_NONE,
+		MainGpu:      0,
+		VocabOnly:    0,
+		UseMmap:      1, // Enable mmap by default
+		UseMlock:     0,
+		CheckTensors: 1, // Enable tensor validation by default
+	}
+}
+
+// Context_default_params returns default context parameters
+func Context_default_params() LlamaContextParams {
+	if err := ensureLoaded(); err != nil {
+		panic(err)
+	}
+
+	if runtime.GOOS == "darwin" {
+		return llamaContextDefaultParams()
+	}
+
+	// For non-Darwin platforms, return a default struct
+	return LlamaContextParams{
+		Seed:            LLAMA_DEFAULT_SEED,
+		NCtx:            0, // Auto-detect from model
+		NBatch:          2048,
+		NUbatch:         512,
+		NSeqMax:         1,
+		NThreads:        int32(runtime.NumCPU()),
+		NThreadsBatch:   int32(runtime.NumCPU()),
+		RopeScalingType: LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED,
+		PoolingType:     LLAMA_POOLING_TYPE_UNSPECIFIED,
+		AttentionType:   LLAMA_ATTENTION_TYPE_CAUSAL,
+		DefragThold:     -1.0, // Disabled by default
+		Logits:          0,    // Disabled by default
+		Embeddings:      0,    // Disabled by default
+		Offload_kqv:     1,    // Enable by default
+		FlashAttn:       0,    // Disabled by default
+		NoPerf:          0,    // Enable performance measurement by default
+	}
+}
+
+// Sampler_chain_default_params returns default sampler chain parameters
+func Sampler_chain_default_params() LlamaSamplerChainParams {
+	if err := ensureLoaded(); err != nil {
+		panic(err)
+	}
+
+	if runtime.GOOS == "darwin" {
+		return llamaSamplerChainDefaultParams()
+	}
+
+	// For non-Darwin platforms, return a default struct
+	return LlamaSamplerChainParams{
+		NoPerf: 0, // Enable performance measurement by default
+	}
 }
 
 // Model_load_from_file loads a model from a file
 func Model_load_from_file(pathModel string, params LlamaModelParams) (LlamaModel, error) {
 	if err := ensureLoaded(); err != nil {
 		return 0, err
+	}
+
+	if runtime.GOOS != "darwin" {
+		return 0, errors.New("Model_load_from_file not yet implemented for non-Darwin platforms")
 	}
 
 	pathBytes := append([]byte(pathModel), 0) // null-terminate
@@ -766,18 +839,14 @@ func Get_memory(ctx LlamaContext) LlamaMemory {
 	return llamaGetMemory(ctx)
 }
 
-// Context_default_params returns default context parameters
-func Context_default_params() LlamaContextParams {
-	if err := ensureLoaded(); err != nil {
-		panic(err)
-	}
-	return llamaContextDefaultParams()
-}
-
 // Init_from_model creates a context from a model
 func Init_from_model(model LlamaModel, params LlamaContextParams) (LlamaContext, error) {
 	if err := ensureLoaded(); err != nil {
 		return 0, err
+	}
+
+	if runtime.GOOS != "darwin" {
+		return 0, errors.New("Init_from_model not yet implemented for non-Darwin platforms")
 	}
 
 	ctx := llamaInitFromModel(model, params)
@@ -886,6 +955,12 @@ func Batch_init(nTokens, embd, nSeqMax int32) LlamaBatch {
 	if err := ensureLoaded(); err != nil {
 		panic(err)
 	}
+
+	if runtime.GOOS != "darwin" {
+		// Return a zero-initialized batch for non-Darwin platforms
+		return LlamaBatch{}
+	}
+
 	return llamaBatchInit(nTokens, embd, nSeqMax)
 }
 
@@ -897,6 +972,12 @@ func Batch_get_one(tokens []LlamaToken) LlamaBatch {
 	if len(tokens) == 0 {
 		return LlamaBatch{}
 	}
+
+	if runtime.GOOS != "darwin" {
+		// Return a zero-initialized batch for non-Darwin platforms
+		return LlamaBatch{}
+	}
+
 	tokensLen := len(tokens)
 	if tokensLen > math.MaxInt32 {
 		panic(fmt.Errorf("too many tokens: %d, maximum supported: %d", tokensLen, math.MaxInt32))
@@ -911,7 +992,7 @@ func Batch_free(batch LlamaBatch) {
 	}
 	// Only call llama_batch_free for batches created with llama_batch_init
 	// Batches created with llama_batch_get_one don't need to be freed
-	if batch.Token != nil {
+	if runtime.GOOS == "darwin" && batch.Token != nil {
 		llamaBatchFree(batch)
 	}
 }
@@ -920,6 +1001,10 @@ func Batch_free(batch LlamaBatch) {
 func Decode(ctx LlamaContext, batch LlamaBatch) error {
 	if err := ensureLoaded(); err != nil {
 		return err
+	}
+
+	if runtime.GOOS != "darwin" {
+		return errors.New("Decode not yet implemented for non-Darwin platforms")
 	}
 
 	result := llamaDecode(ctx, batch)
@@ -1090,4 +1175,66 @@ func Max_devices() uint64 {
 		return 0
 	}
 	return llamaMaxDevices()
+}
+
+// Helper functions for platforms where struct returns aren't supported
+func ModelDefaultParams() LlamaModelParams {
+	if runtime.GOOS == "darwin" && llamaModelDefaultParams != nil {
+		return llamaModelDefaultParams()
+	}
+	// Return default values for non-Darwin platforms
+	return LlamaModelParams{
+		NGpuLayers:    0,
+		SplitMode:     LLAMA_SPLIT_MODE_LAYER,
+		MainGpu:       0,
+		VocabOnly:     0,
+		UseMmap:       1,
+		UseMlock:      0,
+		CheckTensors:  1,
+		UseExtraBufts: 0,
+	}
+}
+
+func ContextDefaultParams() LlamaContextParams {
+	if runtime.GOOS == "darwin" && llamaContextDefaultParams != nil {
+		return llamaContextDefaultParams()
+	}
+	// Return default values for non-Darwin platforms
+	return LlamaContextParams{
+		Seed:            LLAMA_DEFAULT_SEED,
+		NCtx:            0, // 0 = from model
+		NBatch:          2048,
+		NUbatch:         512,
+		NSeqMax:         1,
+		NThreads:        -1, // -1 = auto-detect
+		NThreadsBatch:   -1, // -1 = auto-detect
+		RopeScalingType: LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED,
+		PoolingType:     LLAMA_POOLING_TYPE_UNSPECIFIED,
+		AttentionType:   LLAMA_ATTENTION_TYPE_CAUSAL,
+		RopeFreqBase:    0.0, // 0.0 = from model
+		RopeFreqScale:   0.0, // 0.0 = from model
+		YarnExtFactor:   -1.0,
+		YarnAttnFactor:  1.0,
+		YarnBetaFast:    32.0,
+		YarnBetaSlow:    1.0,
+		YarnOrigCtx:     0,
+		DefragThold:     -1.0,
+		TypeK:           -1,
+		TypeV:           -1,
+		Logits:          0,
+		Embeddings:      0,
+		Offload_kqv:     1,
+		FlashAttn:       0,
+		NoPerf:          0,
+	}
+}
+
+func SamplerChainDefaultParams() LlamaSamplerChainParams {
+	if runtime.GOOS == "darwin" && llamaSamplerChainDefaultParams != nil {
+		return llamaSamplerChainDefaultParams()
+	}
+	// Return default values for non-Darwin platforms
+	return LlamaSamplerChainParams{
+		NoPerf: 0,
+	}
 }

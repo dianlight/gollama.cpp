@@ -74,10 +74,12 @@ func (l *LibraryLoader) UnloadLibrary() error {
 
 	// Close library handle
 	if l.handle != 0 {
-		if runtime.GOOS != "windows" {
+		if runtime.GOOS != "windows" && runtime.GOOS == "darwin" {
+			// Only call dlclose on Darwin where it's more stable
 			_ = purego.Dlclose(l.handle) // Ignore error during cleanup
 		}
-		// On Windows, we would use FreeLibrary, but purego doesn't expose this
+		// On other platforms, we just mark as unloaded without calling dlclose
+		// to avoid segfaults in the underlying library
 	}
 
 	// Clean up temporary files

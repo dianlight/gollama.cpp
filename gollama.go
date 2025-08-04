@@ -35,8 +35,6 @@ import (
 	"runtime"
 	"sync"
 	"unsafe"
-
-	"github.com/ebitengine/purego"
 )
 
 // Version information
@@ -495,24 +493,22 @@ func loadLibrary() error {
 		return fmt.Errorf("failed to get library path: %w", err)
 	}
 
-	var handle uintptr
-	if runtime.GOOS == "windows" {
-		// On Windows, use LoadLibrary via syscall
-		// This would need to be implemented with proper Windows API calls
-		return errors.New("support for windows platform not yet implemented")
-	} else {
-		// On Unix-like systems, use purego's Dlopen
-		handle, err = purego.Dlopen(libPath, purego.RTLD_NOW|purego.RTLD_GLOBAL)
-		if err != nil {
-			return fmt.Errorf("failed to load library %s: %w", libPath, err)
-		}
+	// Check if platform is supported
+	if !isPlatformSupported() {
+		return getPlatformError()
+	}
+
+	// Use platform-specific library loading
+	handle, err := loadLibraryPlatform(libPath)
+	if err != nil {
+		return fmt.Errorf("failed to load library %s: %w", libPath, err)
 	}
 
 	libHandle = handle
 
 	// Register all function pointers
 	if err := registerFunctions(); err != nil {
-		_ = purego.Dlclose(handle) // Ignore error during cleanup
+		_ = closeLibraryPlatform(handle) // Ignore error during cleanup
 		return fmt.Errorf("failed to register functions: %w", err)
 	}
 
@@ -523,137 +519,137 @@ func loadLibrary() error {
 // registerFunctions registers all llama.cpp function pointers
 func registerFunctions() error {
 	// Backend functions
-	purego.RegisterLibFunc(&llamaBackendInit, libHandle, "llama_backend_init")
-	purego.RegisterLibFunc(&llamaBackendFree, libHandle, "llama_backend_free")
-	purego.RegisterLibFunc(&llamaLogSet, libHandle, "llama_log_set")
+	registerLibFunc(&llamaBackendInit, libHandle, "llama_backend_init")
+	registerLibFunc(&llamaBackendFree, libHandle, "llama_backend_free")
+	registerLibFunc(&llamaLogSet, libHandle, "llama_log_set")
 
 	// Model functions - Skip functions that use structs on non-Darwin platforms
 	if runtime.GOOS == "darwin" {
-		purego.RegisterLibFunc(&llamaModelDefaultParams, libHandle, "llama_model_default_params")
-		purego.RegisterLibFunc(&llamaContextDefaultParams, libHandle, "llama_context_default_params")
-		purego.RegisterLibFunc(&llamaSamplerChainDefaultParams, libHandle, "llama_sampler_chain_default_params")
-		purego.RegisterLibFunc(&llamaModelLoadFromFile, libHandle, "llama_model_load_from_file")
-		purego.RegisterLibFunc(&llamaModelLoadFromSplits, libHandle, "llama_model_load_from_splits")
-		purego.RegisterLibFunc(&llamaInitFromModel, libHandle, "llama_init_from_model")
+		registerLibFunc(&llamaModelDefaultParams, libHandle, "llama_model_default_params")
+		registerLibFunc(&llamaContextDefaultParams, libHandle, "llama_context_default_params")
+		registerLibFunc(&llamaSamplerChainDefaultParams, libHandle, "llama_sampler_chain_default_params")
+		registerLibFunc(&llamaModelLoadFromFile, libHandle, "llama_model_load_from_file")
+		registerLibFunc(&llamaModelLoadFromSplits, libHandle, "llama_model_load_from_splits")
+		registerLibFunc(&llamaInitFromModel, libHandle, "llama_init_from_model")
 	}
-	purego.RegisterLibFunc(&llamaModelSaveToFile, libHandle, "llama_model_save_to_file")
-	purego.RegisterLibFunc(&llamaModelFree, libHandle, "llama_model_free")
+	registerLibFunc(&llamaModelSaveToFile, libHandle, "llama_model_save_to_file")
+	registerLibFunc(&llamaModelFree, libHandle, "llama_model_free")
 
 	// Context functions
-	purego.RegisterLibFunc(&llamaFree, libHandle, "llama_free")
+	registerLibFunc(&llamaFree, libHandle, "llama_free")
 
 	// Model info functions
-	purego.RegisterLibFunc(&llamaModelNCtxTrain, libHandle, "llama_model_n_ctx_train")
-	purego.RegisterLibFunc(&llamaModelNEmbd, libHandle, "llama_model_n_embd")
-	purego.RegisterLibFunc(&llamaModelNLayer, libHandle, "llama_model_n_layer")
-	purego.RegisterLibFunc(&llamaModelNHead, libHandle, "llama_model_n_head")
-	purego.RegisterLibFunc(&llamaModelNHeadKv, libHandle, "llama_model_n_head_kv")
-	purego.RegisterLibFunc(&llamaModelVocabType, libHandle, "llama_vocab_type")
-	purego.RegisterLibFunc(&llamaModelRopeType, libHandle, "llama_model_rope_type")
+	registerLibFunc(&llamaModelNCtxTrain, libHandle, "llama_model_n_ctx_train")
+	registerLibFunc(&llamaModelNEmbd, libHandle, "llama_model_n_embd")
+	registerLibFunc(&llamaModelNLayer, libHandle, "llama_model_n_layer")
+	registerLibFunc(&llamaModelNHead, libHandle, "llama_model_n_head")
+	registerLibFunc(&llamaModelNHeadKv, libHandle, "llama_model_n_head_kv")
+	registerLibFunc(&llamaModelVocabType, libHandle, "llama_vocab_type")
+	registerLibFunc(&llamaModelRopeType, libHandle, "llama_model_rope_type")
 
 	// Context info functions
-	purego.RegisterLibFunc(&llamaNCtx, libHandle, "llama_n_ctx")
-	purego.RegisterLibFunc(&llamaNBatch, libHandle, "llama_n_batch")
-	purego.RegisterLibFunc(&llamaNUbatch, libHandle, "llama_n_ubatch")
-	purego.RegisterLibFunc(&llamaNSeqMax, libHandle, "llama_n_seq_max")
-	purego.RegisterLibFunc(&llamaPoolingType, libHandle, "llama_pooling_type")
-	purego.RegisterLibFunc(&llamaGetModel, libHandle, "llama_get_model")
+	registerLibFunc(&llamaNCtx, libHandle, "llama_n_ctx")
+	registerLibFunc(&llamaNBatch, libHandle, "llama_n_batch")
+	registerLibFunc(&llamaNUbatch, libHandle, "llama_n_ubatch")
+	registerLibFunc(&llamaNSeqMax, libHandle, "llama_n_seq_max")
+	registerLibFunc(&llamaPoolingType, libHandle, "llama_pooling_type")
+	registerLibFunc(&llamaGetModel, libHandle, "llama_get_model")
 
 	// Tokenization functions
-	purego.RegisterLibFunc(&llamaTokenize, libHandle, "llama_tokenize")
-	purego.RegisterLibFunc(&llamaTokenToPiece, libHandle, "llama_token_to_piece")
-	purego.RegisterLibFunc(&llamaDetokenize, libHandle, "llama_detokenize")
-	purego.RegisterLibFunc(&llamaVocabGetText, libHandle, "llama_vocab_get_text")
+	registerLibFunc(&llamaTokenize, libHandle, "llama_tokenize")
+	registerLibFunc(&llamaTokenToPiece, libHandle, "llama_token_to_piece")
+	registerLibFunc(&llamaDetokenize, libHandle, "llama_detokenize")
+	registerLibFunc(&llamaVocabGetText, libHandle, "llama_vocab_get_text")
 
 	// Vocab functions
-	purego.RegisterLibFunc(&llamaModelGetVocab, libHandle, "llama_model_get_vocab")
-	purego.RegisterLibFunc(&llamaVocabNTokens, libHandle, "llama_vocab_n_tokens")
-	purego.RegisterLibFunc(&llamaVocabBos, libHandle, "llama_vocab_bos")
-	purego.RegisterLibFunc(&llamaVocabEos, libHandle, "llama_vocab_eos")
-	purego.RegisterLibFunc(&llamaVocabEot, libHandle, "llama_vocab_eot")
-	purego.RegisterLibFunc(&llamaVocabNl, libHandle, "llama_vocab_nl")
-	purego.RegisterLibFunc(&llamaVocabPad, libHandle, "llama_vocab_pad")
+	registerLibFunc(&llamaModelGetVocab, libHandle, "llama_model_get_vocab")
+	registerLibFunc(&llamaVocabNTokens, libHandle, "llama_vocab_n_tokens")
+	registerLibFunc(&llamaVocabBos, libHandle, "llama_vocab_bos")
+	registerLibFunc(&llamaVocabEos, libHandle, "llama_vocab_eos")
+	registerLibFunc(&llamaVocabEot, libHandle, "llama_vocab_eot")
+	registerLibFunc(&llamaVocabNl, libHandle, "llama_vocab_nl")
+	registerLibFunc(&llamaVocabPad, libHandle, "llama_vocab_pad")
 
 	// Batch functions - Skip functions that use structs on non-Darwin platforms
 	if runtime.GOOS == "darwin" {
-		purego.RegisterLibFunc(&llamaBatchInit, libHandle, "llama_batch_init")
-		purego.RegisterLibFunc(&llamaBatchGetOne, libHandle, "llama_batch_get_one")
-		purego.RegisterLibFunc(&llamaBatchFree, libHandle, "llama_batch_free")
+		registerLibFunc(&llamaBatchInit, libHandle, "llama_batch_init")
+		registerLibFunc(&llamaBatchGetOne, libHandle, "llama_batch_get_one")
+		registerLibFunc(&llamaBatchFree, libHandle, "llama_batch_free")
 	}
 
 	// Decode functions - Skip functions that use structs on non-Darwin platforms
 	if runtime.GOOS == "darwin" {
-		purego.RegisterLibFunc(&llamaDecode, libHandle, "llama_decode")
-		purego.RegisterLibFunc(&llamaEncode, libHandle, "llama_encode")
+		registerLibFunc(&llamaDecode, libHandle, "llama_decode")
+		registerLibFunc(&llamaEncode, libHandle, "llama_encode")
 	}
 
 	// Logits and embeddings
-	purego.RegisterLibFunc(&llamaGetLogits, libHandle, "llama_get_logits")
-	purego.RegisterLibFunc(&llamaGetLogitsIth, libHandle, "llama_get_logits_ith")
-	purego.RegisterLibFunc(&llamaGetEmbeddings, libHandle, "llama_get_embeddings")
-	purego.RegisterLibFunc(&llamaGetEmbeddingsIth, libHandle, "llama_get_embeddings_ith")
-	purego.RegisterLibFunc(&llamaSetCausalAttn, libHandle, "llama_set_causal_attn")
-	purego.RegisterLibFunc(&llamaSetEmbeddings, libHandle, "llama_set_embeddings")
-	purego.RegisterLibFunc(&llamaMemoryClear, libHandle, "llama_memory_clear")
-	purego.RegisterLibFunc(&llamaGetMemory, libHandle, "llama_get_memory")
+	registerLibFunc(&llamaGetLogits, libHandle, "llama_get_logits")
+	registerLibFunc(&llamaGetLogitsIth, libHandle, "llama_get_logits_ith")
+	registerLibFunc(&llamaGetEmbeddings, libHandle, "llama_get_embeddings")
+	registerLibFunc(&llamaGetEmbeddingsIth, libHandle, "llama_get_embeddings_ith")
+	registerLibFunc(&llamaSetCausalAttn, libHandle, "llama_set_causal_attn")
+	registerLibFunc(&llamaSetEmbeddings, libHandle, "llama_set_embeddings")
+	registerLibFunc(&llamaMemoryClear, libHandle, "llama_memory_clear")
+	registerLibFunc(&llamaGetMemory, libHandle, "llama_get_memory")
 
 	// Sampling functions - Skip functions that use structs on non-Darwin platforms
 	if runtime.GOOS == "darwin" {
-		purego.RegisterLibFunc(&llamaSamplerChainInit, libHandle, "llama_sampler_chain_init")
+		registerLibFunc(&llamaSamplerChainInit, libHandle, "llama_sampler_chain_init")
 	}
-	purego.RegisterLibFunc(&llamaSamplerChainAdd, libHandle, "llama_sampler_chain_add")
-	purego.RegisterLibFunc(&llamaSamplerChainGet, libHandle, "llama_sampler_chain_get")
-	purego.RegisterLibFunc(&llamaSamplerChainN, libHandle, "llama_sampler_chain_n")
-	purego.RegisterLibFunc(&llamaSamplerChainFree, libHandle, "llama_sampler_free")
-	purego.RegisterLibFunc(&llamaSamplerSample, libHandle, "llama_sampler_sample")
-	purego.RegisterLibFunc(&llamaSamplerAccept, libHandle, "llama_sampler_accept")
-	purego.RegisterLibFunc(&llamaSamplerReset, libHandle, "llama_sampler_reset")
+	registerLibFunc(&llamaSamplerChainAdd, libHandle, "llama_sampler_chain_add")
+	registerLibFunc(&llamaSamplerChainGet, libHandle, "llama_sampler_chain_get")
+	registerLibFunc(&llamaSamplerChainN, libHandle, "llama_sampler_chain_n")
+	registerLibFunc(&llamaSamplerChainFree, libHandle, "llama_sampler_free")
+	registerLibFunc(&llamaSamplerSample, libHandle, "llama_sampler_sample")
+	registerLibFunc(&llamaSamplerAccept, libHandle, "llama_sampler_accept")
+	registerLibFunc(&llamaSamplerReset, libHandle, "llama_sampler_reset")
 
 	// Built-in samplers
-	purego.RegisterLibFunc(&llamaSamplerInitGreedy, libHandle, "llama_sampler_init_greedy")
-	purego.RegisterLibFunc(&llamaSamplerInitDist, libHandle, "llama_sampler_init_dist")
-	purego.RegisterLibFunc(&llamaSamplerInitSoftmax, libHandle, "llama_sampler_init_softmax")
-	purego.RegisterLibFunc(&llamaSamplerInitTopK, libHandle, "llama_sampler_init_top_k")
-	purego.RegisterLibFunc(&llamaSamplerInitTopP, libHandle, "llama_sampler_init_top_p")
-	purego.RegisterLibFunc(&llamaSamplerInitMinP, libHandle, "llama_sampler_init_min_p")
-	// purego.RegisterLibFunc(&llamaSamplerInitTailFree, libHandle, "llama_sampler_init_tail_free")  // Function doesn't exist
-	purego.RegisterLibFunc(&llamaSamplerInitTypical, libHandle, "llama_sampler_init_typical")
-	purego.RegisterLibFunc(&llamaSamplerInitTemp, libHandle, "llama_sampler_init_temp")
-	purego.RegisterLibFunc(&llamaSamplerInitTempExt, libHandle, "llama_sampler_init_temp_ext")
-	purego.RegisterLibFunc(&llamaSamplerInitMirostat, libHandle, "llama_sampler_init_mirostat")
-	purego.RegisterLibFunc(&llamaSamplerInitMirostatV2, libHandle, "llama_sampler_init_mirostat_v2")
+	registerLibFunc(&llamaSamplerInitGreedy, libHandle, "llama_sampler_init_greedy")
+	registerLibFunc(&llamaSamplerInitDist, libHandle, "llama_sampler_init_dist")
+	registerLibFunc(&llamaSamplerInitSoftmax, libHandle, "llama_sampler_init_softmax")
+	registerLibFunc(&llamaSamplerInitTopK, libHandle, "llama_sampler_init_top_k")
+	registerLibFunc(&llamaSamplerInitTopP, libHandle, "llama_sampler_init_top_p")
+	registerLibFunc(&llamaSamplerInitMinP, libHandle, "llama_sampler_init_min_p")
+	// registerLibFunc(&llamaSamplerInitTailFree, libHandle, "llama_sampler_init_tail_free")  // Function doesn't exist
+	registerLibFunc(&llamaSamplerInitTypical, libHandle, "llama_sampler_init_typical")
+	registerLibFunc(&llamaSamplerInitTemp, libHandle, "llama_sampler_init_temp")
+	registerLibFunc(&llamaSamplerInitTempExt, libHandle, "llama_sampler_init_temp_ext")
+	registerLibFunc(&llamaSamplerInitMirostat, libHandle, "llama_sampler_init_mirostat")
+	registerLibFunc(&llamaSamplerInitMirostatV2, libHandle, "llama_sampler_init_mirostat_v2")
 
 	// Utility functions
-	purego.RegisterLibFunc(&llamaMaxDevices, libHandle, "llama_max_devices")
-	purego.RegisterLibFunc(&llamaSupportsMmap, libHandle, "llama_supports_mmap")
-	purego.RegisterLibFunc(&llamaSupportsMlock, libHandle, "llama_supports_mlock")
-	purego.RegisterLibFunc(&llamaSupportsGpuOffload, libHandle, "llama_supports_gpu_offload")
-	purego.RegisterLibFunc(&llamaSupportsRpc, libHandle, "llama_supports_rpc")
-	purego.RegisterLibFunc(&llamaTimeUs, libHandle, "llama_time_us")
-	purego.RegisterLibFunc(&llamaPrintSystemInfo, libHandle, "llama_print_system_info")
+	registerLibFunc(&llamaMaxDevices, libHandle, "llama_max_devices")
+	registerLibFunc(&llamaSupportsMmap, libHandle, "llama_supports_mmap")
+	registerLibFunc(&llamaSupportsMlock, libHandle, "llama_supports_mlock")
+	registerLibFunc(&llamaSupportsGpuOffload, libHandle, "llama_supports_gpu_offload")
+	registerLibFunc(&llamaSupportsRpc, libHandle, "llama_supports_rpc")
+	registerLibFunc(&llamaTimeUs, libHandle, "llama_time_us")
+	registerLibFunc(&llamaPrintSystemInfo, libHandle, "llama_print_system_info")
 
 	// KV cache functions
-	purego.RegisterLibFunc(&llamaKvCacheClear, libHandle, "llama_kv_self_clear")
-	purego.RegisterLibFunc(&llamaKvCacheSeqRm, libHandle, "llama_kv_self_seq_rm")
-	purego.RegisterLibFunc(&llamaKvCacheSeqCp, libHandle, "llama_kv_self_seq_cp")
-	purego.RegisterLibFunc(&llamaKvCacheSeqKeep, libHandle, "llama_kv_self_seq_keep")
-	purego.RegisterLibFunc(&llamaKvCacheSeqAdd, libHandle, "llama_kv_self_seq_add")
-	purego.RegisterLibFunc(&llamaKvCacheSeqDiv, libHandle, "llama_kv_self_seq_div")
-	// purego.RegisterLibFunc(&llamaKvCacheSeqPos, libHandle, "llama_kv_self_seq_pos")  // Might not exist
-	purego.RegisterLibFunc(&llamaKvCacheDefrag, libHandle, "llama_kv_self_defrag")
-	purego.RegisterLibFunc(&llamaKvCacheUpdate, libHandle, "llama_kv_self_update")
+	registerLibFunc(&llamaKvCacheClear, libHandle, "llama_kv_self_clear")
+	registerLibFunc(&llamaKvCacheSeqRm, libHandle, "llama_kv_self_seq_rm")
+	registerLibFunc(&llamaKvCacheSeqCp, libHandle, "llama_kv_self_seq_cp")
+	registerLibFunc(&llamaKvCacheSeqKeep, libHandle, "llama_kv_self_seq_keep")
+	registerLibFunc(&llamaKvCacheSeqAdd, libHandle, "llama_kv_self_seq_add")
+	registerLibFunc(&llamaKvCacheSeqDiv, libHandle, "llama_kv_self_seq_div")
+	// registerLibFunc(&llamaKvCacheSeqPos, libHandle, "llama_kv_self_seq_pos")  // Might not exist
+	registerLibFunc(&llamaKvCacheDefrag, libHandle, "llama_kv_self_defrag")
+	registerLibFunc(&llamaKvCacheUpdate, libHandle, "llama_kv_self_update")
 
 	// State functions
-	purego.RegisterLibFunc(&llamaStateGetSize, libHandle, "llama_state_get_size")
-	purego.RegisterLibFunc(&llamaStateGetData, libHandle, "llama_state_get_data")
-	purego.RegisterLibFunc(&llamaStateSetData, libHandle, "llama_state_set_data")
-	purego.RegisterLibFunc(&llamaStateLoadFile, libHandle, "llama_state_load_file")
-	purego.RegisterLibFunc(&llamaStateSaveFile, libHandle, "llama_state_save_file")
+	registerLibFunc(&llamaStateGetSize, libHandle, "llama_state_get_size")
+	registerLibFunc(&llamaStateGetData, libHandle, "llama_state_get_data")
+	registerLibFunc(&llamaStateSetData, libHandle, "llama_state_set_data")
+	registerLibFunc(&llamaStateLoadFile, libHandle, "llama_state_load_file")
+	registerLibFunc(&llamaStateSaveFile, libHandle, "llama_state_save_file")
 
 	// Performance functions - These may not exist in this llama.cpp version
-	// purego.RegisterLibFunc(&llamaGetTimings, libHandle, "llama_get_timings")
-	// purego.RegisterLibFunc(&llamaPrintTimings, libHandle, "llama_print_timings")
-	// purego.RegisterLibFunc(&llamaResetTimings, libHandle, "llama_reset_timings")
+	// registerLibFunc(&llamaGetTimings, libHandle, "llama_get_timings")
+	// registerLibFunc(&llamaPrintTimings, libHandle, "llama_print_timings")
+	// registerLibFunc(&llamaResetTimings, libHandle, "llama_reset_timings")
 
 	return nil
 }

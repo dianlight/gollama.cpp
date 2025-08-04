@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
-
-	"github.com/ebitengine/purego"
 )
 
 // Embedded libraries - in a real implementation, you would embed the pre-built libraries
@@ -76,7 +74,7 @@ func (l *LibraryLoader) UnloadLibrary() error {
 	if l.handle != 0 {
 		if runtime.GOOS != "windows" && runtime.GOOS == "darwin" {
 			// Only call dlclose on Darwin where it's more stable
-			_ = purego.Dlclose(l.handle) // Ignore error during cleanup
+			_ = closeLibraryPlatform(l.handle) // Ignore error during cleanup
 		}
 		// On other platforms, we just mark as unloaded without calling dlclose
 		// to avoid segfaults in the underlying library
@@ -214,8 +212,8 @@ func (l *LibraryLoader) loadSharedLibrary(path string) (uintptr, error) {
 		// For now, return an error as Windows support is not fully implemented
 		return 0, fmt.Errorf("support for windows platform not yet implemented")
 	default:
-		// On Unix-like systems, use purego's Dlopen
-		return purego.Dlopen(path, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+		// On Unix-like systems, use platform-specific loading
+		return loadLibraryPlatform(path)
 	}
 }
 
@@ -238,7 +236,7 @@ func RegisterFunction(fptr interface{}, name string) error {
 		return fmt.Errorf("library not loaded")
 	}
 
-	purego.RegisterLibFunc(fptr, handle, name)
+	registerLibFunc(fptr, handle, name)
 	return nil
 }
 

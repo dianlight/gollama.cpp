@@ -164,7 +164,7 @@ jobs:
       if: contains(matrix.cmake_flags, 'CUDA=ON')
       uses: Jimver/cuda-toolkit@7263c89f6aa4f1c5247a0947b8e9f8eedfce66a5 # v0.2.26
       with:
-        cuda: '12.0'
+        cuda: '12.0.0'
 
     - name: Clone llama.cpp
       run: |

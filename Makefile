@@ -43,7 +43,7 @@ clean:
 .PHONY: clean-libs
 clean-libs:
 	@echo "Cleaning library cache..."
-	$(GO) run ./cmd/gollama-download -clean-cache
+	env GOOS= GOARCH= $(GO) run ./cmd/gollama-download -clean-cache
 
 # Initialize/update dependencies
 .PHONY: deps
@@ -91,7 +91,7 @@ test-race: deps
 .PHONY: test-download
 test-download: deps
 	@echo "Testing library download functionality"
-	$(GO) run ./cmd/gollama-download -test-download
+	env GOOS= GOARCH= $(GO) run ./cmd/gollama-download -test-download
 
 # Run platform-specific tests
 .PHONY: test-platform
@@ -126,25 +126,25 @@ test-download-platforms:
 .PHONY: download-libs
 download-libs: deps
 	@echo "Downloading llama.cpp libraries for $(GOOS)/$(GOARCH)"
-	$(GO) run ./cmd/gollama-download -download -version $(LLAMA_CPP_BUILD)
+	env GOOS= GOARCH= $(GO) run ./cmd/gollama-download -download -version $(LLAMA_CPP_BUILD)
 
 # Download libraries for all platforms (for testing)
 .PHONY: download-libs-all
 download-libs-all: deps
 	@echo "Downloading llama.cpp libraries for all platforms"
-	$(GO) run ./cmd/gollama-download -download-all -version $(LLAMA_CPP_BUILD)
+	env GOOS= GOARCH= $(GO) run ./cmd/gollama-download -download-all -version $(LLAMA_CPP_BUILD)
 
 # Download libraries for all platforms with parallel processing
 .PHONY: download-libs-parallel
 download-libs-parallel: deps
 	@echo "Downloading llama.cpp libraries for all platforms (parallel)"
-	$(GO) run ./cmd/gollama-download -download-all -version $(LLAMA_CPP_BUILD) -checksum
+	env GOOS= GOARCH= $(GO) run ./cmd/gollama-download -download-all -version $(LLAMA_CPP_BUILD) -checksum
 
 # Download libraries for specific platforms
 .PHONY: download-libs-platforms
 download-libs-platforms: deps
 	@echo "Downloading llama.cpp libraries for specific platforms"
-	$(GO) run ./cmd/gollama-download -platforms "linux/amd64,darwin/arm64,windows/amd64" -version $(LLAMA_CPP_BUILD) -checksum
+	env GOOS= GOARCH= $(GO) run ./cmd/gollama-download -platforms "linux/amd64,darwin/arm64,windows/amd64" -version $(LLAMA_CPP_BUILD) -checksum
 
 # Test compilation for specific platform  
 .PHONY: test-compile-windows

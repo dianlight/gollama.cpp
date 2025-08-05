@@ -3,8 +3,12 @@
 
 # Version information
 VERSION ?= 1.0.0
-LLAMA_CPP_BUILD ?= b6076
-FULL_VERSION = v$(VERSION)-llamacpp.$(LLAMA_CPP_BUILD)
+LLAMA_CPP_BUILD ?= b6089
+FULL_VERSION = v$(VERSION)-llamacpp.$(LL# Check everything
+.PHONY: check
+check: fmt vet lint sec test
+
+# Package releases
 
 # Go configuration
 GO ?= go
@@ -13,24 +17,11 @@ GOARCH ?= $(shell go env GOARCH)
 
 # Build directories
 BUILD_DIR = build
-LIB_DIR = libs
 DIST_DIR = dist
 EXAMPLES_DIR = examples
 
 # Platform-specific configurations
 PLATFORMS = darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64
-
-# llama.cpp build configurations
-LLAMA_CPP_REPO = https://github.com/ggml-org/llama.cpp
-LLAMA_CPP_DIR = $(BUILD_DIR)/llama.cpp
-
-# Library names per platform
-LIB_darwin_amd64 = libllama.dylib
-LIB_darwin_arm64 = libllama.dylib  
-LIB_linux_amd64 = libllama.so
-LIB_linux_arm64 = libllama.so
-LIB_windows_amd64 = llama.dll
-LIB_windows_arm64 = llama.dll
 
 # Default target
 .PHONY: all
@@ -45,7 +36,8 @@ clean:
 # Clean libraries only
 .PHONY: clean-libs
 clean-libs:
-	rm -rf $(LIB_DIR)
+	@echo "Cleaning library cache..."
+	$(GO) run ./cmd/gollama-download -clean-cache
 
 # Initialize/update dependencies
 .PHONY: deps
@@ -77,17 +69,23 @@ build-examples: build
 	@echo "Building examples"
 	cd $(EXAMPLES_DIR) && $(GO) build ./...
 
-# Test
+# Test with library download
 .PHONY: test
-test: deps build-llamacpp-current
-	@echo "Running tests"
+test: deps
+	@echo "Running tests (libraries will be downloaded automatically)"
 	$(GO) test -v ./...
 
 # Test with race detection
 .PHONY: test-race
-test-race: deps build-llamacpp-current
+test-race: deps
 	@echo "Running tests with race detection"
 	$(GO) test -race -v ./...
+
+# Test library download functionality
+.PHONY: test-download
+test-download: deps
+	@echo "Testing library download functionality"
+	$(GO) run ./cmd/gollama-download -test-download
 
 # Run platform-specific tests
 .PHONY: test-platform
@@ -106,6 +104,34 @@ test-cross-compile:
 		env GOOS=$$GOOS GOARCH=$$GOARCH $(GO) build -v ./... || exit 1; \
 	done
 	@echo "All cross-compilation tests passed!"
+
+# Test library download for specific platforms
+.PHONY: test-download-platforms
+test-download-platforms:
+	@echo "Testing library download for different platforms..."
+	@for platform in $(PLATFORMS); do \
+		GOOS=$$(echo $$platform | cut -d'/' -f1); \
+		GOARCH=$$(echo $$platform | cut -d'/' -f2); \
+		echo "Testing download for $$GOOS/$$GOARCH..."; \
+		env GOOS=$$GOOS GOARCH=$$GOARCH $(GO) run ./cmd/gollama-download -test-download || echo "Download test for $$GOOS/$$GOARCH completed"; \
+	done
+
+# Download and verify libraries for current platform
+.PHONY: download-libs
+download-libs: deps
+	@echo "Downloading llama.cpp libraries for $(GOOS)/$(GOARCH)"
+	$(GO) run ./cmd/gollama-download -download -version $(LLAMA_CPP_BUILD)
+
+# Download libraries for all platforms (for testing)
+.PHONY: download-libs-all
+download-libs-all: deps
+	@echo "Downloading llama.cpp libraries for all platforms"
+	@for platform in $(PLATFORMS); do \
+		GOOS=$$(echo $$platform | cut -d'/' -f1); \
+		GOARCH=$$(echo $$platform | cut -d'/' -f2); \
+		echo "Downloading for $$GOOS/$$GOARCH..."; \
+		env GOOS=$$GOOS GOARCH=$$GOARCH $(GO) run ./cmd/gollama-download -download -version $(LLAMA_CPP_BUILD) || echo "Download for $$GOOS/$$GOARCH completed"; \
+	done
 
 # Test compilation for specific platform  
 .PHONY: test-compile-windows
@@ -128,8 +154,8 @@ test-compile-darwin:
 
 # Benchmark
 .PHONY: bench
-bench: deps build-llamacpp-current
-	@echo "Running benchmarks"
+bench: deps
+	@echo "Running benchmarks (libraries will be downloaded automatically)"
 	$(GO) test -bench=. -benchmem ./...
 
 # Lint
@@ -355,7 +381,7 @@ build-llamacpp-linux-amd64-hip: clone-llamacpp
 
 # Package releases
 .PHONY: release
-release: clean build-all build-llamacpp-all
+release: clean build-all
 	@echo "Creating release packages"
 	mkdir -p $(DIST_DIR)
 	@for platform in $(PLATFORMS); do \
@@ -365,20 +391,18 @@ release: clean build-all build-llamacpp-all
 		pkg_name="gollama.cpp-$(FULL_VERSION)-$$os-$$arch"; \
 		mkdir -p $(DIST_DIR)/$$pkg_name; \
 		cp -r $(BUILD_DIR)/$$os\_$$arch/* $(DIST_DIR)/$$pkg_name/ 2>/dev/null || true; \
-		cp -r $(LIB_DIR)/$$os\_$$arch/* $(DIST_DIR)/$$pkg_name/ 2>/dev/null || true; \
 		cp README.md LICENSE CHANGELOG.md $(DIST_DIR)/$$pkg_name/; \
 		cd $(DIST_DIR) && zip -r $$pkg_name.zip $$pkg_name && rm -rf $$pkg_name; \
 	done
 
 # Quick release for current platform
 .PHONY: release-current
-release-current: clean build build-llamacpp-current
+release-current: clean build
 	@echo "Creating release package for $(GOOS)/$(GOARCH)"
 	mkdir -p $(DIST_DIR)
 	pkg_name="gollama.cpp-$(FULL_VERSION)-$(GOOS)-$(GOARCH)"
 	mkdir -p $(DIST_DIR)/$$pkg_name
 	cp -r $(BUILD_DIR)/$(GOOS)_$(GOARCH)/* $(DIST_DIR)/$$pkg_name/ 2>/dev/null || true
-	cp -r $(LIB_DIR)/$(GOOS)_$(GOARCH)/* $(DIST_DIR)/$$pkg_name/ 2>/dev/null || true
 	cp README.md LICENSE CHANGELOG.md $(DIST_DIR)/$$pkg_name/
 	cd $(DIST_DIR) && zip -r $$pkg_name.zip $$pkg_name && rm -rf $$pkg_name
 	@echo "Release package created: $(DIST_DIR)/$$pkg_name.zip"
@@ -396,19 +420,17 @@ model_download:
 	@echo "Downloading models"
 	@mkdir -p models
 	@if [ ! -f "models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf" ]; then \
-		echo "Downloading TinyLlama model using llama.cpp hf.sh script..."; \
-		cd $(LLAMA_CPP_DIR) && \
-		./scripts/hf.sh --repo TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF --file tinyllama-1.1b-chat-v1.0.Q2_K.gguf; \
-		mv tinyllama-1.1b-chat-v1.0.Q2_K.gguf ../../models/; \
+		echo "Downloading TinyLlama model..."; \
+		curl -L -o models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf \
+			"https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q2_K.gguf"; \
 		echo "TinyLlama model downloaded successfully"; \
 	else \
 		echo "TinyLlama model already exists in models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf"; \
 	fi
 	@if [ ! -f "models/gritlm-7b_q4_1.gguf" ]; then \
-		echo "Downloading GritLM model using llama.cpp hf.sh script..."; \
-		cd $(LLAMA_CPP_DIR) && \
-		./scripts/hf.sh --repo cohesionet/GritLM-7B_gguf --file gritlm-7b_q4_1.gguf; \
-		mv gritlm-7b_q4_1.gguf ../../models/; \
+		echo "Downloading GritLM model..."; \
+		curl -L -o models/gritlm-7b_q4_1.gguf \
+			"https://huggingface.co/cohesionet/GritLM-7B_gguf/resolve/main/gritlm-7b_q4_1.gguf"; \
 		echo "GritLM model downloaded successfully"; \
 	else \
 		echo "GritLM model already exists in models/gritlm-7b_q4_1.gguf"; \
@@ -430,17 +452,17 @@ help:
 	@echo "  build              Build for current platform"
 	@echo "  build-all          Build for all platforms"
 	@echo "  build-examples     Build examples"
-	@echo "  test               Run tests"
+	@echo "  test               Run tests (downloads libraries automatically)"
 	@echo "  test-race          Run tests with race detection"
 	@echo "  bench              Run benchmarks"
 	@echo "  clean              Clean all build artifacts"
 	@echo ""
-	@echo "Library building:"
-	@echo "  build-llamacpp-current       Build llama.cpp for current platform"
-	@echo "  build-llamacpp-all           Build llama.cpp for all platforms"
-	@echo "  build-libs-gpu               Build libraries with GPU support (auto-detect CUDA/HIP)"
-	@echo "  build-libs-cpu               Build CPU-only libraries"
-	@echo "  build-llamacpp-linux-amd64-hip  Force HIP/AMD GPU build (requires ROCm)"
+	@echo "Library management:"
+	@echo "  download-libs      Download llama.cpp libraries for current platform"
+	@echo "  download-libs-all  Download llama.cpp libraries for all platforms"
+	@echo "  test-download      Test library download functionality"
+	@echo "  test-download-platforms  Test downloads for all platforms"
+	@echo "  clean-libs         Clean library cache (forces re-download)"
 	@echo ""
 	@echo "Quality assurance:"
 	@echo "  check              Run all checks (fmt, vet, lint, sec, test)"
@@ -455,10 +477,9 @@ help:
 	@echo ""
 	@echo "Utilities:"
 	@echo "  deps               Update dependencies"
-	@echo "  model_download     Download tinyllama-1.1b-chat-v1.0.Q2_K.gguf model"
+	@echo "  model_download     Download example models"
 	@echo "  install-tools      Install development tools"
 	@echo "  version            Show version information"
-	@echo "  gpu-info           Show GPU detection information"
 	@echo "  help               Show this help"
 	@echo ""
 	@echo "Variables:"
@@ -466,53 +487,3 @@ help:
 	@echo "  LLAMA_CPP_BUILD=$(LLAMA_CPP_BUILD)"
 	@echo "  GOOS=$(GOOS)"
 	@echo "  GOARCH=$(GOARCH)"
-
-# Show GPU detection information
-.PHONY: gpu-info
-gpu-info:
-	@echo "GPU Detection Information:"
-	@echo "========================="
-	@echo ""
-	@echo "CUDA Detection:"
-	@if command -v nvcc >/dev/null 2>&1; then \
-		echo "  ✅ nvcc found: $$(nvcc --version | grep 'release' | awk '{print $$6}')"; \
-		echo "  📍 Location: $$(which nvcc)"; \
-	else \
-		echo "  ❌ nvcc not found in PATH"; \
-	fi
-	@if [ -n "$$CUDA_PATH" ]; then \
-		echo "  📍 CUDA_PATH: $$CUDA_PATH"; \
-	else \
-		echo "  ❌ CUDA_PATH not set"; \
-	fi
-	@echo ""
-	@echo "HIP Detection:"
-	@if command -v hipconfig >/dev/null 2>&1; then \
-		echo "  ✅ hipconfig found: $$(hipconfig --version 2>/dev/null || echo 'version unknown')"; \
-		echo "  📍 Location: $$(which hipconfig)"; \
-		if [ -x "$$(which hipconfig)" ]; then \
-			echo "  🎯 Platform: $$(hipconfig --platform 2>/dev/null || echo 'unknown')"; \
-		fi \
-	else \
-		echo "  ❌ hipconfig not found in PATH"; \
-	fi
-	@if [ -n "$$ROCM_PATH" ]; then \
-		echo "  📍 ROCM_PATH: $$ROCM_PATH"; \
-	else \
-		echo "  ❌ ROCM_PATH not set"; \
-	fi
-	@echo ""
-	@echo "Current Platform: $(GOOS)/$(GOARCH)"
-	@echo ""
-	@echo "Build Configuration (for $(GOOS)-$(GOARCH)):"
-	@if [ "$(GOOS)" = "darwin" ]; then \
-		echo "  🍎 Metal: Always enabled on macOS"; \
-	elif [ "$(GOOS)" = "linux" ] || [ "$(GOOS)" = "windows" ]; then \
-		if command -v nvcc >/dev/null 2>&1 || [ -n "$$CUDA_PATH" ]; then \
-			echo "  🚀 CUDA: Will be enabled"; \
-		elif command -v hipconfig >/dev/null 2>&1 || [ -n "$$ROCM_PATH" ]; then \
-			echo "  🔥 HIP: Will be enabled"; \
-		else \
-			echo "  💻 CPU: Will be used (no GPU SDK detected)"; \
-		fi \
-	fi

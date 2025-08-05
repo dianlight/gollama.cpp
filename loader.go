@@ -1,33 +1,30 @@
 package gollama
 
 import (
-	"embed"
 	"fmt"
-	"os"
-	"path/filepath"
 	"runtime"
 	"sync"
 )
 
-// Embedded libraries - in a real implementation, you would embed the pre-built libraries
-// For now, we'll use an empty embed so the build doesn't fail
-//
-//go:embed libs
-var embeddedLibs embed.FS
-
 // Library loader manages the loading and lifecycle of llama.cpp shared libraries
 type LibraryLoader struct {
-	handle  uintptr
-	loaded  bool
-	tempDir string
-	libPath string
-	mutex   sync.RWMutex
+	handle     uintptr
+	loaded     bool
+	libPath    string
+	downloader *LibraryDownloader
+	mutex      sync.RWMutex
 }
 
 var globalLoader = &LibraryLoader{}
 
 // LoadLibrary loads the appropriate llama.cpp library for the current platform
 func (l *LibraryLoader) LoadLibrary() error {
+	return l.LoadLibraryWithVersion("")
+}
+
+// LoadLibraryWithVersion loads the llama.cpp library for a specific version
+// If version is empty, it loads the latest version
+func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
@@ -35,17 +32,53 @@ func (l *LibraryLoader) LoadLibrary() error {
 		return nil
 	}
 
-	// Get platform-specific library name
-	libName, err := l.getLibraryName()
-	if err != nil {
-		return fmt.Errorf("failed to get library name: %w", err)
+	// Initialize downloader if not already done
+	if l.downloader == nil {
+		downloader, err := NewLibraryDownloader()
+		if err != nil {
+			return fmt.Errorf("failed to create library downloader: %w", err)
+		}
+		l.downloader = downloader
 	}
 
-	// Try to load from embedded files first, then fallback to system paths
-	libPath, err := l.extractEmbeddedLibraries()
+	// Get the appropriate release
+	var release *ReleaseInfo
+	var err error
+
+	if version == "" {
+		release, err = l.downloader.GetLatestRelease()
+		if err != nil {
+			return fmt.Errorf("failed to get latest release: %w", err)
+		}
+	} else {
+		release, err = l.downloader.GetReleaseByTag(version)
+		if err != nil {
+			return fmt.Errorf("failed to get release %s: %w", version, err)
+		}
+	}
+
+	// Get platform-specific asset pattern
+	pattern, err := l.downloader.GetPlatformAssetPattern()
 	if err != nil {
-		// Fallback to system library
-		libPath = libName
+		return fmt.Errorf("failed to get platform pattern: %w", err)
+	}
+
+	// Find the appropriate asset
+	assetName, downloadURL, err := l.downloader.FindAssetByPattern(release, pattern)
+	if err != nil {
+		return fmt.Errorf("failed to find platform asset: %w", err)
+	}
+
+	// Download and extract the library
+	extractedDir, err := l.downloader.DownloadAndExtract(downloadURL, assetName)
+	if err != nil {
+		return fmt.Errorf("failed to download library: %w", err)
+	}
+
+	// Find the main library file
+	libPath, err := l.downloader.FindLibraryPath(extractedDir)
+	if err != nil {
+		return fmt.Errorf("failed to find library file: %w", err)
 	}
 
 	// Load the library
@@ -61,7 +94,7 @@ func (l *LibraryLoader) LoadLibrary() error {
 	return nil
 }
 
-// UnloadLibrary unloads the library and cleans up temporary files
+// UnloadLibrary unloads the library and cleans up resources
 func (l *LibraryLoader) UnloadLibrary() error {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
@@ -80,14 +113,8 @@ func (l *LibraryLoader) UnloadLibrary() error {
 		// to avoid segfaults in the underlying library
 	}
 
-	// Clean up temporary files
-	if l.tempDir != "" {
-		_ = os.RemoveAll(l.tempDir) // Ignore error during cleanup
-	}
-
 	l.handle = 0
 	l.loaded = false
-	l.tempDir = ""
 	l.libPath = ""
 
 	return nil
@@ -107,103 +134,6 @@ func (l *LibraryLoader) IsLoaded() bool {
 	return l.loaded
 }
 
-// getLibraryName returns the platform-specific library name
-func (l *LibraryLoader) getLibraryName() (string, error) {
-	goos := runtime.GOOS
-
-	switch goos {
-	case "darwin":
-		return "libllama.dylib", nil
-	case "linux":
-		return "libllama.so", nil
-	case "windows":
-		return "llama.dll", nil
-	default:
-		return "", fmt.Errorf("unsupported OS: %s", goos)
-	}
-}
-
-// extractEmbeddedLibraries extracts all embedded libraries for the current platform to a temporary location
-func (l *LibraryLoader) extractEmbeddedLibraries() (string, error) {
-	goos := runtime.GOOS
-	goarch := runtime.GOARCH
-
-	// Define file extensions for each platform
-	var libExtension string
-	switch goos {
-	case "darwin":
-		libExtension = ".dylib"
-	case "linux":
-		libExtension = ".so"
-	case "windows":
-		libExtension = ".dll"
-	default:
-		return "", fmt.Errorf("unsupported OS: %s", goos)
-	}
-
-	// Create temporary directory
-	tempDir, err := os.MkdirTemp("", "gollama-*")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp dir: %w", err)
-	}
-
-	// Extract all libraries for this platform
-	embeddedDir := fmt.Sprintf("libs/%s_%s", goos, goarch)
-	extractedCount := 0
-
-	// Read the embedded directory to find all library files
-	dirEntries, err := embeddedLibs.ReadDir(embeddedDir)
-	if err != nil {
-		_ = os.RemoveAll(tempDir) // Ignore error during cleanup
-		return "", fmt.Errorf("no embedded libraries directory found for platform %s_%s: %w", goos, goarch, err)
-	}
-
-	// Extract all files with the appropriate extension
-	for _, entry := range dirEntries {
-		if entry.IsDir() {
-			continue
-		}
-
-		fileName := entry.Name()
-		if filepath.Ext(fileName) != libExtension {
-			continue
-		}
-
-		embeddedPath := fmt.Sprintf("%s/%s", embeddedDir, fileName)
-
-		// Try to read the embedded file
-		data, err := embeddedLibs.ReadFile(embeddedPath)
-		if err != nil {
-			// Skip files that can't be read
-			continue
-		}
-
-		// Write library to temporary file
-		tempLibPath := filepath.Join(tempDir, fileName)
-		err = os.WriteFile(tempLibPath, data, 0600)
-		if err != nil {
-			_ = os.RemoveAll(tempDir) // Ignore error during cleanup
-			return "", fmt.Errorf("failed to write temp library %s: %w", fileName, err)
-		}
-		extractedCount++
-	}
-
-	if extractedCount == 0 {
-		_ = os.RemoveAll(tempDir) // Ignore error during cleanup
-		return "", fmt.Errorf("no embedded libraries found for platform %s_%s", goos, goarch)
-	}
-
-	l.tempDir = tempDir
-
-	// Return path to main library
-	mainLib, err := l.getLibraryName()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(tempDir, mainLib), nil
-}
-
 // loadSharedLibrary loads a shared library using the appropriate method for the platform
 func (l *LibraryLoader) loadSharedLibrary(path string) (uintptr, error) {
 	switch runtime.GOOS {
@@ -218,6 +148,11 @@ func (l *LibraryLoader) loadSharedLibrary(path string) (uintptr, error) {
 }
 
 // Global functions for backward compatibility
+
+// LoadLibraryWithVersion loads a specific version of the llama.cpp library
+func LoadLibraryWithVersion(version string) error {
+	return globalLoader.LoadLibraryWithVersion(version)
+}
 
 // getLibHandle returns the global library handle
 func getLibHandle() uintptr {
@@ -243,4 +178,12 @@ func RegisterFunction(fptr interface{}, name string) error {
 // Cleanup function to be called when the program exits
 func Cleanup() {
 	_ = globalLoader.UnloadLibrary() // Ignore error during cleanup
+}
+
+// CleanLibraryCache removes cached library files to force re-download
+func CleanLibraryCache() error {
+	if globalLoader.downloader != nil {
+		return globalLoader.downloader.CleanCache()
+	}
+	return nil
 }

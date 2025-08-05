@@ -183,90 +183,66 @@ jobs:
         # This reduces noise while focusing on actionable security issues
         args: '-exclude=G103,G104,G115,G304 -severity=medium ./...'
 
-  build-libs:
-    name: Build Libraries
+  download-libs:
+    name: Download Libraries
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
-          # Linux builds with auto-detection for CUDA/HIP/CPU-only
+          # Linux downloads
           - os: ubuntu-latest
             platform: linux
             arch: amd64
-            gpu_type: auto-detect
-            description: "Auto-detect CUDA/HIP or CPU-only"
+            description: "Download pre-built libraries"
           - os: ubuntu-latest
             platform: linux
             arch: arm64
-            gpu_type: auto-detect
-            description: "Auto-detect CUDA/HIP or CPU-only"
-          # macOS builds with Metal support
+            description: "Download pre-built libraries"
+          # macOS downloads
           - os: macos-latest
             platform: darwin
             arch: amd64
-            gpu_type: metal
-            description: "Metal GPU acceleration"
+            description: "Download pre-built libraries"
           - os: macos-latest
             platform: darwin
             arch: arm64
-            gpu_type: metal
-            description: "Metal GPU acceleration"
-          # Windows builds with CUDA support
+            description: "Download pre-built libraries"
+          # Windows downloads
           - os: windows-latest
             platform: windows
             arch: amd64
-            gpu_type: cuda
-            description: "CUDA GPU acceleration"
+            description: "Download pre-built libraries"
     
     steps:
     - name: Checkout code
       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-    - name: Cache llama.cpp
+    - name: Set up Go
+      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
       uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
       with:
-        path: build/llama.cpp
-        key: llama-cpp-${{ env.LLAMA_CPP_BUILD }}-${{ matrix.platform }}-${{ matrix.arch }}
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ env.GO_VERSION }}-
 
-    - name: Install dependencies (Ubuntu)
-      if: matrix.platform == 'linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake build-essential patchelf
-        if [[ "${{ matrix.arch }}" == "arm64" ]]; then
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-        fi
-        # Note: CUDA and ROCm SDKs are auto-detected by the Makefile
-        # No need to install them in CI as they're optional
+    - name: Download dependencies
+      run: go mod download
 
-    - name: Install dependencies (macOS)
-      if: matrix.platform == 'darwin'
-      run: |
-        brew install cmake
-
-    - name: Install dependencies (Windows)
-      if: matrix.platform == 'windows'
-      run: |
-        choco install cmake
-
-    - name: Set up CUDA (Windows only)
-      if: matrix.platform == 'windows' && matrix.gpu_type == 'cuda'
-      uses: Jimver/cuda-toolkit@v0.2.26 # v0.2.26
-      with:
-        cuda: '12.9.1'
-        method: 'network'
-        use-github-cache: false
-        use-local-cache: true
-        log-file-suffix: 'cuda-install.log'
-        sub-packages: '["nvcc", "cudart", "thrust", "cufft", "curand", "cusolver", "cusparse", "cublas"]'
-
-    - name: Clone and build llama.cpp using Makefile
+    - name: Download llama.cpp libraries using Makefile
       env:
         LLAMA_CPP_BUILD: ${{ env.LLAMA_CPP_BUILD }}
+        GOOS: ${{ matrix.platform }}
+        GOARCH: ${{ matrix.arch }}
       run: |
-        echo "Building for ${{ matrix.platform }}-${{ matrix.arch }} with ${{ matrix.description }}"
-        make clone-llamacpp
-        make build-llamacpp-${{ matrix.platform }}-${{ matrix.arch }}
+        echo "Downloading libraries for ${{ matrix.platform }}-${{ matrix.arch }} - ${{ matrix.description }}"
+        make download-libs
 
     - name: Upload library artifacts
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -358,7 +334,7 @@ jobs:
     name: Create Release
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    needs: [build-libs, examples, documentation]
+    needs: [download-libs, examples, documentation]
     
     steps:
     - name: Checkout code
@@ -447,7 +423,7 @@ jobs:
   examples:
     name: Build Examples
     runs-on: ${{ matrix.os }}
-    needs: [build-libs]
+    needs: [download-libs]
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]

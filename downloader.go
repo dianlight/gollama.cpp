@@ -490,7 +490,9 @@ func (d *LibraryDownloader) downloadFileWithChecksum(url, filepath string) (stri
 	if err != nil {
 		return "", fmt.Errorf("failed to download file: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close() // Ignore error in defer
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("download failed with status %d", resp.StatusCode)

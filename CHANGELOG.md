@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows compilation compatibility using native syscalls (`LoadLibraryW`, `FreeLibrary`)
 - Cross-platform compilation testing in CI pipeline
 - Platform capability detection functions (`isPlatformSupported`, `getPlatformError`)
+- **Integrated hf.sh script management** for Hugging Face model downloads
+- `update-hf-script` target for updating hf.sh from llama.cpp repository
+- Enhanced model download system using hf.sh instead of direct curl
+- Comprehensive tools documentation (`docs/TOOLS.md`)
 - Dedicated platform-specific test suite (`TestPlatformSpecific`)
 - Enhanced Makefile with cross-compilation targets (`test-cross-compile`, `test-compile-*`)
 - Comprehensive platform migration documentation
@@ -30,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Simplified build process**: No longer requires CMake, compilers, or GPU SDKs
 - Library loading now uses automatic download instead of local compilation
 - Updated documentation to reflect new download-based workflow
+- **Model download system**: Now uses hf.sh script from llama.cpp instead of direct curl commands
+- **Example projects**: Updated to use local hf.sh script from `scripts/` directory
+- **Documentation**: Updated to reflect hf.sh script integration and usage
 
 ### Removed
 - All `build-llamacpp-*` compilation targets (no longer needed)

@@ -210,6 +210,28 @@ clone-llamacpp:
 	fi
 	@echo "Checking out build $(LLAMA_CPP_BUILD)"
 	cd $(LLAMA_CPP_DIR) && git fetch && git checkout $(LLAMA_CPP_BUILD)
+	@echo "Copying hf.sh script if different or missing"
+	@if [ ! -f "scripts/hf.sh" ] || ! cmp -s "$(LLAMA_CPP_DIR)/scripts/hf.sh" "scripts/hf.sh"; then \
+		echo "Copying hf.sh from llama.cpp/scripts/"; \
+		cp "$(LLAMA_CPP_DIR)/scripts/hf.sh" "scripts/hf.sh"; \
+		chmod +x "scripts/hf.sh"; \
+		echo "hf.sh script updated"; \
+	else \
+		echo "hf.sh script is already up to date"; \
+	fi
+
+# Update hf.sh script from llama.cpp repository
+.PHONY: update-hf-script
+update-hf-script: clone-llamacpp
+	@echo "Forcing update of hf.sh script from llama.cpp"
+	@if [ -f "$(LLAMA_CPP_DIR)/scripts/hf.sh" ]; then \
+		cp "$(LLAMA_CPP_DIR)/scripts/hf.sh" "scripts/hf.sh"; \
+		chmod +x "scripts/hf.sh"; \
+		echo "hf.sh script updated from llama.cpp build $(LLAMA_CPP_BUILD)"; \
+	else \
+		echo "Error: hf.sh script not found in llama.cpp repository"; \
+		exit 1; \
+	fi
 
 
 # Package releases
@@ -247,23 +269,25 @@ install-tools:
 	$(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	$(GO) install github.com/securego/gosec/v2/cmd/gosec@latest
 
-# Download model file
+# Download model file using hf.sh script
 .PHONY: model_download
 model_download:
-	@echo "Downloading models"
+	@echo "Downloading models using hf.sh script"
 	@mkdir -p models
+	@if [ ! -f "scripts/hf.sh" ]; then \
+		echo "Error: hf.sh script not found. Run 'make clone-llamacpp' first."; \
+		exit 1; \
+	fi
 	@if [ ! -f "models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf" ]; then \
-		echo "Downloading TinyLlama model..."; \
-		curl -L -o models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf \
-			"https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q2_K.gguf"; \
+		echo "Downloading TinyLlama model using hf.sh..."; \
+		bash scripts/hf.sh --repo TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF --file tinyllama-1.1b-chat-v1.0.Q2_K.gguf --outdir models; \
 		echo "TinyLlama model downloaded successfully"; \
 	else \
 		echo "TinyLlama model already exists in models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf"; \
 	fi
 	@if [ ! -f "models/gritlm-7b_q4_1.gguf" ]; then \
-		echo "Downloading GritLM model..."; \
-		curl -L -o models/gritlm-7b_q4_1.gguf \
-			"https://huggingface.co/cohesionet/GritLM-7B_gguf/resolve/main/gritlm-7b_q4_1.gguf"; \
+		echo "Downloading GritLM model using hf.sh..."; \
+		bash scripts/hf.sh --repo cohesionet/GritLM-7B_gguf --file gritlm-7b_q4_1.gguf --outdir models; \
 		echo "GritLM model downloaded successfully"; \
 	else \
 		echo "GritLM model already exists in models/gritlm-7b_q4_1.gguf"; \
@@ -311,7 +335,8 @@ help:
 	@echo "Utilities:"
 	@echo "  deps               Update dependencies"
 	@echo "  clone-llamacpp     Clone llama.cpp repository for cross-reference"
-	@echo "  model_download     Download example models"
+	@echo "  update-hf-script   Update hf.sh script from llama.cpp repository"
+	@echo "  model_download     Download example models using hf.sh script"
 	@echo "  install-tools      Install development tools"
 	@echo "  version            Show version information"
 	@echo "  help               Show this help"

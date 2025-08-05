@@ -94,7 +94,7 @@ func LoadConfig(path string) (*Config, error) {
 	if strings.Contains(cleanPath, "..") {
 		return nil, fmt.Errorf("invalid path: path traversal detected")
 	}
-	
+
 	data, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)

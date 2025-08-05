@@ -24,6 +24,9 @@ go build -o simple-chat main.go
 echo "✅ Build complete!"
 echo ""
 
+echo "ℹ️  Note: This example will automatically download llama.cpp libraries if not found."
+echo ""
+
 # Demo 1: Basic text completion
 echo "📝 Demo 1: Basic Text Completion"
 echo "Command: $CHAT_BIN -prompt \"Once upon a time\" -n-predict 80"

@@ -381,8 +381,22 @@ func main() {
 
 	// Initialize the library
 	fmt.Print("Initializing backend... ")
-	if err := gollama.Backend_init(); err != nil {
-		log.Fatalf("Failed to initialize backend: %v", err)
+	err := gollama.Backend_init()
+	if err != nil {
+		fmt.Printf("failed (%v)\n", err)
+		fmt.Println("Attempting to download llama.cpp libraries...")
+
+		// Try to download the library
+		downloadErr := gollama.LoadLibraryWithVersion("")
+		if downloadErr != nil {
+			log.Fatalf("Failed to download library: %v", downloadErr)
+		}
+
+		fmt.Print("Retrying backend initialization... ")
+		err = gollama.Backend_init()
+		if err != nil {
+			log.Fatalf("Failed to initialize backend after download: %v", err)
+		}
 	}
 	defer gollama.Backend_free()
 	fmt.Println("done")

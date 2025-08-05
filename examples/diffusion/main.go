@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dianlight/gollama.cpp"
+	"gollama"
 )
 
 // secureRandFloat32 generates a cryptographically secure random float32 in [0, 1)
@@ -155,11 +155,26 @@ func main() {
 	fmt.Println()
 
 	// Initialize backend
-	fmt.Println("Loading model...")
-	if err := gollama.Backend_init(); err != nil {
-		log.Fatalf("Failed to initialize backend: %v", err)
+	fmt.Print("Initializing backend... ")
+	err := gollama.Backend_init()
+	if err != nil {
+		fmt.Printf("failed (%v)\n", err)
+		fmt.Println("Attempting to download llama.cpp libraries...")
+
+		// Try to download the library
+		downloadErr := gollama.LoadLibraryWithVersion("")
+		if downloadErr != nil {
+			log.Fatalf("Failed to download library: %v", downloadErr)
+		}
+
+		fmt.Print("Retrying backend initialization... ")
+		err = gollama.Backend_init()
+		if err != nil {
+			log.Fatalf("Failed to initialize backend after download: %v", err)
+		}
 	}
 	defer gollama.Backend_free()
+	fmt.Println("done")
 
 	// Load model
 	modelParams := gollama.Model_default_params()

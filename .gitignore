@@ -12,3 +12,7 @@ examples/simple-chat/simple-chat
 examples/embedding/embedding
 examples/eval-callback/eval-callback
 examples/simple-chat-with-loader/simple-chat-with-loader
+examples/retrieval/retrieval
+examples/batched/batched
+examples/diffusion/diffusion
+

@@ -80,6 +80,8 @@ help:
 	@echo "  clean        - Remove build artifacts"
 	@echo "  help         - Show this help message"
 	@echo ""
+	@echo "Note: The example will automatically download llama.cpp libraries if not found."
+	@echo ""
 	@echo "Manual usage examples:"
 	@echo "  ./simple-chat -prompt \"Your prompt here\""
 	@echo "  ./simple-chat -prompt \"Story beginning\" -n-predict 150"

@@ -17,17 +17,43 @@ A high-performance Go binding for [llama.cpp](https://github.com/ggml-org/llama.
 
 ## Supported Platforms
 
-### macOS
+Gollama.cpp uses a **platform-specific architecture** with build tags to ensure optimal compatibility and performance across all operating systems.
+
+### ✅ Fully Supported Platforms
+
+#### macOS
 - **CPU**: Intel x64, Apple Silicon (ARM64)
 - **GPU**: Metal (Apple Silicon)
+- **Status**: Full feature support with purego
+- **Build Tags**: Uses `!windows` build tag
 
-### Linux
+#### Linux
 - **CPU**: x86_64, ARM64
 - **GPU**: NVIDIA (CUDA), AMD (HIP/ROCm)
+- **Status**: Full feature support with purego
+- **Build Tags**: Uses `!windows` build tag
 
-### Windows
-- **CPU**: x86_64, ARM64
-- **GPU**: NVIDIA (CUDA), AMD (HIP)
+### 🚧 In Development
+
+#### Windows
+- **CPU**: x86_64, ARM64 
+- **GPU**: NVIDIA (CUDA), AMD (HIP) - planned
+- **Status**: **Build compatibility implemented**, runtime support in development
+- **Build Tags**: Uses `windows` build tag with syscall-based library loading
+- **Current State**: 
+  - ✅ Compiles without errors on Windows
+  - ✅ Cross-compilation from other platforms works
+  - 🚧 Runtime functionality being implemented
+  - 🚧 GPU acceleration being added
+
+### Platform-Specific Implementation Details
+
+Our platform abstraction layer uses Go build tags to provide:
+
+- **Unix-like systems** (`!windows`): Uses [purego](https://github.com/ebitengine/purego) for dynamic library loading
+- **Windows** (`windows`): Uses native Windows syscalls (`LoadLibraryW`, `FreeLibrary`, `GetProcAddress`)
+- **Cross-compilation**: Supports building for any platform from any platform
+- **Automatic detection**: Runtime platform capability detection
 
 ## Installation
 
@@ -35,7 +61,37 @@ A high-performance Go binding for [llama.cpp](https://github.com/ggml-org/llama.
 go get github.com/dianlight/gollama.cpp
 ```
 
-The Go module includes pre-built llama.cpp libraries for all supported platforms. No additional installation required!
+The Go module automatically downloads pre-built llama.cpp libraries from the official [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) releases on first use. No manual compilation required!
+
+## Cross-Platform Development
+
+### Build Compatibility Matrix
+
+Our CI system tests compilation across all platforms:
+
+| Target Platform | Build From Linux | Build From macOS | Build From Windows |
+|------------------|:----------------:|:----------------:|:------------------:|
+| Linux (amd64)    | ✅               | ✅               | ✅                 |
+| Linux (arm64)    | ✅               | ✅               | ✅                 |
+| macOS (amd64)    | ✅               | ✅               | ✅                 |
+| macOS (arm64)    | ✅               | ✅               | ✅                 |
+| Windows (amd64)  | ✅               | ✅               | ✅                 |
+| Windows (arm64)  | ✅               | ✅               | ✅                 |
+
+### Development Workflow
+
+```bash
+# Test cross-compilation for all platforms
+make test-cross-compile
+
+# Build for specific platform
+GOOS=windows GOARCH=amd64 go build ./...
+GOOS=linux GOARCH=arm64 go build ./...
+GOOS=darwin GOARCH=arm64 go build ./...
+
+# Run platform-specific tests
+go test -v -run TestPlatformSpecific ./...
+```
 
 ## Quick Start
 
@@ -108,14 +164,34 @@ func main() {
 
 ### GPU Configuration
 
-```go
-// Enable Metal on macOS
-params := gollama.Context_default_params()
-params.n_gpu_layers = 32 // Offload layers to GPU
+Gollama.cpp automatically downloads the appropriate pre-built binaries with GPU support and configures the optimal backend:
 
-// Enable CUDA on Linux/Windows
+```go
+// Automatic GPU detection and configuration
+params := gollama.Context_default_params()
+params.n_gpu_layers = 32 // Offload layers to GPU (if available)
+
+// Platform-specific optimizations:
+// - macOS: Uses Metal when available  
+// - Linux: Supports CUDA and HIP
+// - Windows: Supports CUDA and HIP
 params.split_mode = gollama.LLAMA_SPLIT_MODE_LAYER
 ```
+
+#### GPU Support Matrix
+
+| Platform | GPU Type | Backend | Status |
+|----------|----------|---------|--------|
+| macOS | Apple Silicon | Metal | ✅ Supported |
+| macOS | Intel/AMD | CPU only | ✅ Supported |
+| Linux | NVIDIA | CUDA | ✅ Available in releases |
+| Linux | AMD | HIP/ROCm | ✅ Available in releases |
+| Linux | Intel/Other | CPU | ✅ Fallback |
+| Windows | NVIDIA | CUDA | ✅ Available in releases |
+| Windows | AMD | HIP | ✅ Available in releases |
+| Windows | Intel/Other | CPU | ✅ Fallback |
+
+The library automatically downloads pre-built binaries from the official llama.cpp releases with the appropriate GPU support for your platform. The download happens automatically on first use!
 
 ### Model Loading Options
 
@@ -127,18 +203,47 @@ params.use_mlock = true       // Memory locking
 params.vocab_only = false     // Load full model
 ```
 
-### Sampling Configuration
+### Library Management
+
+Gollama.cpp automatically downloads pre-built binaries from the official llama.cpp releases. You can also manage libraries manually:
 
 ```go
-// Temperature sampling
-sampler := gollama.Sampler_init_temp(0.8)
+// Load a specific version
+err := gollama.LoadLibraryWithVersion("b6089")
 
-// Top-k + Top-p sampling
-chain := gollama.Sampler_chain_init(gollama.Sampler_chain_default_params())
-gollama.Sampler_chain_add(chain, gollama.Sampler_init_top_k(40))
-gollama.Sampler_chain_add(chain, gollama.Sampler_init_top_p(0.9, 1))
-gollama.Sampler_chain_add(chain, gollama.Sampler_init_temp(0.8))
+// Clean cache to force re-download
+err := gollama.CleanLibraryCache()
 ```
+
+#### Command Line Tools
+
+```bash
+# Download libraries for current platform
+make download-libs
+
+# Download libraries for all platforms  
+make download-libs-all
+
+# Test download functionality
+make test-download
+
+# Clean library cache
+make clean-libs
+```
+
+#### Available Library Variants
+
+The downloader automatically selects the best variant for your platform:
+
+- **macOS**: Metal-enabled binaries (arm64/x64)
+- **Linux**: CPU-optimized binaries (CUDA/HIP versions available)
+- **Windows**: CPU-optimized binaries (CUDA/HIP versions available)
+
+#### Cache Location
+
+Downloaded libraries are cached in:
+- **Linux/macOS**: `~/.cache/gollama/libs/`
+- **Windows**: `%LOCALAPPDATA%/gollama/libs/`
 
 ## Building from Source
 
@@ -146,22 +251,22 @@ gollama.Sampler_chain_add(chain, gollama.Sampler_init_temp(0.8))
 
 - Go 1.21 or later
 - Make
-- Platform-specific build tools:
-  - **macOS**: Xcode Command Line Tools
-  - **Linux**: GCC, CUDA SDK (for NVIDIA), ROCm (for AMD)
-  - **Windows**: Visual Studio or MinGW-w64, CUDA SDK (for NVIDIA)
 
-### Build Commands
+### Quick Start
 
 ```bash
+# Clone and build
+git clone https://github.com/dianlight/gollama.cpp
+cd gollama.cpp
+
 # Build for current platform
 make build
 
-# Build for all platforms
-make build-all
+# Run tests (downloads libraries automatically)
+make test
 
-# Build with GPU support
-make build-gpu
+# Build examples
+make build-examples
 
 # Run tests
 make test
@@ -169,6 +274,17 @@ make test
 # Generate release packages
 make release
 ```
+
+### GPU Detection Logic
+
+The Makefile implements intelligent GPU detection:
+
+1. **CUDA Detection**: Checks for `nvcc` compiler and CUDA toolkit
+2. **HIP Detection**: Checks for `hipconfig` and ROCm installation  
+3. **Priority Order**: CUDA > HIP > CPU (on Linux/Windows)
+4. **Metal**: Always enabled on macOS when Xcode is available
+
+No manual configuration or environment variables required!
 
 ## Version Compatibility
 

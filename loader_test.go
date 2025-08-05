@@ -84,7 +84,7 @@ func TestLibraryLoader_ExtractEmbeddedLibraries(t *testing.T) {
 			t.Log("extractEmbeddedLibraries succeeded - embedded libraries are present")
 			// Clean up if extraction succeeded
 			if loader.tempDir != "" {
-				os.RemoveAll(loader.tempDir)
+				_ = os.RemoveAll(loader.tempDir) // Ignore error in test cleanup
 				loader.tempDir = ""
 			}
 		} else {
@@ -131,7 +131,7 @@ func TestLibraryLoader_ExtractEmbeddedLibraries(t *testing.T) {
 					}
 
 					// Clean up
-					os.RemoveAll(loader.tempDir)
+					_ = os.RemoveAll(loader.tempDir) // Ignore error in test cleanup
 					loader.tempDir = ""
 				}
 			} else {
@@ -271,7 +271,7 @@ func TestLibraryLoader_LoadLibrary(t *testing.T) {
 
 		// Clean up if somehow it succeeded
 		if loader.loaded {
-			loader.UnloadLibrary()
+			_ = loader.UnloadLibrary() // Ignore error in test cleanup
 		}
 	})
 }
@@ -325,7 +325,7 @@ func TestLibraryLoader_ThreadSafety(t *testing.T) {
 
 		// Clean up if any succeeded
 		if loader.loaded {
-			loader.UnloadLibrary()
+			_ = loader.UnloadLibrary() // Ignore error in test cleanup
 		}
 	})
 }
@@ -373,14 +373,14 @@ func TestLibraryLoader_ExtractEmbeddedLibrariesWriteFailure(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create temp dir: %v", err)
 		}
-		defer os.RemoveAll(tempDir)
+		defer func() { _ = os.RemoveAll(tempDir) }() // Ignore error in cleanup
 
 		// Make directory read-only
 		err = os.Chmod(tempDir, 0444)
 		if err != nil {
 			t.Skipf("Cannot change directory permissions: %v", err)
 		}
-		defer os.Chmod(tempDir, 0755) // Restore permissions for cleanup
+		defer func() { _ = os.Chmod(tempDir, 0755) }() // Restore permissions for cleanup, ignore error
 
 		// This test is OS-dependent and may not work reliably
 		// We'll just verify the function doesn't panic
@@ -470,7 +470,7 @@ func TestLibraryLoader_RaceConditions(t *testing.T) {
 
 		// Final cleanup
 		if loader.loaded {
-			loader.UnloadLibrary()
+			_ = loader.UnloadLibrary() // Ignore error in test cleanup
 		}
 	})
 }

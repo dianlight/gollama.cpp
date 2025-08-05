@@ -11,6 +11,8 @@ cd examples/simple-chat
 go run main.go -prompt "The future of AI is"
 ```
 
+**Note:** The example will automatically download the required llama.cpp libraries if they are not found on your system. This ensures the example works out of the box without manual setup.
+
 ## Features
 
 - Basic text generation and completion

@@ -52,7 +52,7 @@ GritLM is a breakthrough unified model architecture that can perform:
 
 ### Build System
 - **`Makefile`** - Comprehensive build automation with 25+ targets:
-  - `model_download` - Downloads GritLM-7B model using hf.sh script
+  - `model_download` - Downloads GritLM-7B model using hf.sh script from scripts/
   - `build`, `run`, `test` - Standard development workflow
   - `demo` - Interactive demonstration mode
   - `benchmark`, `profile` - Performance analysis
@@ -75,7 +75,7 @@ GritLM is a breakthrough unified model architecture that can perform:
 - **Size**: ~4.2GB (Q4_1 quantized for efficiency)
 - **Architecture**: Based on Mistral-7B with specialized training
 - **Embedding Dimension**: 4096
-- **Download**: Automated via `hf.sh` script from llama.cpp
+- **Download**: Automated via `hf.sh` script from project's scripts/ directory
 
 ### Advanced Features
 - Automatic model downloading with `make model_download`

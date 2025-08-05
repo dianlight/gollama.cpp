@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 
 	"github.com/dianlight/gollama.cpp"
@@ -34,8 +35,22 @@ func main() {
 
 	// Initialize the library
 	fmt.Print("Initializing backend... ")
-	if err := gollama.Backend_init(); err != nil {
-		log.Fatalf("Failed to initialize backend: %v", err)
+	err := gollama.Backend_init()
+	if err != nil {
+		fmt.Printf("failed (%v)\n", err)
+		fmt.Println("Attempting to download llama.cpp libraries...")
+
+		// Try to download the library
+		downloadErr := gollama.LoadLibraryWithVersion("")
+		if downloadErr != nil {
+			log.Fatalf("Failed to download library: %v", downloadErr)
+		}
+
+		fmt.Print("Retrying backend initialization... ")
+		err = gollama.Backend_init()
+		if err != nil {
+			log.Fatalf("Failed to initialize backend after download: %v", err)
+		}
 	}
 	defer gollama.Backend_free()
 	fmt.Println("done")
@@ -75,6 +90,12 @@ func main() {
 	fmt.Printf("Default NBatch: %d\n", ctxParams.NBatch)
 	fmt.Printf("Default NUbatch: %d\n", ctxParams.NUbatch)
 
+	if *ctx > math.MaxUint32 || *ctx < 0 {
+		log.Fatalf("context size %d is out of range for uint32", *ctx)
+	}
+	if *threads > math.MaxInt32 || *threads < math.MinInt32 {
+		log.Fatalf("threads count %d is out of range for int32", *threads)
+	}
 	ctxParams.NCtx = uint32(*ctx)
 	ctxParams.NBatch = 512 // Use smaller batch size
 	// ctxParams.NUbatch = 512   // Keep default value

@@ -67,8 +67,8 @@ The fastest way to build gollama.cpp:
 git clone https://github.com/dianlight/gollama.cpp
 cd gollama.cpp
 
-# Build everything (Go bindings + llama.cpp libraries)
-make build build-llamacpp-current
+# Build Go bindings (libraries are downloaded automatically)
+make build
 
 # Run tests
 make test
@@ -86,44 +86,55 @@ cd gollama.cpp
 make deps
 ```
 
-### 2. Build llama.cpp Libraries
+### 2. Library Management
 
-#### Current Platform Only
+Gollama.cpp now uses pre-built binaries from official llama.cpp releases instead of local compilation.
+
+#### Automatic Download
+Libraries are downloaded automatically when needed:
+
 ```bash
-# Build for your current platform
-make build-llamacpp-current
+# Build Go bindings (downloads libraries automatically if needed)
+make build
+
+# Run tests (downloads libraries automatically if needed)
+make test
 ```
 
-#### All Platforms
+#### Manual Library Management
 ```bash
-# Build for all supported platforms (requires cross-compilation setup)
-make build-llamacpp-all
+# Download libraries for current platform
+make download-libs
+
+# Download libraries for all platforms (for testing)
+make download-libs-all
+
+# Test library download functionality
+make test-download
+
+# Clean library cache (forces re-download)
+make clean-libs
 ```
 
-#### Specific Platforms
+#### Cross-Platform Downloads
 ```bash
-# macOS (with Metal support)
-make build-llamacpp-darwin-amd64
-make build-llamacpp-darwin-arm64
-
-# Linux (with CUDA support where available)
-make build-llamacpp-linux-amd64
-make build-llamacpp-linux-arm64
-
-# Windows (with CUDA support where available)
-make build-llamacpp-windows-amd64
+# Test downloads for all platforms
+make test-download-platforms
 ```
 
-#### GPU-Specific Builds
-```bash
-# Build with GPU acceleration (CUDA, Metal, etc.)
-make build-libs-gpu
+### 3. Development Tools
 
-# Build CPU-only versions
-make build-libs-cpu
+#### Cross-Reference with llama.cpp Source
+If you need access to llama.cpp source code and documentation for development:
+
+```bash
+# Clone llama.cpp repository for cross-reference
+make clone-llamacpp
 ```
 
-### 3. Build Go Bindings
+This will clone the llama.cpp repository to `build/llama.cpp/` and checkout the specific version used by gollama.cpp.
+
+### 4. Build Go Bindings
 
 ```bash
 # Build for current platform
@@ -136,7 +147,7 @@ make build-all
 GOOS=linux GOARCH=amd64 make build
 ```
 
-### 4. Build Examples
+### 5. Build Examples
 
 ```bash
 make build-examples
@@ -149,7 +160,7 @@ make build-examples
 You can customize the build with environment variables:
 
 ```bash
-# Specify llama.cpp version
+# Specify llama.cpp version for downloads
 export LLAMA_CPP_BUILD=b6076
 
 # Specify Go version
@@ -162,26 +173,28 @@ export GOARCH=amd64
 make build
 ```
 
-### CMake Options for llama.cpp
+## Library Architecture
 
-When building llama.cpp, you can pass custom CMake flags:
+Gollama.cpp now uses a **download-based architecture** that automatically fetches pre-built binaries from the official llama.cpp releases. This eliminates the need for local compilation and complex build dependencies.
 
-#### GPU Acceleration
+### Supported Binaries
+
+The downloader automatically selects the appropriate binary based on your platform:
+
+- **macOS**: `llama-b6089-bin-macos-{arch}.zip` (includes Metal support)
+- **Linux**: `llama-b6089-bin-ubuntu-{arch}.zip` (includes CUDA/HIP support)  
+- **Windows**: `llama-b6089-bin-win-cpu-{arch}.zip` (CPU support, GPU support planned)
+
+### Cache Management
+
+Downloaded libraries are cached locally to avoid repeated downloads:
+
 ```bash
-# NVIDIA CUDA
-cmake -DGGML_CUDA=ON
+# View cache location
+ls ~/.cache/gollama/
 
-# AMD HIP/ROCm
-cmake -DGGML_HIP=ON
-
-# Apple Metal
-cmake -DGGML_METAL=ON
-
-# Intel oneAPI
-cmake -DGGML_SYCL=ON
-
-# Vulkan
-cmake -DGGML_VULKAN=ON
+# Clear cache to force re-download
+make clean-libs
 ```
 
 #### CPU Optimizations

@@ -5,16 +5,50 @@
 package main
 
 import (
+	"crypto/rand"
 	"flag"
 	"fmt"
 	"log"
 	"math"
-	"math/rand"
+	"math/big"
 	"strings"
 	"time"
 
-	"gollama"
+	gollama "github.com/dianlight/gollama.cpp"
 )
+
+// secureRandFloat32 generates a cryptographically secure random float32 in [0, 1)
+func secureRandFloat32() float32 {
+	max := big.NewInt(1 << 24) // 24 bits for float32 precision
+	n, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		log.Fatalf("Failed to generate secure random number: %v", err)
+	}
+	return float32(n.Int64()) / float32(1<<24)
+}
+
+// secureRandIntn generates a cryptographically secure random int in [0, n)
+func secureRandIntn(n int) int {
+	if n <= 0 {
+		log.Fatalf("Invalid range for secure random: %d", n)
+	}
+	max := big.NewInt(int64(n))
+	result, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		log.Fatalf("Failed to generate secure random number: %v", err)
+	}
+	return int(result.Int64())
+}
+
+// secureRandFloat64 generates a cryptographically secure random float64 in [0, 1)
+func secureRandFloat64() float64 {
+	max := big.NewInt(1 << 53) // 53 bits for float64 precision
+	n, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		log.Fatalf("Failed to generate secure random number: %v", err)
+	}
+	return float64(n.Int64()) / float64(1<<53)
+}
 
 // DiffusionConfig holds configuration for diffusion generation
 type DiffusionConfig struct {
@@ -86,6 +120,9 @@ func main() {
 
 	// Convert types
 	config.Temperature = float32(temperature)
+	if topK > math.MaxInt32 || topK < math.MinInt32 {
+		log.Fatalf("top-k value %d is out of range for int32", topK)
+	}
 	config.TopK = int32(topK)
 	config.TopP = float32(topP)
 	config.Eps = eps
@@ -94,7 +131,8 @@ func main() {
 	if config.Seed == -1 {
 		config.Seed = time.Now().UnixNano()
 	}
-	rand.Seed(config.Seed)
+	// Note: crypto/rand doesn't use seeds like math/rand did
+	// The secure random functions we use don't require seeding
 
 	// Version information
 	fmt.Printf("Gollama.cpp Diffusion Generation Example %s\n", gollama.FullVersion)
@@ -117,11 +155,26 @@ func main() {
 	fmt.Println()
 
 	// Initialize backend
-	fmt.Println("Loading model...")
-	if err := gollama.Backend_init(); err != nil {
-		log.Fatalf("Failed to initialize backend: %v", err)
+	fmt.Print("Initializing backend... ")
+	err := gollama.Backend_init()
+	if err != nil {
+		fmt.Printf("failed (%v)\n", err)
+		fmt.Println("Attempting to download llama.cpp libraries...")
+
+		// Try to download the library
+		downloadErr := gollama.LoadLibraryWithVersion("")
+		if downloadErr != nil {
+			log.Fatalf("Failed to download library: %v", downloadErr)
+		}
+
+		fmt.Print("Retrying backend initialization... ")
+		err = gollama.Backend_init()
+		if err != nil {
+			log.Fatalf("Failed to initialize backend after download: %v", err)
+		}
 	}
 	defer gollama.Backend_free()
+	fmt.Println("done")
 
 	// Load model
 	modelParams := gollama.Model_default_params()
@@ -133,6 +186,21 @@ func main() {
 
 	// Create context
 	contextParams := gollama.Context_default_params()
+	if config.ContextSize > math.MaxUint32 || config.ContextSize < 0 {
+		log.Fatalf("context size %d is out of range for uint32", config.ContextSize)
+	}
+	if config.MaxLength > math.MaxUint32 || config.MaxLength < 0 {
+		log.Fatalf("max length %d is out of range for uint32", config.MaxLength)
+	}
+	if config.Threads > math.MaxInt32 || config.Threads < math.MinInt32 {
+		log.Fatalf("threads count %d is out of range for int32", config.Threads)
+	}
+	if config.ContextSize > math.MaxUint32 || config.ContextSize < 0 {
+		log.Fatalf("context size %d is out of range for uint32", config.ContextSize)
+	}
+	if config.MaxLength > math.MaxUint32 || config.MaxLength < 0 {
+		log.Fatalf("max length %d is out of range for uint32", config.MaxLength)
+	}
 	contextParams.NCtx = uint32(config.ContextSize)
 	contextParams.NBatch = uint32(config.MaxLength)
 	contextParams.NThreads = int32(config.Threads)
@@ -331,19 +399,19 @@ func sampleTokenWithConfidence(logitsPtr *float32, config *DiffusionConfig, algo
 
 	// Generate a reasonable token (simplified)
 	commonTokens := []gollama.LlamaToken{464, 262, 286, 290, 319, 356, 389, 423, 447, 481} // Some common token IDs
-	selectedToken := commonTokens[rand.Intn(len(commonTokens))]
+	selectedToken := commonTokens[secureRandIntn(len(commonTokens))]
 
 	// Calculate confidence based on algorithm
 	var confidence float32
 	switch algorithm {
 	case ConfidenceBased:
-		confidence = 0.7 + rand.Float32()*0.3 // Random confidence between 0.7-1.0
+		confidence = 0.7 + secureRandFloat32()*0.3 // Random confidence between 0.7-1.0
 	case EntropyBased:
-		confidence = float32(math.Exp(-rand.Float64() * 2)) // Entropy-based confidence
+		confidence = float32(math.Exp(-secureRandFloat64() * 2)) // Entropy-based confidence
 	case MarginBased:
-		confidence = 0.5 + rand.Float32()*0.5 // Margin-based confidence
+		confidence = 0.5 + secureRandFloat32()*0.5 // Margin-based confidence
 	case Random:
-		confidence = rand.Float32() // Random confidence
+		confidence = secureRandFloat32() // Random confidence
 	default:
 		confidence = 0.8
 	}

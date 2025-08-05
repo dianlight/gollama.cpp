@@ -10,7 +10,7 @@ MODEL_NAME := gritlm-7b_q4_1.gguf
 MODEL_REPO := cohesionet/GritLM-7B_gguf
 MODEL_DIR := ../../models
 MODEL_PATH := $(MODEL_DIR)/$(MODEL_NAME)
-HF_SCRIPT := ../../build/llama.cpp/scripts/hf.sh
+HF_SCRIPT := ../../scripts/hf.sh
 
 # Build settings
 BUILD_FLAGS := -ldflags="-s -w"
@@ -64,7 +64,7 @@ model_download:
 	@echo ""
 	@if [ ! -f "$(HF_SCRIPT)" ]; then \
 		echo "Error: hf.sh script not found at $(HF_SCRIPT)"; \
-		echo "Please ensure llama.cpp is properly built in ../../build/llama.cpp/"; \
+		echo "Please run 'make clone-llamacpp' from the project root to install the hf.sh script"; \
 		exit 1; \
 	fi
 	@mkdir -p $(MODEL_DIR)

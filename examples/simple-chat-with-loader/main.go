@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 
 	"github.com/dianlight/gollama.cpp"
@@ -104,6 +105,12 @@ func main() {
 	fmt.Printf("Default NBatch: %d\n", ctxParams.NBatch)
 	fmt.Printf("Default NUbatch: %d\n", ctxParams.NUbatch)
 
+	if *ctx > math.MaxUint32 || *ctx < 0 {
+		log.Fatalf("context size %d is out of range for uint32", *ctx)
+	}
+	if *threads > math.MaxInt32 || *threads < math.MinInt32 {
+		log.Fatalf("threads count %d is out of range for int32", *threads)
+	}
 	ctxParams.NCtx = uint32(*ctx)
 	ctxParams.NBatch = 512 // Use smaller batch size
 	// ctxParams.NUbatch = 512   // Keep default value

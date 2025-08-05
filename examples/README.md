@@ -229,6 +229,13 @@ make interactive       # Interactive prompt input
 - Go 1.21 or later
 - A GGUF model file (included: `tinyllama-1.1b-chat-v1.0.Q2_K.gguf`)
 
+### Library Dependencies
+
+Most examples require the llama.cpp library binaries to be available. There are two approaches:
+
+1. **Automatic Download (Recommended)**: Examples will automatically download the required llama.cpp binaries using the `gollama-download` tool when libraries are not found
+2. **Embedded Loader**: The `simple-chat-with-loader` example includes embedded libraries and doesn't require external dependencies
+
 ### Building and Running Examples
 
 Each example can be built and run independently:
@@ -276,6 +283,12 @@ Most examples support these common command-line options:
 - Check that the model path is correct
 - Ensure the model file is a valid GGUF file
 - Make sure you have enough RAM to load the model
+
+### "Failed to initialize backend" or library loading errors
+- The example will automatically attempt to download required llama.cpp libraries
+- If download fails, check your internet connection
+- Manual download: `go run ../../cmd/gollama-download/main.go -download`
+- Clean cache if needed: `go run ../../cmd/gollama-download/main.go -clean-cache`
 
 ### "Permission denied" when running examples
 - Make sure the example binary is executable: `chmod +x example-name`

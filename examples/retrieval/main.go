@@ -5,12 +5,13 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"sort"
 	"strings"
 	"unsafe"
 
-	"gollama"
+	gollama "github.com/dianlight/gollama.cpp"
 )
 
 // Chunk represents a text chunk with metadata and embedding
@@ -85,7 +86,23 @@ func main() {
 
 	// Initialize the backend
 	fmt.Print("Initializing backend... ")
-	gollama.Backend_init()
+	err := gollama.Backend_init()
+	if err != nil {
+		fmt.Printf("failed (%v)\n", err)
+		fmt.Println("Attempting to download llama.cpp libraries...")
+
+		// Try to download the library
+		downloadErr := gollama.LoadLibraryWithVersion("")
+		if downloadErr != nil {
+			log.Fatalf("Failed to download library: %v", downloadErr)
+		}
+
+		fmt.Print("Retrying backend initialization... ")
+		err = gollama.Backend_init()
+		if err != nil {
+			log.Fatalf("Failed to initialize backend after download: %v", err)
+		}
+	}
 	defer gollama.Backend_free()
 	fmt.Println("done")
 
@@ -105,6 +122,12 @@ func main() {
 	// Create context with embeddings enabled
 	fmt.Print("Creating context... ")
 	ctxParams := gollama.Context_default_params()
+	if *ctx > math.MaxUint32 || *ctx < 0 {
+		log.Fatalf("context size %d is out of range for uint32", *ctx)
+	}
+	if *threads > math.MaxInt32 || *threads < math.MinInt32 {
+		log.Fatalf("threads count %d is out of range for int32", *threads)
+	}
 	ctxParams.NCtx = uint32(*ctx)
 	ctxParams.NThreads = int32(*threads)
 	ctxParams.NThreadsBatch = int32(*threads)

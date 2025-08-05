@@ -141,7 +141,7 @@ The example uses the `cohesionet/GritLM-7B_gguf` model. The Makefile includes an
 make model_download
 ```
 
-This downloads `gritlm-7b_q4_1.gguf` (~4.2GB) from Hugging Face using the project's `hf.sh` script.
+This downloads `gritlm-7b_q4_1.gguf` (~4.2GB) from Hugging Face using the `hf.sh` script from the project's `scripts/` directory.
 
 ## Architecture Details
 

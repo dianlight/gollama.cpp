@@ -76,6 +76,35 @@
       "automerge": true,
       "automergeType": "pr",
       "ignoreTests": true
+    },
+    {
+      "matchPackageNames": [
+        "ggml-org/llama.cpp"
+      ],
+      "groupName": "llama.cpp",
+      "addLabels": [
+        "llama.cpp",
+        "dependencies"
+      ],
+      "schedule": [
+        "before 4am on monday"
+      ],
+      "minimumReleaseAge": "1 days",
+      "semanticCommitType": "feat",
+      "semanticCommitScope": "deps",
+      "commitMessageTopic": "llama.cpp",
+      "prTitle": "feat(deps): update llama.cpp to {{newVersion}}",
+      "postUpgradeTasks": {
+        "commands": [
+          "chmod +x scripts/increment-version.sh",
+          "./scripts/increment-version.sh minor"
+        ],
+        "fileFilters": [
+          "Makefile",
+          "gollama.go"
+        ],
+        "executionMode": "branch"
+      }
     }
   ],
   "vulnerabilityAlerts": {
@@ -90,11 +119,52 @@
   "customManagers": [
     {
       "customType": "regex",
+      "description": "Update LLAMA_CPP_BUILD in GitHub workflows",
       "managerFilePatterns": [
         "/^\\.github/workflows/.*\\.ya?ml$/"
       ],
       "matchStrings": [
         "LLAMA_CPP_BUILD: ['\"]?(?<currentValue>[^'\"\\s]+)['\"]?"
+      ],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "ggml-org/llama.cpp",
+      "extractVersionTemplate": "^(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Update LLAMA_CPP_BUILD in Makefile",
+      "managerFilePatterns": [
+        "Makefile"
+      ],
+      "matchStrings": [
+        "LLAMA_CPP_BUILD \\?= (?<currentValue>[^\\s]+)"
+      ],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "ggml-org/llama.cpp",
+      "extractVersionTemplate": "^(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Update LLAMA_CPP_BUILD in documentation",
+      "managerFilePatterns": [
+        "CONTRIBUTING.md",
+        "docs/BUILD.md"
+      ],
+      "matchStrings": [
+        "export LLAMA_CPP_BUILD=(?<currentValue>[^\\s]+)"
+      ],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "ggml-org/llama.cpp",
+      "extractVersionTemplate": "^(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Update LlamaCppBuild in gollama.go",
+      "managerFilePatterns": [
+        "gollama.go"
+      ],
+      "matchStrings": [
+        "LlamaCppBuild = \"(?<currentValue>[^\"]+)\""
       ],
       "datasourceTemplate": "github-tags",
       "depNameTemplate": "ggml-org/llama.cpp",

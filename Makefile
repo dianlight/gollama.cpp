@@ -175,11 +175,7 @@ bench: deps
 .PHONY: lint
 lint:
 	@echo "Running linter"
-	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run; \
-	else \
-		echo "golangci-lint not found, skipping linting"; \
-	fi
+	$(GO) run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run
 
 # Format code
 .PHONY: fmt
@@ -197,11 +193,7 @@ vet:
 .PHONY: sec
 sec:
 	@echo "Running security check"
-	@if command -v gosec >/dev/null 2>&1; then \
-		gosec -exclude=G103,G104,G115,G304 -severity=medium ./...; \
-	else \
-		echo "gosec not found, skipping security check"; \
-	fi
+	$(GO) run github.com/securego/gosec/v2/cmd/gosec@latest -exclude=G103,G104,G115,G304 -severity=medium ./...
 
 # Check everything
 .PHONY: check

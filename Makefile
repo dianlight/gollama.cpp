@@ -2,9 +2,11 @@
 # Cross-platform Go bindings for llama.cpp using purego
 
 # Version information
-VERSION ?= 1.0.0
+VERSION ?= 0.1.0
 LLAMA_CPP_BUILD ?= b6089
-FULL_VERSION = v$(VERSION)-llamacpp.$(LL# Check everything
+FULL_VERSION = v$(VERSION)-llamacpp.$(LLAMA_CPP_BUILD)
+
+# Check everything
 .PHONY: check
 check: fmt vet lint sec test
 

@@ -17,10 +17,10 @@ We've migrated from a **compilation-based architecture** to a **download-based a
 
 ### Before (Compilation-Based)
 
-```go
-// Required complex build process
+```bash
+# Required complex build process
 make clone-llamacpp
-make build-llamacpp-current  // Requires CMake, compilers, GPU SDKs
+make build-llamacpp-current  # Required CMake, compilers, GPU SDKs
 ```
 
 **Problems:**
@@ -31,6 +31,14 @@ make build-llamacpp-current  // Requires CMake, compilers, GPU SDKs
 - ❌ Dependency hell with different CUDA/HIP versions
 
 ### After (Download-Based Architecture)
+
+```bash
+# Simple Go build (libraries download automatically)
+make build
+
+# Optional: Clone llama.cpp source for cross-reference
+make clone-llamacpp
+```
 
 ```go
 // Automatic download on first use

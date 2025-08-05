@@ -158,28 +158,28 @@ The Makefile implements intelligent GPU detection using the following logic:
 
 ### Detection Commands
 ```bash
-# CUDA detection
-which nvcc || echo $CUDA_PATH
+# Check if GPU support is available in downloaded binaries
+make test-download  # Downloads and tests appropriate binaries
 
-# HIP detection  
-which hipconfig || echo $ROCM_PATH
-
-# Manual build with specific backend
-make build-llamacpp-linux-amd64  # Auto-detects available GPU
+# View downloaded libraries for your platform
+ls ~/.cache/gollama/libs/
 ```
 
-### Override Detection
-If needed, you can override automatic detection:
+## GPU Support in Pre-Built Binaries
+
+Gollama.cpp now uses pre-built binaries from official llama.cpp releases that include GPU support:
+
+- **macOS**: Binaries include Metal support automatically
+- **Linux**: Binaries include CUDA and HIP support where available
+- **Windows**: CPU support available, GPU support planned
+
+### Binary Selection
+
+The downloader automatically selects GPU-enabled binaries when available:
 
 ```bash
-# Force CUDA build
-make build-llamacpp-linux-amd64 FORCE_CUDA=1
-
-# Force HIP build
-make build-llamacpp-linux-amd64 FORCE_HIP=1
-
-# Force CPU build
-make build-llamacpp-linux-amd64 FORCE_CPU=1
+# Downloads appropriate binary for your platform with GPU support
+make download-libs
 ```
 
 ## Runtime Configuration

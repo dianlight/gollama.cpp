@@ -13,15 +13,19 @@ This document summarizes the changes made to migrate gollama.cpp from a compilat
 ### 2. Modified Files
 
 - **`loader.go`**: Updated to use downloader instead of embedded libraries
-- **`Makefile`**: Removed compilation targets, added download targets
+- **`Makefile`**: Removed compilation targets, added download targets, kept `clone-llamacpp` for development
 - **`go.mod`**: Remains minimal (only purego dependency)
 
 ### 3. Removed Complexity
 
-- **Compilation targets**: All `build-llamacpp-*` targets removed
+- **Compilation targets**: All `build-llamacpp-*` targets removed (compilation no longer needed)
 - **GPU detection**: No longer needed at build time
-- **CMake dependencies**: Eliminated
+- **CMake dependencies**: Eliminated for regular builds
 - **Cross-compilation complexity**: Simplified
+
+### 4. Retained Development Tools
+
+- **`clone-llamacpp` target**: Kept for developers who need access to llama.cpp source code and documentation for cross-reference purposes
 
 ## Architecture Overview
 

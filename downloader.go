@@ -22,6 +22,27 @@ const (
 	userAgent         = "gollama.cpp/1.0.0"
 )
 
+// isValidPath checks if a file path is safe for extraction
+func isValidPath(dest, filename string) error {
+	// Clean the filename to resolve any .. components
+	cleanName := filepath.Clean(filename)
+
+	// Check for absolute paths or paths that start with ..
+	if filepath.IsAbs(cleanName) || strings.HasPrefix(cleanName, "..") {
+		return fmt.Errorf("unsafe path: %s", filename)
+	}
+
+	// Join with destination and check final path
+	finalPath := filepath.Join(dest, cleanName)
+	cleanDest := filepath.Clean(dest) + string(os.PathSeparator)
+
+	if !strings.HasPrefix(finalPath, cleanDest) {
+		return fmt.Errorf("path traversal attempt: %s", filename)
+	}
+
+	return nil
+}
+
 // ReleaseInfo represents GitHub release information
 type ReleaseInfo struct {
 	TagName string `json:"tag_name"`
@@ -53,7 +74,7 @@ func NewLibraryDownloader() (*LibraryDownloader, error) {
 		cacheDir = filepath.Join(os.TempDir(), "gollama", "libs")
 	}
 
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+	if err := os.MkdirAll(cacheDir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
@@ -243,26 +264,29 @@ func (d *LibraryDownloader) extractZip(src, dest string) error {
 	defer reader.Close()
 
 	// Create destination directory
-	if err := os.MkdirAll(dest, 0755); err != nil {
+	if err := os.MkdirAll(dest, 0750); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
 	// Extract files
 	for _, file := range reader.File {
-		path := filepath.Join(dest, file.Name)
-
-		// Security check: ensure the file path is within the destination directory
-		if !strings.HasPrefix(path, filepath.Clean(dest)+string(os.PathSeparator)) {
-			return fmt.Errorf("invalid file path: %s", file.Name)
+		// Validate path security
+		if err := isValidPath(dest, file.Name); err != nil {
+			return err
 		}
 
+		// #nosec G305 - Path is validated by isValidPath function above
+		path := filepath.Join(dest, file.Name)
+
 		if file.FileInfo().IsDir() {
-			os.MkdirAll(path, file.FileInfo().Mode())
+			if err := os.MkdirAll(path, file.FileInfo().Mode()); err != nil {
+				return fmt.Errorf("failed to create directory: %w", err)
+			}
 			continue
 		}
 
 		// Create parent directories
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 			return fmt.Errorf("failed to create parent directory: %w", err)
 		}
 
@@ -279,7 +303,11 @@ func (d *LibraryDownloader) extractZip(src, dest string) error {
 		}
 		defer targetFile.Close()
 
-		_, err = io.Copy(targetFile, fileReader)
+		// Limit extraction to prevent decompression bombs (max 1GB per file)
+		const maxFileSize = 1 << 30 // 1GB
+		limitedReader := io.LimitReader(fileReader, maxFileSize)
+
+		_, err = io.Copy(targetFile, limitedReader)
 		if err != nil {
 			return fmt.Errorf("failed to extract file: %w", err)
 		}

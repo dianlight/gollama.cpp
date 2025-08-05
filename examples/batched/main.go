@@ -10,7 +10,9 @@ import (
 	"log"
 	"math"
 	"time"
-) // BatchedConfig holds configuration for batched generation
+)
+
+// BatchedConfig holds configuration for batched generation
 type BatchedConfig struct {
 	ModelPath   string
 	Prompt      string

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unsafe"
 
-	"gollama"
+	gollama "github.com/dianlight/gollama.cpp"
 )
 
 // Chunk represents a text chunk with metadata and embedding

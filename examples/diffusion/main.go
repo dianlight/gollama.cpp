@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"gollama"
+	gollama "github.com/dianlight/gollama.cpp"
 )
 
 // secureRandFloat32 generates a cryptographically secure random float32 in [0, 1)

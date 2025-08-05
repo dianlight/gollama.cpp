@@ -221,3 +221,31 @@ func CleanLibraryCache() error {
 	}
 	return nil
 }
+
+// DownloadLibrariesForPlatforms downloads libraries for multiple platforms in parallel
+// platforms should be in the format []string{"linux/amd64", "darwin/arm64", "windows/amd64"}
+// version can be empty for latest version or specify a specific version like "b6089"
+func DownloadLibrariesForPlatforms(platforms []string, version string) ([]DownloadResult, error) {
+	if globalLoader.downloader == nil {
+		downloader, err := NewLibraryDownloader()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create library downloader: %w", err)
+		}
+		globalLoader.downloader = downloader
+	}
+
+	return globalLoader.downloader.DownloadMultiplePlatforms(platforms, version)
+}
+
+// GetSHA256ForFile calculates the SHA256 checksum for a given file
+func GetSHA256ForFile(filepath string) (string, error) {
+	if globalLoader.downloader == nil {
+		downloader, err := NewLibraryDownloader()
+		if err != nil {
+			return "", fmt.Errorf("failed to create library downloader: %w", err)
+		}
+		globalLoader.downloader = downloader
+	}
+
+	return globalLoader.downloader.calculateSHA256(filepath)
+}

@@ -132,12 +132,19 @@ download-libs: deps
 .PHONY: download-libs-all
 download-libs-all: deps
 	@echo "Downloading llama.cpp libraries for all platforms"
-	@for platform in $(PLATFORMS); do \
-		GOOS=$$(echo $$platform | cut -d'/' -f1); \
-		GOARCH=$$(echo $$platform | cut -d'/' -f2); \
-		echo "Downloading for $$GOOS/$$GOARCH..."; \
-		env GOOS=$$GOOS GOARCH=$$GOARCH $(GO) run ./cmd/gollama-download -download -version $(LLAMA_CPP_BUILD) || echo "Download for $$GOOS/$$GOARCH completed"; \
-	done
+	$(GO) run ./cmd/gollama-download -download-all -version $(LLAMA_CPP_BUILD)
+
+# Download libraries for all platforms with parallel processing
+.PHONY: download-libs-parallel
+download-libs-parallel: deps
+	@echo "Downloading llama.cpp libraries for all platforms (parallel)"
+	$(GO) run ./cmd/gollama-download -download-all -version $(LLAMA_CPP_BUILD) -checksum
+
+# Download libraries for specific platforms
+.PHONY: download-libs-platforms
+download-libs-platforms: deps
+	@echo "Downloading llama.cpp libraries for specific platforms"
+	$(GO) run ./cmd/gollama-download -platforms "linux/amd64,darwin/arm64,windows/amd64" -version $(LLAMA_CPP_BUILD) -checksum
 
 # Test compilation for specific platform  
 .PHONY: test-compile-windows

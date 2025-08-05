@@ -186,8 +186,20 @@ $ make download-libs
 1. **Renovate Integration**: Automatic dependency updates for new llama.cpp releases
 2. **GPU Variant Selection**: Smart selection based on detected hardware
 3. **Progress Indicators**: Download progress for large binaries
-4. **Parallel Downloads**: Concurrent downloads for multiple platforms
-5. **Checksum Verification**: SHA verification for downloaded binaries
+
+### Recently Implemented Improvements
+
+4. ✅ **Parallel Downloads**: Concurrent downloads for multiple platforms
+   - Download libraries for all platforms simultaneously
+   - Configurable concurrency limits (default: 4 concurrent downloads)
+   - Command-line support: `-download-all` and `-platforms "platform1,platform2"`
+   - Makefile targets: `make download-libs-parallel` and `make download-libs-platforms`
+
+5. ✅ **Checksum Verification**: SHA256 calculation and verification for downloaded binaries
+   - Automatic SHA256 calculation during download
+   - Verification support for provided checksums
+   - Command-line checksum display: `-checksum` flag
+   - Standalone checksum calculation: `-verify-checksum filename`
 
 ### Extensibility
 
@@ -196,6 +208,93 @@ The architecture easily supports:
 - Different binary variants (CUDA, HIP, etc.)
 - Alternative download sources
 - Custom caching strategies
+
+## New Features: Parallel Downloads & Checksum Verification
+
+### Parallel Downloads
+
+The system now supports downloading libraries for multiple platforms concurrently, dramatically reducing total download time for cross-platform development.
+
+#### Features
+- **Concurrent Processing**: Up to 4 simultaneous downloads (configurable)
+- **Platform-Specific Detection**: Automatically detects correct library files for each platform (.so, .dylib, .dll)
+- **Progress Reporting**: Real-time status updates for each platform
+- **Error Handling**: Graceful failure handling with detailed error messages
+
+#### Command-Line Usage
+```bash
+# Download for all supported platforms
+go run ./cmd/gollama-download -download-all -checksum
+
+# Download for specific platforms
+go run ./cmd/gollama-download -platforms "linux/amd64,darwin/arm64,windows/amd64" -checksum
+
+# Makefile targets
+make download-libs-parallel        # All platforms with checksums
+make download-libs-platforms       # Specific platforms
+```
+
+#### Programmatic API
+```go
+// Download for multiple platforms
+platforms := []string{"linux/amd64", "darwin/arm64", "windows/amd64"}
+results, err := gollama.DownloadLibrariesForPlatforms(platforms, "b6089")
+
+// Process results
+for _, result := range results {
+    if result.Success {
+        fmt.Printf("✅ %s: %s (SHA256: %s)\n", 
+            result.Platform, result.LibraryPath, result.SHA256Sum)
+    } else {
+        fmt.Printf("❌ %s: %v\n", result.Platform, result.Error)
+    }
+}
+```
+
+### Checksum Verification
+
+All downloads now include automatic SHA256 checksum calculation for integrity verification and security auditing.
+
+#### Features
+- **Automatic Calculation**: SHA256 computed during download (no additional I/O)
+- **Verification Support**: Can verify against provided checksums
+- **Standalone Utility**: Calculate checksums for any file
+- **Security**: Detects corrupted or tampered downloads
+
+#### Command-Line Usage
+```bash
+# Download with checksum display
+go run ./cmd/gollama-download -download -checksum
+
+# Verify checksum of existing file
+go run ./cmd/gollama-download -verify-checksum path/to/file.zip
+
+# Parallel downloads with checksums
+go run ./cmd/gollama-download -download-all -checksum
+```
+
+#### Programmatic API
+```go
+// Calculate SHA256 for any file
+checksum, err := gollama.GetSHA256ForFile("/path/to/file")
+
+// Downloads automatically include checksums in results
+results, err := gollama.DownloadLibrariesForPlatforms(platforms, version)
+// results[i].SHA256Sum contains the calculated checksum
+```
+
+#### Example Output
+```
+Download Results:
+================
+✅ linux/amd64: SUCCESS (Library: .../libllama.so)
+✅ darwin/arm64: SUCCESS (Library: .../libllama.dylib)
+   SHA256: e5ec9a20b0e77ba87ed5d8938e846ab5f03c3e11faeea23c38941508f3008ff8
+✅ windows/amd64: SUCCESS (Library: .../llama.dll)
+   SHA256: 7e7d3de87806f0b780ecd9458da3afe0fe11bf8edb5e042aafec1d71ff9eb9e8
+
+Summary: 3/3 platforms downloaded successfully
+```
 
 ## Migration Complete
 

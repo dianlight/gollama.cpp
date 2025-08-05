@@ -2,6 +2,8 @@ package gollama
 
 import (
 	"archive/zip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +13,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -51,6 +54,24 @@ type ReleaseInfo struct {
 		BrowserDownloadURL string `json:"browser_download_url"`
 		Size               int64  `json:"size"`
 	} `json:"assets"`
+}
+
+// DownloadTask represents a single download task for parallel processing
+type DownloadTask struct {
+	Platform     string
+	AssetName    string
+	DownloadURL  string
+	TargetDir    string
+	ExpectedSHA2 string
+}
+
+// DownloadResult represents the result of a download task
+type DownloadResult struct {
+	Platform    string
+	Success     bool
+	Error       error
+	LibraryPath string
+	SHA256Sum   string
 }
 
 // LibraryDownloader handles downloading pre-built llama.cpp binaries
@@ -222,6 +243,199 @@ func (d *LibraryDownloader) DownloadAndExtract(downloadURL, filename string) (st
 	return targetDir, nil
 }
 
+// DownloadAndExtractWithChecksum downloads and extracts the library archive with checksum verification
+func (d *LibraryDownloader) DownloadAndExtractWithChecksum(downloadURL, filename, expectedChecksum string) (string, string, error) {
+	// Create target directory for this release
+	targetDir := filepath.Join(d.cacheDir, strings.TrimSuffix(filename, ".zip"))
+
+	// Check if already extracted
+	if d.isLibraryReady(targetDir) {
+		// Calculate checksum of existing file if available
+		archivePath := filepath.Join(d.cacheDir, filename)
+		if _, err := os.Stat(archivePath); err == nil {
+			checksum, _ := d.calculateSHA256(archivePath)
+			return targetDir, checksum, nil
+		}
+		return targetDir, "", nil
+	}
+
+	// Download the archive with checksum calculation
+	archivePath := filepath.Join(d.cacheDir, filename)
+	checksum, err := d.downloadFileWithChecksum(downloadURL, archivePath)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to download %s: %w", filename, err)
+	}
+
+	// Verify checksum if provided
+	if err := d.verifySHA256(archivePath, expectedChecksum); err != nil {
+		// Remove corrupted file
+		_ = os.Remove(archivePath)
+		return "", "", fmt.Errorf("checksum verification failed for %s: %w", filename, err)
+	}
+
+	// Extract the archive
+	if err := d.extractZip(archivePath, targetDir); err != nil {
+		return "", "", fmt.Errorf("failed to extract %s: %w", filename, err)
+	}
+
+	// Clean up the archive file
+	_ = os.Remove(archivePath)
+
+	return targetDir, checksum, nil
+}
+
+// GetPlatformAssetPatternForPlatform returns the asset name pattern for a specific platform
+func (d *LibraryDownloader) GetPlatformAssetPatternForPlatform(goos, goarch string) (string, error) {
+	// Convert Go arch to llama.cpp naming convention
+	var arch string
+	switch goarch {
+	case "amd64":
+		arch = "x64"
+	case "arm64":
+		arch = "arm64"
+	default:
+		return "", fmt.Errorf("unsupported architecture: %s", goarch)
+	}
+
+	switch goos {
+	case "darwin":
+		return fmt.Sprintf("llama-.*-bin-macos-%s.zip", arch), nil
+	case "linux":
+		// Prefer CPU version for compatibility, could be enhanced to detect GPU capabilities
+		return fmt.Sprintf("llama-.*-bin-ubuntu-%s.zip", arch), nil
+	case "windows":
+		// Start with CPU version for compatibility
+		return fmt.Sprintf("llama-.*-bin-win-cpu-%s.zip", arch), nil
+	default:
+		return "", fmt.Errorf("unsupported operating system: %s", goos)
+	}
+}
+
+// DownloadMultiplePlatforms downloads libraries for multiple platforms in parallel
+func (d *LibraryDownloader) DownloadMultiplePlatforms(platforms []string, version string) ([]DownloadResult, error) {
+	var release *ReleaseInfo
+	var err error
+
+	// Get release information
+	if version != "" {
+		release, err = d.GetReleaseByTag(version)
+	} else {
+		release, err = d.GetLatestRelease()
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get release information: %w", err)
+	}
+
+	// Create download tasks
+	var tasks []DownloadTask
+	for _, platform := range platforms {
+		parts := strings.Split(platform, "/")
+		if len(parts) != 2 {
+			continue // Skip invalid platform specifications
+		}
+		goos, goarch := parts[0], parts[1]
+
+		pattern, err := d.GetPlatformAssetPatternForPlatform(goos, goarch)
+		if err != nil {
+			continue // Skip unsupported platforms
+		}
+
+		assetName, downloadURL, err := d.FindAssetByPattern(release, pattern)
+		if err != nil {
+			continue // Skip platforms without available assets
+		}
+
+		targetDir := filepath.Join(d.cacheDir, strings.TrimSuffix(assetName, ".zip"))
+		tasks = append(tasks, DownloadTask{
+			Platform:    platform,
+			AssetName:   assetName,
+			DownloadURL: downloadURL,
+			TargetDir:   targetDir,
+			// No expected checksum since llama.cpp doesn't provide them
+			ExpectedSHA2: "",
+		})
+	}
+
+	// Execute downloads in parallel
+	return d.executeParallelDownloads(tasks)
+}
+
+// executeParallelDownloads executes multiple download tasks concurrently
+func (d *LibraryDownloader) executeParallelDownloads(tasks []DownloadTask) ([]DownloadResult, error) {
+	results := make([]DownloadResult, len(tasks))
+	var wg sync.WaitGroup
+
+	// Use a semaphore to limit concurrent downloads (max 4 concurrent)
+	semaphore := make(chan struct{}, 4)
+
+	for i, task := range tasks {
+		wg.Add(1)
+		go func(index int, t DownloadTask) {
+			defer wg.Done()
+
+			// Acquire semaphore
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			result := DownloadResult{
+				Platform: t.Platform,
+				Success:  false,
+			}
+
+			// Check if already exists and ready
+			if d.isLibraryReady(t.TargetDir) {
+				result.Success = true
+				// Extract platform info from task
+				parts := strings.Split(t.Platform, "/")
+				if len(parts) == 2 {
+					libPath, err := d.FindLibraryPathForPlatform(t.TargetDir, parts[0])
+					if err == nil {
+						result.LibraryPath = libPath
+					}
+				}
+				// Try to calculate checksum of existing archive if available
+				archivePath := filepath.Join(d.cacheDir, t.AssetName)
+				if checksum, err := d.calculateSHA256(archivePath); err == nil {
+					result.SHA256Sum = checksum
+				}
+				results[index] = result
+				return
+			}
+
+			// Download and extract with checksum
+			extractedDir, checksum, err := d.DownloadAndExtractWithChecksum(t.DownloadURL, t.AssetName, t.ExpectedSHA2)
+			if err != nil {
+				result.Error = err
+				results[index] = result
+				return
+			}
+
+			// Find library path for the specific platform
+			parts := strings.Split(t.Platform, "/")
+			if len(parts) != 2 {
+				result.Error = fmt.Errorf("invalid platform format: %s", t.Platform)
+				results[index] = result
+				return
+			}
+
+			libPath, err := d.FindLibraryPathForPlatform(extractedDir, parts[0])
+			if err != nil {
+				result.Error = fmt.Errorf("library not found after extraction: %w", err)
+				results[index] = result
+				return
+			}
+
+			result.Success = true
+			result.LibraryPath = libPath
+			result.SHA256Sum = checksum
+			results[index] = result
+		}(i, task)
+	}
+
+	wg.Wait()
+	return results, nil
+}
+
 // downloadFile downloads a file from URL to the specified path
 func (d *LibraryDownloader) downloadFile(url, filepath string) error {
 	req, err := http.NewRequest("GET", url, nil)
@@ -250,6 +464,79 @@ func (d *LibraryDownloader) downloadFile(url, filepath string) error {
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
+}
+
+// downloadFileWithChecksum downloads a file and calculates its SHA256 checksum
+func (d *LibraryDownloader) downloadFileWithChecksum(url, filepath string) (string, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", d.userAgent)
+
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to download file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("download failed with status %d", resp.StatusCode)
+	}
+
+	out, err := os.Create(filepath)
+	if err != nil {
+		return "", fmt.Errorf("failed to create file: %w", err)
+	}
+	defer out.Close()
+
+	// Create a hash writer that computes SHA256 while writing
+	hash := sha256.New()
+	multiWriter := io.MultiWriter(out, hash)
+
+	_, err = io.Copy(multiWriter, resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to write file: %w", err)
+	}
+
+	// Return the hexadecimal representation of the hash
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+// calculateSHA256 calculates the SHA256 checksum of a file
+func (d *LibraryDownloader) calculateSHA256(filepath string) (string, error) {
+	file, err := os.Open(filepath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", fmt.Errorf("failed to calculate hash: %w", err)
+	}
+
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+// verifySHA256 verifies that a file matches the expected SHA256 checksum
+func (d *LibraryDownloader) verifySHA256(filepath, expectedChecksum string) error {
+	if expectedChecksum == "" {
+		// No checksum to verify
+		return nil
+	}
+
+	actualChecksum, err := d.calculateSHA256(filepath)
+	if err != nil {
+		return err
+	}
+
+	if actualChecksum != expectedChecksum {
+		return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedChecksum, actualChecksum)
 	}
 
 	return nil
@@ -361,9 +648,48 @@ func getExpectedLibraryName() (string, error) {
 	}
 }
 
+// getExpectedLibraryNameForPlatform returns the expected library filename for a specific platform
+func getExpectedLibraryNameForPlatform(goos string) (string, error) {
+	switch goos {
+	case "darwin":
+		return "libllama.dylib", nil
+	case "linux":
+		return "libllama.so", nil
+	case "windows":
+		return "llama.dll", nil
+	default:
+		return "", fmt.Errorf("unsupported OS: %s", goos)
+	}
+}
+
 // FindLibraryPath finds the main library file in the extracted directory
 func (d *LibraryDownloader) FindLibraryPath(extractedDir string) (string, error) {
 	expectedLib, err := getExpectedLibraryName()
+	if err != nil {
+		return "", err
+	}
+
+	// Common paths where the library might be located
+	searchPaths := []string{
+		filepath.Join(extractedDir, "build", "bin", expectedLib),
+		filepath.Join(extractedDir, "bin", expectedLib),
+		filepath.Join(extractedDir, expectedLib),
+		filepath.Join(extractedDir, "lib", expectedLib),
+		filepath.Join(extractedDir, "src", expectedLib),
+	}
+
+	for _, path := range searchPaths {
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+	}
+
+	return "", fmt.Errorf("library file %s not found in %s", expectedLib, extractedDir)
+}
+
+// FindLibraryPathForPlatform finds the main library file for a specific platform
+func (d *LibraryDownloader) FindLibraryPathForPlatform(extractedDir, goos string) (string, error) {
+	expectedLib, err := getExpectedLibraryNameForPlatform(goos)
 	if err != nil {
 		return "", err
 	}

@@ -123,9 +123,7 @@ func (d *LibraryDownloader) GetLatestRelease() (*ReleaseInfo, error) {
 		return nil, fmt.Errorf("failed to fetch release info: %w", err)
 	}
 	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			// Log the error but don't override the main error
-		}
+		_ = resp.Body.Close() // Ignore error in defer
 	}()
 
 	if resp.StatusCode != http.StatusOK {
@@ -157,9 +155,7 @@ func (d *LibraryDownloader) GetReleaseByTag(tag string) (*ReleaseInfo, error) {
 		return nil, fmt.Errorf("failed to fetch release info: %w", err)
 	}
 	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			// Log the error but don't override the main error
-		}
+		_ = resp.Body.Close() // Ignore error in defer
 	}()
 
 	if resp.StatusCode == http.StatusNotFound {
@@ -458,9 +454,7 @@ func (d *LibraryDownloader) downloadFile(url, filepath string) error {
 		return fmt.Errorf("failed to download file: %w", err)
 	}
 	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			// Log the error but don't override the main error
-		}
+		_ = resp.Body.Close() // Ignore error in defer
 	}()
 
 	if resp.StatusCode != http.StatusOK {
@@ -472,9 +466,7 @@ func (d *LibraryDownloader) downloadFile(url, filepath string) error {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
 	defer func() {
-		if closeErr := out.Close(); closeErr != nil {
-			// Log the error but don't override the main error
-		}
+		_ = out.Close() // Ignore error in defer
 	}()
 
 	_, err = io.Copy(out, resp.Body)
@@ -509,9 +501,7 @@ func (d *LibraryDownloader) downloadFileWithChecksum(url, filepath string) (stri
 		return "", fmt.Errorf("failed to create file: %w", err)
 	}
 	defer func() {
-		if closeErr := out.Close(); closeErr != nil {
-			// Log the error but don't override the main error
-		}
+		_ = out.Close() // Ignore error in defer
 	}()
 
 	// Create a hash writer that computes SHA256 while writing
@@ -534,9 +524,7 @@ func (d *LibraryDownloader) calculateSHA256(filepath string) (string, error) {
 		return "", fmt.Errorf("failed to open file: %w", err)
 	}
 	defer func() {
-		if closeErr := file.Close(); closeErr != nil {
-			// Log the error but don't override the main error
-		}
+		_ = file.Close() // Ignore error in defer
 	}()
 
 	hash := sha256.New()
@@ -573,9 +561,7 @@ func (d *LibraryDownloader) extractZip(src, dest string) error {
 		return fmt.Errorf("failed to open ZIP file: %w", err)
 	}
 	defer func() {
-		if closeErr := reader.Close(); closeErr != nil {
-			// Log the error but don't override the main error
-		}
+		_ = reader.Close() // Ignore error in defer
 	}()
 
 	// Create destination directory
@@ -611,9 +597,7 @@ func (d *LibraryDownloader) extractZip(src, dest string) error {
 			return fmt.Errorf("failed to open file in archive: %w", err)
 		}
 		defer func(fr io.ReadCloser) {
-			if closeErr := fr.Close(); closeErr != nil {
-				// Log the error but don't override the main error
-			}
+			_ = fr.Close() // Ignore error in defer
 		}(fileReader)
 
 		targetFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.FileInfo().Mode())
@@ -621,9 +605,7 @@ func (d *LibraryDownloader) extractZip(src, dest string) error {
 			return fmt.Errorf("failed to create target file: %w", err)
 		}
 		defer func(tf *os.File) {
-			if closeErr := tf.Close(); closeErr != nil {
-				// Log the error but don't override the main error
-			}
+			_ = tf.Close() // Ignore error in defer
 		}(targetFile)
 
 		// Limit extraction to prevent decompression bombs (max 1GB per file)

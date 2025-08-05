@@ -57,6 +57,24 @@ When making changes that affect the build process, testing, or deployment:
 
 ## Code Quality Rules
 
+### Rule: Automatic Code Validation
+Before completing any code changes, always run validation tools:
+
+1. **Lint Validation**:
+   - Run `make lint` to check code formatting and style
+   - Fix any linting issues before submitting changes
+   - Ensure code follows Go best practices and project conventions
+
+2. **Security Validation**:
+   - Run `make sec` to perform security analysis
+   - Address any security vulnerabilities or warnings
+   - Verify that new code doesn't introduce security risks
+
+3. **Combined Validation**:
+   - Use the available VS Code task "Validate Changes (lint + sec)" to run both checks
+   - Alternatively run `make lint sec` to execute both validations
+   - Ensure all validation passes before considering code changes complete
+
 ### Rule: Maintain Code Standards
 When writing or modifying code:
 
@@ -107,24 +125,33 @@ When writing or modifying code:
 
 When Copilot detects:
 
-1. **New Go module dependencies**: 
+1. **Code changes in Go files**:
+   - Automatically run `make lint` to validate code style
+   - Automatically run `make sec` to check for security issues
+   - Fix any linting or security issues before completing changes
+
+2. **New Go module dependencies**: 
    - Check if CI needs updated system dependencies
    - Update README.md installation instructions if needed
+   - Run validation tools to ensure new dependencies don't introduce issues
 
-2. **API signature changes**:
+3. **API signature changes**:
    - Update all example code
    - Update documentation with new signatures
    - Add deprecation notices if needed
+   - Validate changes with lint and security tools
 
-3. **New platform support**:
+4. **New platform support**:
    - Add platform to CI matrix
    - Update README.md supported platforms section
    - Update build documentation
+   - Run validation to ensure cross-platform compatibility
 
-4. **Version bumps**:
+5. **Version bumps**:
    - Update CHANGELOG.md
    - Update version references in documentation
    - Update CI configuration if needed
+   - Validate all changes before completing version update
 
 ## Priority Guidelines
 

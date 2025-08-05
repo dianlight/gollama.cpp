@@ -1,0 +1,19 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Validate Changes (lint + sec)",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"lint",
+				"sec"
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": [
+				"$go"
+			]
+		}
+	]
+}

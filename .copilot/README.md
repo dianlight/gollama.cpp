@@ -16,6 +16,7 @@ Comprehensive rules document explaining:
 - When to update different types of documentation
 - Priority guidelines for different types of changes
 - Platform-specific update requirements
+- **Code validation rules** for automatic lint and security checks
 
 ### `templates.md`
 Ready-to-use templates for:
@@ -25,22 +26,32 @@ Ready-to-use templates for:
 - Go documentation comments
 - Example documentation
 
+### `validation.md`
+Code validation guidelines including:
+- Pre-commit validation workflow
+- Lint and security check requirements
+- VS Code task integration
+- Troubleshooting guidance
+
 ## Automatic Behavior
 
 When GitHub Copilot detects changes to:
 
 ### API Files (`gollama.go`, `platform_*.go`, etc.)
+- **Runs automatic validation** with `make lint sec`
 - Updates README.md examples
 - Updates Go doc comments
 - Adds CHANGELOG.md entries
 - Updates CI if dependencies change
 
 ### Example Files (`examples/*/`)
+- **Validates code changes** before completion
 - Updates corresponding README.md files
 - Ensures demo scripts work
 - Updates main examples documentation
 
 ### Dependencies (`go.mod`, `libs/`)
+- **Runs security checks** on new dependencies
 - Updates CI configuration
 - Updates installation instructions
 - Updates version references
@@ -64,6 +75,19 @@ This script:
 - Tests example compilation
 - Checks for TODOs and formatting issues
 
+### Code Validation
+Run validation before committing:
+```bash
+make lint sec
+# Or use VS Code task: "Validate Changes (lint + sec)"
+```
+
+This validation:
+- Checks code formatting and style
+- Performs security analysis
+- Ensures code quality standards
+- Required for all code changes
+
 ### CI Workflow
 The `doc-sync-check.yml` workflow runs on PRs to:
 - Detect when documentation might be out of sync
@@ -85,9 +109,13 @@ The `doc-sync-check.yml` workflow runs on PRs to:
 
 ## Integration with Development Workflow
 
-1. **During Development**: Copilot suggests documentation updates as you code
-2. **Before Committing**: Run `./scripts/check-docs.sh` to verify completeness  
-3. **In Pull Requests**: CI checks validate documentation sync
+1. **During Development**: 
+   - Copilot suggests documentation updates as you code
+   - **Automatic validation** runs for code changes (lint + security)
+2. **Before Committing**: 
+   - Run `./scripts/check-docs.sh` to verify completeness
+   - **Run `make lint sec`** to validate code quality  
+3. **In Pull Requests**: CI checks validate documentation sync and code quality
 4. **After Merging**: Documentation stays current with code changes
 
-This configuration ensures that documentation never falls behind code changes, improving the developer experience and project quality.
+This configuration ensures that documentation never falls behind code changes and that all code meets quality and security standards, improving the developer experience and project quality.

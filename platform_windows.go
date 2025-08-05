@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	kernel32           = syscall.NewLazyDLL("kernel32.dll")
-	procLoadLibraryW   = kernel32.NewProc("LoadLibraryW")
-	procFreeLibrary    = kernel32.NewProc("FreeLibrary")
-	procGetProcAddress = kernel32.NewProc("GetProcAddress")
+	kernel32         = syscall.NewLazyDLL("kernel32.dll")
+	procLoadLibraryW = kernel32.NewProc("LoadLibraryW")
+	procFreeLibrary  = kernel32.NewProc("FreeLibrary")
+	//procGetProcAddress = kernel32.NewProc("GetProcAddress")
 )
 
 // loadLibraryPlatform loads a shared library using platform-specific methods

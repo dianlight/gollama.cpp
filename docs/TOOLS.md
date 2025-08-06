@@ -4,6 +4,43 @@ This document describes the various tools and scripts included with gollama.cpp.
 
 ## Scripts Directory (`scripts/`)
 
+### update-changelog.sh - CHANGELOG.md Management
+
+The `update-changelog.sh` script automates the management of the `CHANGELOG.md` file during the release process. It's integrated into the `tag-release` target in the Makefile.
+
+#### Features
+
+- Converts `[Unreleased]` sections to versioned entries with current date
+- Adds new `[Unreleased]` sections for future development
+- Updates existing version entries when tags are moved
+- Automatic verification and backup/restore on failure
+
+#### Usage
+
+```bash
+# Convert [Unreleased] to versioned entry
+bash scripts/update-changelog.sh "1.0.0" "release"
+
+# Add new [Unreleased] section
+bash scripts/update-changelog.sh "1.0.1" "unreleased"
+```
+
+#### Integration with tag-release
+
+The script is automatically called during `make tag-release`:
+1. Before tagging: Updates CHANGELOG.md to convert `[Unreleased]` to current version
+2. After tagging: Adds new `[Unreleased]` section for next development cycle
+
+See [CHANGELOG_MANAGEMENT.md](CHANGELOG_MANAGEMENT.md) for detailed documentation.
+
+### test-changelog-workflow.sh - Changelog Testing
+
+Test script that simulates the entire changelog update workflow without making permanent changes.
+
+```bash
+bash scripts/test-changelog-workflow.sh
+```
+
 ### hf.sh - Hugging Face Model Downloader
 
 The `hf.sh` script is a powerful utility for downloading models from Hugging Face. It's automatically copied from the llama.cpp repository to ensure compatibility with the current llama.cpp version.

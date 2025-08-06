@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CPU and GPU acceleration support
 
 ### Changed
+- **Dependencies**: Updated llama.cpp from build b6076 to b6099 (automated via Renovate)
 - **Breaking**: Migrated from compilation-based to download-based architecture
 - **Simplified build process**: No longer requires CMake, compilers, or GPU SDKs
 - Library loading now uses automatic download instead of local compilation
@@ -37,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Model download system**: Now uses hf.sh script from llama.cpp instead of direct curl commands
 - **Example projects**: Updated to use local hf.sh script from `scripts/` directory
 - **Documentation**: Updated to reflect hf.sh script integration and usage
+
+### Dependencies
+- llama.cpp: Updated from b6076 to b6099 (managed by Renovate)
 
 ### Removed
 - All `build-llamacpp-*` compilation targets (no longer needed)

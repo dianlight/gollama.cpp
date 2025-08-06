@@ -258,6 +258,11 @@ tag-release:
 		exit 1; \
 	fi
 	
+	# Update CHANGELOG.md for release
+	@echo "Updating CHANGELOG.md for release v$(VERSION)..."
+	@bash scripts/update-changelog.sh "$(VERSION)" "release"
+	@echo "CHANGELOG.md updated successfully"
+	
 	# Check if current version tag exists
 	@tag_name="v$(VERSION)"; \
 	echo "Checking if tag $$tag_name exists..."; \
@@ -304,6 +309,12 @@ tag-release:
 	@echo "Incrementing patch version for next development cycle..."
 	@bash scripts/increment-version.sh patch
 	@echo "Version incremented successfully (no git commit performed)"
+	
+	# Add new [Unreleased] section to CHANGELOG.md
+	@echo "Adding new [Unreleased] section to CHANGELOG.md..."
+	@new_version=$$(echo $(VERSION) | awk -F. '{print $$1"."$$2"."$$3+1}'); \
+	bash scripts/update-changelog.sh "$$new_version" "unreleased"
+	@echo "[Unreleased] section added successfully"
 	
 	@echo "Tag and release process completed successfully!"
 	@echo "Released version: v$(VERSION)"

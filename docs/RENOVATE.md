@@ -8,7 +8,8 @@ The project uses [Renovate](https://docs.renovatebot.com/) to automatically trac
 
 1. Update `LLAMA_CPP_BUILD` references across multiple files
 2. Automatically increment the project's minor version
-3. Create a pull request with all changes
+3. Update the CHANGELOG.md with the dependency changes
+4. Create a pull request with all changes
 
 ## Files Monitored
 
@@ -30,6 +31,7 @@ When llama.cpp is updated, the project version is automatically incremented usin
 The version is updated in both:
 - `Makefile`: `VERSION ?= 0.2.0`
 - `gollama.go`: `Version = "0.2.0"`
+- `CHANGELOG.md`: Dependency update information
 
 ## Configuration Details
 
@@ -81,6 +83,8 @@ For manual version management, use the provided script:
 
 The script updates both `Makefile` and `gollama.go` consistently.
 
+**Note**: When using manual version management, remember to also update `CHANGELOG.md` with the appropriate version entry and change information.
+
 ## Backup Workflow
 
 A GitHub Action workflow (`auto-version-bump.yml`) provides a backup mechanism that detects Renovate PRs for llama.cpp and automatically increments the version if the post-upgrade task fails.
@@ -120,7 +124,8 @@ If automatic updates fail, manually update:
 
 1. Update all `LLAMA_CPP_BUILD` references to the new llama.cpp version
 2. Run `./scripts/increment-version.sh minor` to bump the project version
-3. Commit changes with format: `feat(deps): update llama.cpp to <version>`
+3. Update `CHANGELOG.md` with documenting the llama.cpp update
+4. Commit changes with format: `feat(deps): update llama.cpp to <version>`
 
 ## Configuration Files
 

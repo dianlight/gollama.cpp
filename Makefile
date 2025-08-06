@@ -259,18 +259,18 @@ tag-release:
 	fi
 	
 	# Update CHANGELOG.md for release
-	@echo "Updating CHANGELOG.md for release v$(VERSION)..."
-	@bash scripts/update-changelog.sh "$(VERSION)" "release"
+	@echo "Updating CHANGELOG.md for release $(FULL_VERSION)..."
+	@bash scripts/update-changelog.sh "$(FULL_VERSION)" "release"
 	@echo "CHANGELOG.md updated successfully"
 	
 	# Commit the changelog update
 	@echo "Committing CHANGELOG.md update..."
 	@git add CHANGELOG.md
-	@git commit -m "Update CHANGELOG.md for release v$(VERSION)"
+	@git commit -m "Update CHANGELOG.md for release $(FULL_VERSION)"
 	@echo "CHANGELOG.md committed successfully"
 	
 	# Check if current version tag exists
-	@tag_name="v$(VERSION)"; \
+	@tag_name="$(FULL_VERSION)"; \
 	echo "Checking if tag $$tag_name exists..."; \
 	if git tag -l | grep -q "^$$tag_name$$"; then \
 		echo "Tag $$tag_name already exists"; \
@@ -319,12 +319,13 @@ tag-release:
 	# Add new [Unreleased] section to CHANGELOG.md
 	@echo "Adding new [Unreleased] section to CHANGELOG.md..."
 	@new_version=$$(echo $(VERSION) | awk -F. '{print $$1"."$$2"."$$3+1}'); \
-	bash scripts/update-changelog.sh "$$new_version" "unreleased"
+	new_full_version="v$$new_version-llamacpp.$(LLAMA_CPP_BUILD)"; \
+	bash scripts/update-changelog.sh "$$new_full_version" "unreleased"
 	@echo "[Unreleased] section added successfully"
 	
 	@echo "Tag and release process completed successfully!"
-	@echo "Released version: v$(VERSION)"
-	@echo "Next development version: $$(echo $(VERSION) | awk -F. '{print $$1"."$$2"."$$3+1}')"
+	@echo "Released version: $(FULL_VERSION)"
+	@echo "Next development version: v$$(echo $(VERSION) | awk -F. '{print $$1"."$$2"."$$3+1}')-llamacpp.$(LLAMA_CPP_BUILD)"
 
 # Package releases
 .PHONY: release

@@ -10,7 +10,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-CHANGELOG_FILE="$PROJECT_ROOT/CHANGELOG.md"
+CHANGELOG_FILE="${CHANGELOG_FILE:-$PROJECT_ROOT/CHANGELOG.md}"
 
 # Parse arguments
 VERSION="$1"
@@ -18,6 +18,7 @@ ACTION="$2"
 
 if [[ -z "$VERSION" ]] || [[ -z "$ACTION" ]]; then
     echo "Usage: $0 [version] [action]"
+    echo "Version format: v0.2.0-llamacpp.b6099 or 0.2.0-llamacpp.b6099"
     echo "Actions:"
     echo "  release    - Convert [Unreleased] to versioned entry"
     echo "  unreleased - Add new [Unreleased] section"

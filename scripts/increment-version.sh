@@ -2,6 +2,11 @@
 
 # Script to increment the version in Makefile and gollama.go
 # Usage: ./scripts/increment-version.sh [major|minor|patch]
+# 
+# This script only increments the semantic version (MAJOR.MINOR.PATCH)
+# and leaves the LLAMA_CPP_BUILD unchanged. The full version format
+# v{VERSION}-llamacpp.{LLAMA_CPP_BUILD} will be automatically updated
+# in the Makefile's FULL_VERSION variable.
 
 set -e
 

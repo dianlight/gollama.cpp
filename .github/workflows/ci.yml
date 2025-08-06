@@ -337,6 +337,7 @@ jobs:
     needs: [examples, documentation, test, lint, security]
     permissions:
       pages: write
+      contents: write
 
     # Deploy to the github-pages environment
     environment:

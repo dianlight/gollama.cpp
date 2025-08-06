@@ -14,22 +14,22 @@ The project uses [Renovate](https://docs.renovatebot.com/) to automatically trac
 
 Renovate monitors the following files for llama.cpp version references:
 
-- **Makefile**: `LLAMA_CPP_BUILD ?= b6076`
-- **gollama.go**: `LlamaCppBuild = "b6076"`
-- **.github/workflows/ci.yml**: `LLAMA_CPP_BUILD: 'b6076'`
-- **CONTRIBUTING.md**: `export LLAMA_CPP_BUILD=b6076`
-- **docs/BUILD.md**: `export LLAMA_CPP_BUILD=b6076`
+- **Makefile**: `LLAMA_CPP_BUILD ?= b6099`
+- **gollama.go**: `LlamaCppBuild = "b6099"`
+- **.github/workflows/ci.yml**: `LLAMA_CPP_BUILD: 'b6099'`
+- **CONTRIBUTING.md**: `export LLAMA_CPP_BUILD=b6099`
+- **docs/BUILD.md**: `export LLAMA_CPP_BUILD=b6099`
 
 ## Version Bumping
 
 When llama.cpp is updated, the project version is automatically incremented using the following logic:
 
-- **Current version**: `1.0.0`
-- **After llama.cpp update**: `1.1.0` (minor version incremented, patch reset to 0)
+- **Current version**: `0.2.0`
+- **After llama.cpp update**: `0.3.0` (minor version incremented, patch reset to 0)
 
 The version is updated in both:
-- `Makefile`: `VERSION ?= 1.1.0`
-- `gollama.go`: `Version = "1.1.0"`
+- `Makefile`: `VERSION ?= 0.2.0`
+- `gollama.go`: `Version = "0.2.0"`
 
 ## Configuration Details
 
@@ -37,10 +37,10 @@ The version is updated in both:
 
 Renovate uses custom regex managers to detect llama.cpp version references:
 
-1. **GitHub Workflows**: Matches `LLAMA_CPP_BUILD: 'b6076'` patterns
-2. **Makefile**: Matches `LLAMA_CPP_BUILD ?= b6076` patterns  
-3. **Go Source**: Matches `LlamaCppBuild = "b6076"` patterns
-4. **Documentation**: Matches `export LLAMA_CPP_BUILD=b6076` patterns
+1. **GitHub Workflows**: Matches `LLAMA_CPP_BUILD: 'b6099'` patterns
+2. **Makefile**: Matches `LLAMA_CPP_BUILD ?= b6099` patterns  
+3. **Go Source**: Matches `LlamaCppBuild = "b6099"` patterns
+4. **Documentation**: Matches `export LLAMA_CPP_BUILD=b6099` patterns
 
 ### Post-Upgrade Tasks
 
@@ -69,13 +69,13 @@ llama.cpp updates are grouped together with the following configuration:
 For manual version management, use the provided script:
 
 ```bash
-# Increment patch version (1.0.0 -> 1.0.1)
+# Increment patch version (0.2.0 -> 0.2.1)
 ./scripts/increment-version.sh patch
 
-# Increment minor version (1.0.0 -> 1.1.0)  
+# Increment minor version (0.2.0 -> 0.3.0)  
 ./scripts/increment-version.sh minor
 
-# Increment major version (1.0.0 -> 2.0.0)
+# Increment major version (0.2.0 -> 1.0.0)
 ./scripts/increment-version.sh major
 ```
 

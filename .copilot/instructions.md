@@ -29,7 +29,7 @@ You are working on Gollama.cpp, a Go binding for llama.cpp. Follow these specifi
 ```yaml
 env:
   GO_VERSION: '1.21'           # Update when minimum Go version changes
-  LLAMA_CPP_BUILD: 'b6076'     # Update when llama.cpp version changes
+  LLAMA_CPP_BUILD: 'b6099'     # Update when llama.cpp version changes
 
 strategy:
   matrix:

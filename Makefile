@@ -2,8 +2,8 @@
 # Cross-platform Go bindings for llama.cpp using purego
 
 # Version information
-VERSION ?= 0.1.0
-LLAMA_CPP_BUILD ?= b6089
+VERSION ?= 0.2.0
+LLAMA_CPP_BUILD ?= b6099
 FULL_VERSION = v$(VERSION)-llamacpp.$(LLAMA_CPP_BUILD)
 
 # Check everything
@@ -302,19 +302,8 @@ tag-release:
 	
 	# Increment patch version for next development cycle
 	@echo "Incrementing patch version for next development cycle..."
-	@current_version="$(VERSION)"; \
-	major=$$(echo $$current_version | cut -d'.' -f1); \
-	minor=$$(echo $$current_version | cut -d'.' -f2); \
-	patch=$$(echo $$current_version | cut -d'.' -f3); \
-	new_patch=$$((patch + 1)); \
-	new_version="$$major.$$minor.$$new_patch"; \
-	echo "Updating VERSION from $$current_version to $$new_version"; \
-	sed -i.bak "s/^VERSION[[:space:]]*\\?=[[:space:]]*.*/VERSION ?= $$new_version/" Makefile; \
-	rm -f Makefile.bak; \
-	git add Makefile; \
-	git commit -m "Bump version to $$new_version for next development cycle"; \
-	git push origin main; \
-	echo "Version bumped to $$new_version and pushed to main"
+	@bash scripts/increment-version.sh patch
+	@echo "Version incremented successfully (no git commit performed)"
 	
 	@echo "Tag and release process completed successfully!"
 	@echo "Released version: v$(VERSION)"

@@ -161,7 +161,7 @@ You can customize the build with environment variables:
 
 ```bash
 # Specify llama.cpp version for downloads
-export LLAMA_CPP_BUILD=b6076
+export LLAMA_CPP_BUILD=b6099
 
 # Specify Go version
 export GO_VERSION=1.21

@@ -224,7 +224,7 @@ func CleanLibraryCache() error {
 
 // DownloadLibrariesForPlatforms downloads libraries for multiple platforms in parallel
 // platforms should be in the format []string{"linux/amd64", "darwin/arm64", "windows/amd64"}
-// version can be empty for latest version or specify a specific version like "b6089"
+// version can be empty for latest version or specify a specific version like "b6099"
 func DownloadLibrariesForPlatforms(platforms []string, version string) ([]DownloadResult, error) {
 	if globalLoader.downloader == nil {
 		downloader, err := NewLibraryDownloader()

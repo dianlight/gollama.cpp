@@ -40,9 +40,9 @@ import (
 // Version information
 const (
 	// Version is the gollama.cpp version
-	Version = "0.1.0"
+	Version = "0.2.0"
 	// LlamaCppBuild is the llama.cpp build number this version is based on
-	LlamaCppBuild = "b6076"
+	LlamaCppBuild = "b6099"
 	// FullVersion combines both version numbers
 	FullVersion = "v" + Version + "-llamacpp." + LlamaCppBuild
 )

@@ -54,10 +54,6 @@ func main() {
 	config.TopK = int32(topK)
 	config.TopP = float32(topP)
 
-	// Version information
-	llamaVersion := "v1.0.0-llamacpp.b6076"
-	fmt.Printf("Gollama.cpp Batched Generation Example %s\n", llamaVersion)
-
 	// Print configuration
 	fmt.Println("Configuration:")
 	fmt.Printf("  Model: %s\n", config.ModelPath)

@@ -153,10 +153,47 @@ When Copilot detects:
    - Update CI configuration if needed
    - Validate all changes before completing version update
 
+## Roadmap Management
+
+### Rule: Auto-update ROADMAP.md
+When implementing features or making significant changes that affect the project roadmap:
+
+1. **Feature Completion**:
+   - Move completed items from "In Progress" to "Completed Major Features"
+   - Update progress indicators (✅, 🚧, [ ]) appropriately
+   - Add completion dates for major milestones
+   - Update the "Last Updated" date at the bottom
+
+2. **New Feature Planning**:
+   - Add new planned features to appropriate priority sections
+   - Update timeline estimates based on current progress
+   - Adjust dependencies and technical requirements
+   - Update success metrics if applicable
+
+3. **Priority Changes**:
+   - Reassess priorities based on user feedback and technical constraints
+   - Move items between Short-term, Medium-term, and Long-term sections
+   - Update implementation priorities (High/Medium/Low)
+   - Adjust target dates accordingly
+
+4. **Technical Dependencies**:
+   - Update external dependencies when new requirements are discovered
+   - Modify internal dependencies based on architectural changes
+   - Update risk assessments for changing technical landscape
+   - Revise contribution opportunities
+
+### Roadmap Triggers for Updates:
+- **Platform Support Changes**: Update platform-specific roadmap items
+- **GPU Backend Updates**: Modify GPU support roadmap sections
+- **API Changes**: Update advanced features and developer experience items
+- **Performance Improvements**: Adjust performance optimization roadmap
+- **Community Growth**: Update contribution and success metrics
+- **External Dependencies**: Modify dependency-related roadmap items
+
 ## Priority Guidelines
 
-1. **High Priority**: Security fixes, breaking changes, new platform support
-2. **Medium Priority**: Feature additions, performance improvements
-3. **Low Priority**: Documentation improvements, example updates
+1. **High Priority**: Security fixes, breaking changes, new platform support, roadmap-critical items
+2. **Medium Priority**: Feature additions, performance improvements, roadmap enhancements
+3. **Low Priority**: Documentation improvements, example updates, roadmap refinements
 
-Always prioritize keeping documentation in sync with code changes to maintain project quality and user experience.
+Always prioritize keeping documentation in sync with code changes to maintain project quality and user experience. The roadmap should reflect the current state and realistic future plans.

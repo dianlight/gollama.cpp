@@ -214,6 +214,49 @@ type TypeName struct {
 }
 ```
 
+## ROADMAP.md Update Templates
+
+### Completing a Feature
+```markdown
+### ✅ Completed Major Features
+- **Feature Name**: Brief description of what was completed
+- **Previous Status**: Move from "In Progress" or planned sections
+```
+
+### Adding New Planned Feature
+```markdown
+### Priority X: Feature Category
+**Target: Month Year**
+- [ ] New planned feature description
+- [ ] Sub-feature or component
+- [ ] Integration requirements
+
+**Technical Details:**
+- Implementation approach
+- Dependencies and requirements
+- Expected challenges
+```
+
+### Updating Progress Status
+```markdown
+### 🚧 In Progress
+- **Feature Name**: Current status update, percentage complete, blockers
+```
+
+### Timeline Adjustment
+```markdown
+**Target: [New Date]** (Updated from [Previous Date] due to [reason])
+```
+
+### Priority Change
+```markdown
+<!-- Move entire section between Short-term/Medium-term/Long-term based on new priorities -->
+### Priority Change Reason:
+- Technical dependencies resolved/discovered
+- User feedback prioritization
+- Resource availability changes
+```
+
 ## Automated Update Checklist
 
 When making changes, ensure these files are updated:
@@ -227,6 +270,7 @@ When making changes, ensure these files are updated:
 ### Documentation:
 - [ ] README.md (if public API changed)
 - [ ] CHANGELOG.md (with proper section)
+- [ ] ROADMAP.md (if implementing planned features or changing priorities)
 - [ ] Example README files (if examples changed)
 - [ ] Migration guides (for breaking changes)
 
@@ -241,3 +285,10 @@ When making changes, ensure these files are updated:
 - [ ] Version references in docs
 - [ ] Library version numbers
 - [ ] Download URLs and checksums
+
+### Roadmap Management:
+- [ ] Feature completion status updated
+- [ ] Progress indicators (✅, 🚧, [ ]) adjusted
+- [ ] Timeline estimates revised
+- [ ] Priority levels reassessed
+- [ ] Success metrics updated if applicable

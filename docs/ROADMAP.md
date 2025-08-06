@@ -1,0 +1,241 @@
+# Gollama.cpp Roadmap
+
+This document outlines the planned development path for gollama.cpp, prioritized by user impact and technical feasibility.
+
+## Current Status (v0.2.1 - August 2025)
+
+### ✅ Completed Major Features
+- **Download-based Architecture**: Eliminated build dependencies, uses official llama.cpp binaries
+- **Cross-platform Support**: Full support for macOS/Linux, Windows build compatibility
+- **GPU Backend Support**: Metal, CUDA, HIP, Vulkan, OpenCL, SYCL with automatic detection
+- **Parallel Downloads**: Concurrent library downloads with checksum verification
+- **Platform-specific Loading**: Native Windows syscalls, purego for Unix-like systems
+- **Comprehensive Examples**: 9 example implementations covering various use cases
+- **CI/CD Pipeline**: Cross-platform testing, automated releases, documentation generation
+
+### 🚧 In Progress
+- **Windows Runtime Support**: Build compatibility complete, runtime functionality in development
+- **Renovate Integration**: Automated llama.cpp dependency updates (Phase 5)
+
+## Short-term Goals (Q3-Q4 2025)
+
+### Priority 1: Windows Runtime Completion
+**Target: September 2025**
+- [ ] Complete Windows runtime library loading implementation
+- [ ] Windows GPU acceleration support (CUDA, HIP, Vulkan, OpenCL, SYCL)
+- [ ] Windows-specific examples and testing
+- [ ] Performance optimization for Windows platform
+- [ ] Windows installation and setup documentation
+
+**Technical Details:**
+- Implement remaining Windows syscall integrations
+- Add Windows GPU SDK detection logic
+- Create Windows-specific test suites
+- Optimize memory management for Windows platform
+
+### Priority 2: Enhanced GPU Support
+**Target: October 2025**
+- [ ] Intelligent GPU variant selection based on hardware detection
+- [ ] GPU memory management and optimization features
+- [ ] Multi-GPU support and load balancing
+- [ ] GPU performance benchmarking and monitoring
+- [ ] Advanced GPU configuration options
+
+**New Features:**
+```go
+// Future GPU configuration API
+gollama.LoadLibraryWithOptions(&gollama.LoadOptions{
+    GPUVariant:    "auto",        // auto, cuda, hip, vulkan, opencl, sycl, cpu
+    GPUDevices:    []int{0, 1},   // Multi-GPU support
+    GPUMemory:     8192,          // Memory limit in MB
+    PreferGPU:     true,          // GPU preference over CPU
+})
+```
+
+### Priority 3: Advanced Model Management
+**Target: November 2025**
+- [ ] Model registry and versioning system
+- [ ] Automatic model downloading and caching
+- [ ] Model quantization utilities
+- [ ] Model format conversion tools
+- [ ] Model performance profiling
+
+**New Components:**
+- `ModelRegistry` for centralized model management
+- `ModelDownloader` with progress tracking
+- `QuantizationTools` for model optimization
+- Integration with Hugging Face Hub
+
+## Medium-term Goals (Q1-Q2 2026)
+
+### Priority 1: Performance Optimization
+**Target: Q1 2026**
+- [ ] Memory mapping optimizations
+- [ ] Zero-copy operations where possible
+- [ ] Batch processing improvements
+- [ ] Streaming optimizations
+- [ ] Memory usage reduction
+
+### Priority 2: Developer Experience Enhancements
+**Target: Q1 2026**
+- [ ] VS Code extension for gollama.cpp development
+- [ ] Interactive debugging tools
+- [ ] Performance profiling dashboard
+- [ ] Comprehensive benchmarking suite
+- [ ] Developer documentation portal
+
+### Priority 3: Advanced Features
+**Target: Q2 2026**
+- [ ] Plugin architecture for extensibility
+- [ ] Custom sampling strategies
+- [ ] Advanced context management
+- [ ] Distributed inference support
+- [ ] Real-time model switching
+
+**Plugin System Design:**
+```go
+// Future plugin architecture
+type Plugin interface {
+    Name() string
+    Initialize(ctx *Context) error
+    ProcessTokens(tokens []Token) []Token
+    Cleanup() error
+}
+
+// Plugin registration
+gollama.RegisterPlugin(&CustomSamplingPlugin{})
+```
+
+## Long-term Vision (2026+)
+
+### Advanced AI Integration
+- [ ] Multi-modal support (text + images)
+- [ ] Voice integration capabilities
+- [ ] Real-time translation services
+- [ ] Advanced reasoning frameworks
+- [ ] Knowledge graph integration
+
+### Enterprise Features
+- [ ] High-availability deployment patterns
+- [ ] Monitoring and observability tools
+- [ ] Security and compliance features
+- [ ] Enterprise-grade authentication
+- [ ] Usage analytics and reporting
+
+### Ecosystem Development
+- [ ] Community plugin marketplace
+- [ ] Third-party integrations (databases, APIs)
+- [ ] Cloud-native deployment options
+- [ ] Containerization and orchestration
+- [ ] Edge computing optimizations
+
+## Implementation Priorities
+
+### High Priority (Critical Path)
+1. **Windows Runtime Completion** - Blocking full cross-platform support
+2. **Automated Dependency Management** - Essential for maintenance
+3. **Enhanced GPU Support** - Core value proposition
+
+### Medium Priority (Value-Adding)
+1. **Advanced Model Management** - Improves user experience
+2. **Performance Optimizations** - Competitive advantage
+3. **Developer Tools** - Community growth
+
+### Low Priority (Future Enhancement)
+1. **Plugin Architecture** - Extensibility for power users
+2. **Enterprise Features** - Commercial applications
+3. **Multi-modal Support** - Emerging requirements
+
+## Technical Dependencies
+
+### External Dependencies
+- **llama.cpp releases**: Continued compatibility with upstream changes
+- **GPU vendors**: SDK availability and compatibility
+- **Go language**: Version compatibility and feature availability
+- **Platform vendors**: OS-specific API stability
+
+### Internal Dependencies
+- **Build system**: Makefile and CI/CD pipeline maintenance
+- **Testing infrastructure**: Comprehensive cross-platform testing
+- **Documentation**: Keeping pace with feature development
+- **Community**: Feedback and contribution management
+
+## Success Metrics
+
+### Short-term (2025)
+- [ ] 100% Windows runtime compatibility
+- [ ] Zero manual compilation required for any platform
+- [ ] <60 second setup time for new users
+- [ ] 95% GPU detection accuracy
+
+### Medium-term (2026)
+- [ ] 10+ community contributors
+- [ ] 50+ stars on GitHub
+- [ ] Integration in 5+ downstream projects
+- [ ] Performance within 10% of native llama.cpp
+
+### Long-term (2027+)
+- [ ] Industry-standard Go LLM binding
+- [ ] Enterprise adoption
+- [ ] Multi-modal capabilities
+- [ ] Plugin ecosystem with 10+ plugins
+
+## Community & Contributions
+
+### Current Contributors
+- Core maintainer: [@dianlight](https://github.com/dianlight)
+- Contributors welcome for all roadmap items
+
+### How to Contribute
+1. **Windows Runtime**: Help with Windows-specific development and testing
+2. **GPU Support**: Contribute GPU backend implementations and optimizations
+3. **Examples**: Create new use-case examples and tutorials
+4. **Documentation**: Improve guides and API documentation
+5. **Testing**: Cross-platform testing and bug reports
+
+### Contribution Priorities
+1. **Windows Platform**: Critical for project completion
+2. **GPU Optimization**: High-value technical contributions
+3. **Documentation**: Essential for user adoption
+4. **Examples**: Showcase project capabilities
+
+## Risk Management
+
+### Technical Risks
+- **llama.cpp API changes**: Mitigated by automated testing and version tracking
+- **Platform deprecation**: Diversified platform support reduces impact
+- **GPU driver issues**: Fallback to CPU ensures functionality
+- **Memory constraints**: Progressive loading and optimization features
+
+### Project Risks
+- **Maintainer availability**: Seeking additional core contributors
+- **Community adoption**: Focus on documentation and examples
+- **Competition**: Differentiate through ease of use and performance
+- **Scope creep**: Maintain focus on core value proposition
+
+## Getting Involved
+
+### For Users
+- Try the examples and provide feedback
+- Report platform-specific issues
+- Request missing features through GitHub issues
+- Share your use cases and success stories
+
+### For Developers
+- Review the [CONTRIBUTING.md](../CONTRIBUTING.md) guide
+- Check the [GitHub Issues](https://github.com/dianlight/gollama.cpp/issues) for `enhancement` labels
+- Join discussions in GitHub Discussions
+- Submit pull requests for roadmap items
+
+### For Organizations
+- Evaluate gollama.cpp for your AI/ML projects
+- Provide feedback on enterprise requirements
+- Consider sponsoring development of specific features
+- Share performance benchmarks and use cases
+
+---
+
+**Last Updated**: August 06, 2025
+**Next Review**: September 1, 2025
+
+*This roadmap is a living document and will be updated based on community feedback, technical discoveries, and changing requirements.*

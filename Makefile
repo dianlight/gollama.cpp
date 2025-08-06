@@ -437,6 +437,22 @@ model_download:
 		echo "GritLM model already exists in models/gritlm-7b_q4_1.gguf"; \
 	fi
 
+# Roadmap management
+.PHONY: roadmap-update
+roadmap-update:
+	@echo "Updating ROADMAP.md last updated date"
+	@bash scripts/roadmap-update.sh update-date
+
+.PHONY: roadmap-validate
+roadmap-validate:
+	@echo "Validating ROADMAP.md format and content"
+	@bash scripts/roadmap-update.sh validate
+
+.PHONY: roadmap-scan
+roadmap-scan:
+	@echo "Scanning for potential roadmap items in code"
+	@bash scripts/roadmap-update.sh scan-todos
+
 # Show version information
 .PHONY: version
 version:
@@ -483,6 +499,9 @@ help:
 	@echo "  update-hf-script   Update hf.sh script from llama.cpp repository"
 	@echo "  model_download     Download example models using hf.sh script"
 	@echo "  install-tools      Install development tools"
+	@echo "  roadmap-update     Update ROADMAP.md last updated date"
+	@echo "  roadmap-validate   Validate ROADMAP.md format and content"
+	@echo "  roadmap-scan       Scan for potential roadmap items in code"
 	@echo "  version            Show version information"
 	@echo "  help               Show this help"
 	@echo ""

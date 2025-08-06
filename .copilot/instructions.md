@@ -8,13 +8,23 @@ You are working on Gollama.cpp, a Go binding for llama.cpp. Follow these specifi
 3. **Platform Changes**: Update supported platforms section and CI matrix
 4. **Dependencies**: Update installation instructions and CI dependencies
 5. **Examples**: Update corresponding README.md files and ensure demo scripts work
+6. **Roadmap Items**: Update ROADMAP.md when implementing planned features or changing priorities
 
 ### Documentation Files to Consider:
 - `README.md` (main project documentation)
 - `CHANGELOG.md` (version history)
+- `docs/ROADMAP.md` (development roadmap and future plans)
 - `examples/*/README.md` (example-specific documentation)
 - `docs/*.md` (technical documentation)
 - Go doc comments in source files
+
+### ROADMAP.md Update Triggers:
+- **Feature Implementation**: Move items from planned to completed sections
+- **New Enhancement Issues**: Add to appropriate roadmap sections
+- **Priority Changes**: Reorganize short/medium/long-term goals
+- **Timeline Updates**: Adjust target dates based on progress
+- **Platform Support**: Update Windows, GPU, or cross-platform roadmap items
+- **Performance Work**: Update optimization and benchmarking roadmap sections
 
 ## Automatic CI Updates
 

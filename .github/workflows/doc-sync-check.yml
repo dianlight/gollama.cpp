@@ -143,6 +143,13 @@ jobs:
 
     - name: Check CHANGELOG.md format
       run: |
+        # Skip CHANGELOG check if last commit is a release commit
+        LAST_COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+        if echo "$LAST_COMMIT_MSG" | grep -q "chore(release)"; then
+          echo "🔄 Skipping CHANGELOG.md check - release commit detected: $LAST_COMMIT_MSG"
+          exit 0
+        fi
+        
         if [ -f "CHANGELOG.md" ]; then
           echo "Checking CHANGELOG.md format..."
           

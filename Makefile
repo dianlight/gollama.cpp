@@ -2,7 +2,7 @@
 # Cross-platform Go bindings for llama.cpp using purego
 
 # Version information
-VERSION ?= 0.2.0
+VERSION ?= 0.2.1
 LLAMA_CPP_BUILD ?= b6099
 FULL_VERSION = v$(VERSION)-llamacpp.$(LLAMA_CPP_BUILD)
 
@@ -316,7 +316,7 @@ tag-release:
 	# Commit the changelog update
 	@echo "Committing CHANGELOG.md update..."
 	@git add CHANGELOG.md
-	@git commit -m "🚀 chore(release): update CHANGELOG.md for $(FULL_VERSION)"
+	@git commit -m ":rocket: chore(release): update CHANGELOG.md for $(FULL_VERSION)"
 	@git push origin main
 	@echo "CHANGELOG.md committed successfully"
 	

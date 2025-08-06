@@ -309,7 +309,7 @@ tag-release:
 	new_patch=$$((patch + 1)); \
 	new_version="$$major.$$minor.$$new_patch"; \
 	echo "Updating VERSION from $$current_version to $$new_version"; \
-	sed -i.bak "s/VERSION ?= $$current_version/VERSION ?= $$new_version/" Makefile; \
+	sed -i.bak "s/^VERSION[[:space:]]*\\?=[[:space:]]*.*/VERSION ?= $$new_version/" Makefile; \
 	rm -f Makefile.bak; \
 	git add Makefile; \
 	git commit -m "Bump version to $$new_version for next development cycle"; \

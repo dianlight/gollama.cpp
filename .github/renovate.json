@@ -93,7 +93,6 @@
       "semanticCommitType": "feat",
       "semanticCommitScope": "deps",
       "commitMessageTopic": "llama.cpp",
-      "prTitle": "feat(deps): update llama.cpp to {{newVersion}}",
       "postUpgradeTasks": {
         "commands": [
           "chmod +x scripts/increment-version.sh",
@@ -180,7 +179,6 @@
   "commitMessageTopic": "{{depName}}",
   "commitMessageExtra": "to {{newVersion}}",
   "commitMessageSuffix": "",
-  "prTitle": "chore(deps): update {{depName}} to {{newVersion}}",
   "prBodyTemplate": "{{{header}}}{{{table}}}{{{notes}}}{{{changelogs}}}",
   "rebaseWhen": "conflicted"
 }

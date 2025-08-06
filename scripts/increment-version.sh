@@ -78,8 +78,8 @@ cp "$GOLLAMA_GO" "$GOLLAMA_GO.bak"
 sed -i.tmp "s/^VERSION ?= .*/VERSION ?= $NEW_VERSION/" "$MAKEFILE"
 rm -f "$MAKEFILE.tmp"
 
-# Update Version in gollama.go (handle tab character)
-sed -i.tmp "s/Version = \"[^\"]*\"/Version = \"$NEW_VERSION\"/" "$GOLLAMA_GO"
+# Update Version in gollama.go (handle tab character, avoid FullVersion)
+sed -i.tmp "s/^\([[:space:]]*\)Version = \"[^\"]*\"/\1Version = \"$NEW_VERSION\"/" "$GOLLAMA_GO"
 rm -f "$GOLLAMA_GO.tmp"
 
 # Verify the changes

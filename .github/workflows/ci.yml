@@ -337,7 +337,6 @@ jobs:
     needs: [examples, documentation, test, lint, security]
     permissions:
       pages: write
-      id-token: write
     
     steps:
     - name: Checkout code

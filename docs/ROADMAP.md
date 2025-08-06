@@ -56,14 +56,10 @@ gollama.LoadLibraryWithOptions(&gollama.LoadOptions{
 **Target: November 2025**
 - [ ] Model registry and versioning system
 - [ ] Automatic model downloading and caching
-- [ ] Model quantization utilities
-- [ ] Model format conversion tools
-- [ ] Model performance profiling
 
 **New Components:**
 - `ModelRegistry` for centralized model management
 - `ModelDownloader` with progress tracking
-- `QuantizationTools` for model optimization
 - Integration with Hugging Face Hub
 
 ## Medium-term Goals (Q1-Q2 2026)
@@ -86,10 +82,7 @@ gollama.LoadLibraryWithOptions(&gollama.LoadOptions{
 
 ### Priority 3: Advanced Features
 **Target: Q2 2026**
-- [ ] Plugin architecture for extensibility
-- [ ] Custom sampling strategies
 - [ ] Advanced context management
-- [ ] Distributed inference support
 - [ ] Real-time model switching
 
 **Plugin System Design:**
@@ -106,14 +99,35 @@ type Plugin interface {
 gollama.RegisterPlugin(&CustomSamplingPlugin{})
 ```
 
+## Long-term Vision (wait for llama.cpp)
+
+### Features Requiring llama.cpp Function Implementation
+These features depend on specific llama.cpp functions that are either missing or not fully implemented in the current version. They will be moved to active development once the required functions become available.
+
+#### Model Processing and Conversion
+- [ ] Model quantization utilities - *Requires full quantization API*
+- [ ] Model format conversion tools - *Requires conversion functions*
+- [ ] Model performance profiling - *Requires timing/profiling functions*
+
+#### Advanced Sampling and Generation  
+- [ ] Plugin architecture for extensibility - *Requires callback/plugin API*
+- [ ] Custom sampling strategies - *Requires extended sampling functions*
+- [ ] Distributed inference support - *Requires distributed computing API*
+
+#### Performance and Monitoring
+- [ ] Performance profiling dashboard - *Requires timing functions*
+- [ ] Advanced GPU configuration options - *Requires extended GPU API*
+
+#### Multi-modal and Advanced AI
+- [ ] Multi-modal support (text + images) - *Requires multi-modal API*
+- [ ] Voice integration capabilities - *Requires audio processing API*
+- [ ] Real-time translation services - *Requires translation functions*
+- [ ] Advanced reasoning frameworks - *Requires reasoning API*
+- [ ] Knowledge graph integration - *Requires graph processing API*
+
 ## Long-term Vision (2026+)
 
 ### Advanced AI Integration
-- [ ] Multi-modal support (text + images)
-- [ ] Voice integration capabilities
-- [ ] Real-time translation services
-- [ ] Advanced reasoning frameworks
-- [ ] Knowledge graph integration
 
 ### Enterprise Features
 - [ ] High-availability deployment patterns
@@ -142,9 +156,13 @@ gollama.RegisterPlugin(&CustomSamplingPlugin{})
 3. **Developer Tools** - Community growth
 
 ### Low Priority (Future Enhancement)
-1. **Plugin Architecture** - Extensibility for power users
-2. **Enterprise Features** - Commercial applications
-3. **Multi-modal Support** - Emerging requirements
+1. **Enterprise Features** - Commercial applications
+2. **Community Features** - Plugin marketplace and ecosystem
+
+### Waiting for llama.cpp (Blocked)
+1. **Model Processing Tools** - Quantization, conversion, profiling utilities
+2. **Advanced Sampling** - Plugin architecture and custom strategies
+3. **Multi-modal Support** - Image, voice, and advanced AI features
 
 ## Technical Dependencies
 
@@ -177,7 +195,6 @@ gollama.RegisterPlugin(&CustomSamplingPlugin{})
 ### Long-term (2027+)
 - [ ] Industry-standard Go LLM binding
 - [ ] Enterprise adoption
-- [ ] Multi-modal capabilities
 - [ ] Plugin ecosystem with 10+ plugins
 
 ## Community & Contributions

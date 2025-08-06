@@ -434,7 +434,7 @@ func ApplyConfig(config *Config) error {
 	}
 
 	// Apply logging configuration
-	// TODO: Implement logging configuration once we have the actual logging functions
+	// TODO: Implement logging configuration once we have the actual logging functions - moved to ROADMAP "wait for llama.cpp" section
 	// if config.EnableLogging {
 	//     llamaLogSet(logCallback, nil)
 	// }

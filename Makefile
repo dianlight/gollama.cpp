@@ -453,6 +453,11 @@ roadmap-scan:
 	@echo "Scanning for potential roadmap items in code"
 	@bash scripts/roadmap-update.sh scan-todos
 
+.PHONY: roadmap-scan-missing
+roadmap-scan-missing:
+	@echo "Scanning for code that depends on missing llama.cpp functions"
+	@bash scripts/roadmap-update.sh scan-missing
+
 # Show version information
 .PHONY: version
 version:
@@ -502,6 +507,7 @@ help:
 	@echo "  roadmap-update     Update ROADMAP.md last updated date"
 	@echo "  roadmap-validate   Validate ROADMAP.md format and content"
 	@echo "  roadmap-scan       Scan for potential roadmap items in code"
+	@echo "  roadmap-scan-missing  Scan for code depending on missing llama.cpp functions"
 	@echo "  version            Show version information"
 	@echo "  help               Show this help"
 	@echo ""

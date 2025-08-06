@@ -42,7 +42,7 @@ func closeLibraryPlatform(handle uintptr) error {
 // registerLibFunc registers a library function using platform-specific methods
 // For Windows, this is a placeholder implementation
 func registerLibFunc(fptr interface{}, handle uintptr, fname string) {
-	// TODO: Implement proper function registration for Windows
+	// TODO: Implement proper function registration for Windows - blocks ROADMAP Priority 1 (Windows Runtime Completion)
 	// This would need to use GetProcAddress and set the function pointer
 	// For now, this is a no-op to prevent build failures
 }

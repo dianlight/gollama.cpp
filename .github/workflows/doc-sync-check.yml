@@ -168,3 +168,21 @@ jobs:
         else
           echo "⚠️  No CHANGELOG.md found - consider adding one to track changes"
         fi
+
+    - name: Validate ROADMAP.md format
+      run: |
+        if [ -f "docs/ROADMAP.md" ]; then
+          echo "Validating ROADMAP.md format and structure..."
+          
+          # Run the roadmap validation script
+          make roadmap-validate
+          
+          # Check for items that might need to be moved to "wait for llama.cpp" section
+          echo ""
+          echo "Checking for potential missing llama.cpp dependencies..."
+          make roadmap-scan-missing
+          
+          echo "✅ ROADMAP.md validation completed"
+        else
+          echo "⚠️  No ROADMAP.md found"
+        fi

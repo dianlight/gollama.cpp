@@ -469,7 +469,7 @@ var (
 	llamaStateLoadFile func(ctx LlamaContext, pathSession *byte, tokensOut *LlamaToken, nTokenCapacity uint64, nTokenCountOut *uint64) bool
 	llamaStateSaveFile func(ctx LlamaContext, pathSession *byte, tokens *LlamaToken, nTokenCount uint64) bool
 
-	// Performance functions - These may not exist in this llama.cpp version
+	// Performance functions - These may not exist in this llama.cpp version - moved to ROADMAP "wait for llama.cpp" section
 	// llamaGetTimings   func(ctx LlamaContext) uintptr
 	// llamaPrintTimings func(ctx LlamaContext)
 	// llamaResetTimings func(ctx LlamaContext)
@@ -684,7 +684,7 @@ func registerFunctions() error {
 	registerLibFunc(&llamaStateLoadFile, libHandle, "llama_state_load_file")
 	registerLibFunc(&llamaStateSaveFile, libHandle, "llama_state_save_file")
 
-	// Performance functions - These may not exist in this llama.cpp version
+	// Performance functions - These may not exist in this llama.cpp version - moved to ROADMAP "wait for llama.cpp" section
 	// registerLibFunc(&llamaGetTimings, libHandle, "llama_get_timings")
 	// registerLibFunc(&llamaPrintTimings, libHandle, "llama_print_timings")
 	// registerLibFunc(&llamaResetTimings, libHandle, "llama_reset_timings")
@@ -1038,7 +1038,7 @@ func Decode(ctx LlamaContext, batch LlamaBatch) error {
 	}
 
 	if runtime.GOOS != "darwin" {
-		return errors.New("Decode not yet implemented for non-Darwin platforms")
+		return errors.New("Decode not yet implemented for non-Darwin platforms - blocks ROADMAP Priority 1 (Windows Runtime Completion)")
 	}
 
 	result := llamaDecode(ctx, batch)

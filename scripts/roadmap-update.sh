@@ -108,6 +108,33 @@ scan_todos() {
     rm -f /tmp/roadmap_todos.txt
 }
 
+# Check for features that might depend on missing llama.cpp functions
+scan_missing_functions() {
+    log_info "Scanning for code that might depend on missing llama.cpp functions..."
+    
+    # Look for patterns that suggest missing functionality
+    local patterns=(
+        "not implemented"
+        "not yet implemented"
+        "missing.*function"
+        "requires.*llama.cpp"
+        "// Function doesn't exist"
+        "runtime.GOOS != \"darwin\""
+        "Skip.*non-Darwin"
+    )
+    
+    for pattern in "${patterns[@]}"; do
+        if find "$ROOT_DIR" -name "*.go" -type f -exec grep -Hn "$pattern" {} \; > /tmp/missing_funcs.txt 2>/dev/null; then
+            if [ -s /tmp/missing_funcs.txt ]; then
+                log_warning "Found code indicating missing functionality: $pattern"
+                head -5 /tmp/missing_funcs.txt
+                echo ""
+            fi
+        fi
+        rm -f /tmp/missing_funcs.txt
+    done
+}
+
 # Validate roadmap format
 validate_roadmap() {
     log_info "Validating ROADMAP.md format..."
@@ -117,6 +144,7 @@ validate_roadmap() {
         "## Current Status"
         "## Short-term Goals"
         "## Medium-term Goals"
+        "## Long-term Vision (wait for llama.cpp)"
         "## Long-term Vision"
         "## Implementation Priorities"
         "## Success Metrics"
@@ -140,8 +168,9 @@ validate_roadmap() {
     # Check for proper checkbox format
     local checkbox_count=$(grep -c "^- \[ \]" "$ROOT_DIR/$ROADMAP_FILE" || true)
     local completed_count=$(grep -c "^- \[x\]" "$ROOT_DIR/$ROADMAP_FILE" || true)
+    local blocked_count=$(grep -c "Requires.*API\|wait for llama.cpp" "$ROOT_DIR/$ROADMAP_FILE" || true)
     
-    log_info "Found $checkbox_count planned items and $completed_count completed items"
+    log_info "Found $checkbox_count planned items, $completed_count completed items, and $blocked_count blocked items"
     
     # Check if last updated date is recent (within 30 days)
     local last_updated_line=$(grep "Last Updated" "$ROOT_DIR/$ROADMAP_FILE" || echo "")
@@ -163,6 +192,7 @@ show_help() {
     echo "  complete-feature \"name\"       Mark a feature as completed (manual editing required)"
     echo "  add-feature \"name\" priority   Add a new planned feature (manual editing required)"
     echo "  scan-todos                     Scan for TODO/FIXME comments"
+    echo "  scan-missing                   Scan for code depending on missing llama.cpp functions"
     echo "  validate                       Validate roadmap format and content"
     echo "  help                          Show this help message"
     echo ""
@@ -171,6 +201,7 @@ show_help() {
     echo "  $0 complete-feature \"Windows Runtime Support\""
     echo "  $0 add-feature \"Multi-GPU Support\" \"Priority 2\" \"Q1 2026\""
     echo "  $0 scan-todos"
+    echo "  $0 scan-missing"
     echo "  $0 validate"
     echo ""
     echo "Note: Most operations require manual editing of ROADMAP.md for safety."
@@ -193,6 +224,9 @@ main() {
             ;;
         "scan-todos")
             scan_todos
+            ;;
+        "scan-missing")
+            scan_missing_functions
             ;;
         "validate")
             validate_roadmap

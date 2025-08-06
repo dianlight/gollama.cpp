@@ -182,6 +182,11 @@ jobs:
           echo "Checking for potential missing llama.cpp dependencies..."
           make roadmap-scan-missing
           
+          # Check for items that might need to be moved to "wait for purego struct support" section
+          echo ""
+          echo "Checking for potential purego struct support dependencies..."
+          make roadmap-scan-purego
+          
           echo "✅ ROADMAP.md validation completed"
         else
           echo "⚠️  No ROADMAP.md found"

@@ -21,15 +21,9 @@ This document outlines the planned development path for gollama.cpp, prioritized
 
 ### Priority 1: Windows Runtime Completion
 **Target: September 2025**
-- [ ] Complete Windows runtime library loading implementation
-- [ ] Windows GPU acceleration support (CUDA, HIP, Vulkan, OpenCL, SYCL)
-- [ ] Windows-specific examples and testing
-- [ ] Performance optimization for Windows platform
 - [ ] Windows installation and setup documentation
 
 **Technical Details:**
-- Implement remaining Windows syscall integrations
-- Add Windows GPU SDK detection logic
 - Create Windows-specific test suites
 - Optimize memory management for Windows platform
 
@@ -99,6 +93,31 @@ type Plugin interface {
 gollama.RegisterPlugin(&CustomSamplingPlugin{})
 ```
 
+## Long-term Vision (wait for purego struct support)
+
+### Features Requiring purego Struct Support
+These features depend on purego's ability to handle struct parameters and return values, which is currently only available on Darwin (macOS) platforms. They will be moved to active development once purego gains cross-platform struct support.
+
+#### Core Runtime Functions
+- [ ] Complete Windows runtime library loading implementation - *Requires struct parameter/return support*
+- [ ] Windows GPU acceleration support (CUDA, HIP, Vulkan, OpenCL, SYCL) - *Requires struct parameter/return support*
+- [ ] Windows-specific examples and testing - *Requires core runtime functions*
+- [ ] Performance optimization for Windows platform - *Requires struct parameter/return support*
+
+#### Batch Processing and Context Management
+- [ ] Cross-platform batch processing - *Requires LlamaBatch struct support*
+- [ ] Advanced context management - *Requires LlamaContextParams struct support*
+- [ ] Model parameter configuration - *Requires LlamaModelParams struct support*
+
+#### Sampling and Generation
+- [ ] Advanced sampling configurations - *Requires sampler struct support*
+- [ ] Custom sampling strategies - *Requires struct-based sampling API*
+
+**Technical Dependencies:**
+- purego struct parameter support on Windows/Linux
+- purego struct return value support on Windows/Linux
+- Cross-platform function registration for struct-based APIs
+
 ## Long-term Vision (wait for llama.cpp)
 
 ### Features Requiring llama.cpp Function Implementation
@@ -146,23 +165,26 @@ These features depend on specific llama.cpp functions that are either missing or
 ## Implementation Priorities
 
 ### High Priority (Critical Path)
-1. **Windows Runtime Completion** - Blocking full cross-platform support
-2. **Automated Dependency Management** - Essential for maintenance
-3. **Enhanced GPU Support** - Core value proposition
+1. **Automated Dependency Management** - Essential for maintenance
+2. **Enhanced GPU Support** - Core value proposition
+3. **Advanced Model Management** - Improves user experience
 
 ### Medium Priority (Value-Adding)
-1. **Advanced Model Management** - Improves user experience
-2. **Performance Optimizations** - Competitive advantage
-3. **Developer Tools** - Community growth
+1. **Performance Optimizations** - Competitive advantage
+2. **Developer Tools** - Community growth
 
 ### Low Priority (Future Enhancement)
 1. **Enterprise Features** - Commercial applications
 2. **Community Features** - Plugin marketplace and ecosystem
 
+### Waiting for purego struct support (Blocked)
+1. **Windows Runtime Completion** - Requires struct parameter/return support
+2. **Cross-platform Batch Processing** - Requires LlamaBatch struct support
+3. **Advanced Sampling** - Requires struct-based sampling configurations
+
 ### Waiting for llama.cpp (Blocked)
 1. **Model Processing Tools** - Quantization, conversion, profiling utilities
-2. **Advanced Sampling** - Plugin architecture and custom strategies
-3. **Multi-modal Support** - Image, voice, and advanced AI features
+2. **Multi-modal Support** - Image, voice, and advanced AI features
 
 ## Technical Dependencies
 

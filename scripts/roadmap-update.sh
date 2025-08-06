@@ -135,6 +135,43 @@ scan_missing_functions() {
     done
 }
 
+# Check for features that might depend on missing purego struct support
+scan_purego_struct_limitations() {
+    log_info "Scanning for code that might depend on missing purego struct support..."
+    
+    # Look for patterns that suggest purego struct limitations
+    local patterns=(
+        "Skip.*struct.*non-Darwin"
+        "struct.*return.*not.*supported"
+        "Helper functions.*struct returns"
+        "runtime.GOOS.*darwin.*struct"
+        "non-Darwin platforms.*struct"
+        "Return default.*non-Darwin"
+    )
+    
+    for pattern in "${patterns[@]}"; do
+        if find "$ROOT_DIR" -name "*.go" -type f -exec grep -Hn "$pattern" {} \; > /tmp/purego_struct.txt 2>/dev/null; then
+            if [ -s /tmp/purego_struct.txt ]; then
+                log_warning "Found code indicating purego struct limitations: $pattern"
+                head -5 /tmp/purego_struct.txt
+                echo ""
+            fi
+        fi
+        rm -f /tmp/purego_struct.txt
+    done
+    
+    # Check for Darwin-only function registrations
+    log_info "Checking for Darwin-only function registrations..."
+    if grep -n "runtime.GOOS.*darwin" "$ROOT_DIR"/*.go > /tmp/darwin_only.txt 2>/dev/null; then
+        if [ -s /tmp/darwin_only.txt ]; then
+            log_warning "Found Darwin-only function registrations (likely due to struct limitations):"
+            head -10 /tmp/darwin_only.txt
+            echo ""
+        fi
+    fi
+    rm -f /tmp/darwin_only.txt
+}
+
 # Validate roadmap format
 validate_roadmap() {
     log_info "Validating ROADMAP.md format..."
@@ -144,6 +181,7 @@ validate_roadmap() {
         "## Current Status"
         "## Short-term Goals"
         "## Medium-term Goals"
+        "## Long-term Vision (wait for purego struct support)"
         "## Long-term Vision (wait for llama.cpp)"
         "## Long-term Vision"
         "## Implementation Priorities"
@@ -168,9 +206,11 @@ validate_roadmap() {
     # Check for proper checkbox format
     local checkbox_count=$(grep -c "^- \[ \]" "$ROOT_DIR/$ROADMAP_FILE" || true)
     local completed_count=$(grep -c "^- \[x\]" "$ROOT_DIR/$ROADMAP_FILE" || true)
-    local blocked_count=$(grep -c "Requires.*API\|wait for llama.cpp" "$ROOT_DIR/$ROADMAP_FILE" || true)
+    local blocked_llama_count=$(grep -c "Requires.*API\|wait for llama.cpp" "$ROOT_DIR/$ROADMAP_FILE" || true)
+    local blocked_purego_count=$(grep -c "Requires.*struct.*support\|wait for purego" "$ROOT_DIR/$ROADMAP_FILE" || true)
     
-    log_info "Found $checkbox_count planned items, $completed_count completed items, and $blocked_count blocked items"
+    log_info "Found $checkbox_count planned items, $completed_count completed items"
+    log_info "Blocked items: $blocked_llama_count (llama.cpp), $blocked_purego_count (purego struct support)"
     
     # Check if last updated date is recent (within 30 days)
     local last_updated_line=$(grep "Last Updated" "$ROOT_DIR/$ROADMAP_FILE" || echo "")
@@ -193,6 +233,7 @@ show_help() {
     echo "  add-feature \"name\" priority   Add a new planned feature (manual editing required)"
     echo "  scan-todos                     Scan for TODO/FIXME comments"
     echo "  scan-missing                   Scan for code depending on missing llama.cpp functions"
+    echo "  scan-purego                    Scan for code depending on purego struct support"
     echo "  validate                       Validate roadmap format and content"
     echo "  help                          Show this help message"
     echo ""
@@ -202,6 +243,7 @@ show_help() {
     echo "  $0 add-feature \"Multi-GPU Support\" \"Priority 2\" \"Q1 2026\""
     echo "  $0 scan-todos"
     echo "  $0 scan-missing"
+    echo "  $0 scan-purego"
     echo "  $0 validate"
     echo ""
     echo "Note: Most operations require manual editing of ROADMAP.md for safety."
@@ -227,6 +269,9 @@ main() {
             ;;
         "scan-missing")
             scan_missing_functions
+            ;;
+        "scan-purego")
+            scan_purego_struct_limitations
             ;;
         "validate")
             validate_roadmap

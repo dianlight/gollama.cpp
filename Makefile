@@ -458,6 +458,11 @@ roadmap-scan-missing:
 	@echo "Scanning for code that depends on missing llama.cpp functions"
 	@bash scripts/roadmap-update.sh scan-missing
 
+.PHONY: roadmap-scan-purego
+roadmap-scan-purego:
+	@echo "Scanning for code that depends on purego struct support"
+	@bash scripts/roadmap-update.sh scan-purego
+
 # Show version information
 .PHONY: version
 version:
@@ -508,6 +513,7 @@ help:
 	@echo "  roadmap-validate   Validate ROADMAP.md format and content"
 	@echo "  roadmap-scan       Scan for potential roadmap items in code"
 	@echo "  roadmap-scan-missing  Scan for code depending on missing llama.cpp functions"
+	@echo "  roadmap-scan-purego   Scan for code depending on purego struct support"
 	@echo "  version            Show version information"
 	@echo "  help               Show this help"
 	@echo ""

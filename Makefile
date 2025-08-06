@@ -316,7 +316,8 @@ tag-release:
 	# Commit the changelog update
 	@echo "Committing CHANGELOG.md update..."
 	@git add CHANGELOG.md
-	@git commit -m "Update CHANGELOG.md for release $(FULL_VERSION)"
+	@git commit -m "🚀 chore(release): update CHANGELOG.md for $(FULL_VERSION)"
+	@git push origin main
 	@echo "CHANGELOG.md committed successfully"
 	
 	# Check if current version tag exists

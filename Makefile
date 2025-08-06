@@ -233,6 +233,93 @@ update-hf-script: clone-llamacpp
 	fi
 
 
+# Automated tag and release
+.PHONY: tag-release
+tag-release:
+	@echo "Starting automated tag and release process..."
+	
+	# Check if we're on the main branch
+	@current_branch=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$current_branch" != "main" ]; then \
+		echo "Error: tag-release can only be run from the main branch. Current branch: $$current_branch"; \
+		exit 1; \
+	fi
+	
+	# Check if current branch is up to date with origin
+	@echo "Checking if main branch is up to date with origin..."
+	@git fetch origin main >/dev/null 2>&1; \
+	local_commit=$$(git rev-parse HEAD); \
+	remote_commit=$$(git rev-parse origin/main); \
+	if [ "$$local_commit" != "$$remote_commit" ]; then \
+		echo "Error: Local main branch is not up to date with origin/main"; \
+		echo "Local:  $$local_commit"; \
+		echo "Remote: $$remote_commit"; \
+		echo "Please pull latest changes: git pull origin main"; \
+		exit 1; \
+	fi
+	
+	# Check if current version tag exists
+	@tag_name="v$(VERSION)"; \
+	echo "Checking if tag $$tag_name exists..."; \
+	if git tag -l | grep -q "^$$tag_name$$"; then \
+		echo "Tag $$tag_name already exists"; \
+		\
+		# Check if GitHub release exists for this tag \
+		echo "Checking if GitHub release exists for tag $$tag_name..."; \
+		if command -v gh >/dev/null 2>&1; then \
+			if gh release view $$tag_name >/dev/null 2>&1; then \
+				echo "GitHub release already exists for tag $$tag_name"; \
+				echo "Moving tag to current HEAD and updating release..."; \
+				git tag -d $$tag_name; \
+				git push origin :refs/tags/$$tag_name; \
+				git tag $$tag_name HEAD; \
+				git push origin $$tag_name; \
+				echo "Tag $$tag_name moved to current HEAD and pushed"; \
+			else \
+				echo "Tag exists but no GitHub release found. Creating release..."; \
+				git push origin $$tag_name; \
+				echo "Tag $$tag_name pushed to origin"; \
+			fi; \
+		else \
+			echo "Warning: GitHub CLI (gh) not found. Cannot check for existing releases."; \
+			echo "Moving tag to current HEAD..."; \
+			git tag -d $$tag_name; \
+			git push origin :refs/tags/$$tag_name; \
+			git tag $$tag_name HEAD; \
+			git push origin $$tag_name; \
+			echo "Tag $$tag_name moved to current HEAD and pushed"; \
+		fi; \
+	else \
+		echo "Tag $$tag_name does not exist. Creating and pushing..."; \
+		git tag $$tag_name HEAD; \
+		git push origin $$tag_name; \
+		echo "Tag $$tag_name created and pushed"; \
+	fi
+	
+	# Wait for GitHub Actions to process the tag and create the release
+	@echo "Waiting for GitHub Actions to process the tag and create release artifacts..."
+	@echo "You can monitor the progress at: https://github.com/$$(git config --get remote.origin.url | sed 's/.*github.com[:/]\([^/]*\/[^/]*\)\.git/\1/')/actions"
+	
+	# Increment patch version for next development cycle
+	@echo "Incrementing patch version for next development cycle..."
+	@current_version="$(VERSION)"; \
+	major=$$(echo $$current_version | cut -d'.' -f1); \
+	minor=$$(echo $$current_version | cut -d'.' -f2); \
+	patch=$$(echo $$current_version | cut -d'.' -f3); \
+	new_patch=$$((patch + 1)); \
+	new_version="$$major.$$minor.$$new_patch"; \
+	echo "Updating VERSION from $$current_version to $$new_version"; \
+	sed -i.bak "s/VERSION ?= $$current_version/VERSION ?= $$new_version/" Makefile; \
+	rm -f Makefile.bak; \
+	git add Makefile; \
+	git commit -m "Bump version to $$new_version for next development cycle"; \
+	git push origin main; \
+	echo "Version bumped to $$new_version and pushed to main"
+	
+	@echo "Tag and release process completed successfully!"
+	@echo "Released version: v$(VERSION)"
+	@echo "Next development version: $$(echo $(VERSION) | awk -F. '{print $$1"."$$2"."$$3+1}')"
+
 # Package releases
 .PHONY: release
 release: clean build-all
@@ -330,6 +417,7 @@ help:
 	@echo "Release:"
 	@echo "  release            Create release packages for all platforms"
 	@echo "  release-current    Create release package for current platform"
+	@echo "  tag-release        Automated tag and release (main branch only)"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  deps               Update dependencies"

@@ -194,7 +194,7 @@ jobs:
         # This reduces noise while focusing on actionable security issues
         args: '-exclude=G103,G104,G115,G304 -severity=medium ./...'
 
-    release:
+  release:
     name: Create Release
     if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-llamacpp.')
     runs-on: ubuntu-latest

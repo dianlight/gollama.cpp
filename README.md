@@ -13,7 +13,7 @@ A high-performance Go binding for [llama.cpp](https://github.com/ggml-org/llama.
 - **Performance**: Direct bindings to llama.cpp shared libraries
 - **Compatibility**: Version-synchronized with llama.cpp releases
 - **Easy Integration**: Simple Go API for LLM inference
-- **GPU Acceleration**: Supports Metal, CUDA, HIP, and other backends
+- **GPU Acceleration**: Supports Metal, CUDA, HIP, Vulkan, OpenCL, SYCL, and other backends
 
 ## Supported Platforms
 
@@ -29,7 +29,7 @@ Gollama.cpp uses a **platform-specific architecture** with build tags to ensure 
 
 #### Linux
 - **CPU**: x86_64, ARM64
-- **GPU**: NVIDIA (CUDA), AMD (HIP/ROCm)
+- **GPU**: NVIDIA (CUDA/Vulkan), AMD (HIP/ROCm/Vulkan), Intel (SYCL/Vulkan)
 - **Status**: Full feature support with purego
 - **Build Tags**: Uses `!windows` build tag
 
@@ -37,7 +37,7 @@ Gollama.cpp uses a **platform-specific architecture** with build tags to ensure 
 
 #### Windows
 - **CPU**: x86_64, ARM64 
-- **GPU**: NVIDIA (CUDA), AMD (HIP) - planned
+- **GPU**: NVIDIA (CUDA/Vulkan), AMD (HIP/Vulkan), Intel (SYCL/Vulkan), Qualcomm Adreno (OpenCL) - planned
 - **Status**: **Build compatibility implemented**, runtime support in development
 - **Build Tags**: Uses `windows` build tag with syscall-based library loading
 - **Current State**: 
@@ -171,10 +171,14 @@ Gollama.cpp automatically downloads the appropriate pre-built binaries with GPU 
 params := gollama.Context_default_params()
 params.n_gpu_layers = 32 // Offload layers to GPU (if available)
 
+// Detect available GPU backend
+backend := gollama.DetectGpuBackend()
+fmt.Printf("Using GPU backend: %s\n", backend.String())
+
 // Platform-specific optimizations:
 // - macOS: Uses Metal when available  
-// - Linux: Supports CUDA and HIP
-// - Windows: Supports CUDA and HIP
+// - Linux: Supports CUDA, HIP, Vulkan, and SYCL
+// - Windows: Supports CUDA, HIP, Vulkan, OpenCL, and SYCL
 params.split_mode = gollama.LLAMA_SPLIT_MODE_LAYER
 ```
 
@@ -185,10 +189,19 @@ params.split_mode = gollama.LLAMA_SPLIT_MODE_LAYER
 | macOS | Apple Silicon | Metal | ✅ Supported |
 | macOS | Intel/AMD | CPU only | ✅ Supported |
 | Linux | NVIDIA | CUDA | ✅ Available in releases |
+| Linux | NVIDIA | Vulkan | ✅ Available in releases |
 | Linux | AMD | HIP/ROCm | ✅ Available in releases |
+| Linux | AMD | Vulkan | ✅ Available in releases |
+| Linux | Intel | SYCL | ✅ Available in releases |
+| Linux | Intel/Other | Vulkan | ✅ Available in releases |
 | Linux | Intel/Other | CPU | ✅ Fallback |
 | Windows | NVIDIA | CUDA | ✅ Available in releases |
+| Windows | NVIDIA | Vulkan | ✅ Available in releases |
 | Windows | AMD | HIP | ✅ Available in releases |
+| Windows | AMD | Vulkan | ✅ Available in releases |
+| Windows | Intel | SYCL | ✅ Available in releases |
+| Windows | Qualcomm Adreno | OpenCL | ✅ Available in releases |
+| Windows | Intel/Other | Vulkan | ✅ Available in releases |
 | Windows | Intel/Other | CPU | ✅ Fallback |
 
 The library automatically downloads pre-built binaries from the official llama.cpp releases with the appropriate GPU support for your platform. The download happens automatically on first use!
@@ -227,6 +240,12 @@ make download-libs-all
 # Test download functionality
 make test-download
 
+# Test GPU detection and functionality
+make test-gpu
+
+# Detect available GPU backends
+make detect-gpu
+
 # Clean library cache
 make clean-libs
 ```
@@ -236,8 +255,8 @@ make clean-libs
 The downloader automatically selects the best variant for your platform:
 
 - **macOS**: Metal-enabled binaries (arm64/x64)
-- **Linux**: CPU-optimized binaries (CUDA/HIP versions available)
-- **Windows**: CPU-optimized binaries (CUDA/HIP versions available)
+- **Linux**: CPU-optimized binaries (CUDA/HIP/Vulkan/SYCL versions available)
+- **Windows**: CPU-optimized binaries (CUDA/HIP/Vulkan/OpenCL/SYCL versions available)
 
 #### Cache Location
 

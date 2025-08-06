@@ -7,7 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🚀 Major GPU Backend Enhancements
+
+This release significantly expands GPU support with **three new GPU backends** and comprehensive detection systems:
+
+- **🔥 Vulkan Support**: Cross-platform GPU acceleration for NVIDIA, AMD, and Intel GPUs
+- **⚡ OpenCL Support**: Broad compatibility including Qualcomm Adreno GPUs on ARM64 devices  
+- **🧠 SYCL Support**: Intel oneAPI unified parallel programming for CPUs and GPUs
+- **🔍 Smart Detection**: Automatic GPU backend detection with optimal library selection
+- **📦 Intelligent Downloads**: GPU-aware library downloader selects best variants automatically
+
 ### Added
+- **Enhanced GPU Backend Support** with comprehensive detection and automatic selection
+  - **Vulkan support** for cross-platform GPU acceleration (NVIDIA, AMD, Intel GPUs)
+  - **OpenCL support** for diverse GPU vendors including Qualcomm Adreno on ARM64
+  - **SYCL support** for Intel oneAPI toolkit and unified parallel programming
+  - **GPU backend detection** with `DetectGpuBackend()` function and `LlamaGpuBackend` enum
+  - **Automatic GPU variant selection** in library downloader based on available SDKs
+  - **GPU detection tools** with new `detect-gpu` Makefile target
+  - **GPU testing suite** with `test-gpu` target and comprehensive backend tests
+- **Enhanced Documentation** for GPU setup and configuration
+  - Comprehensive GPU installation guides for Linux (Vulkan, OpenCL, SYCL)
+  - Windows GPU setup instructions for all supported backends
+  - Platform-specific GPU requirements and verification steps
+  - Updated GPU Support Matrix with all available backends
+- **Improved CI/CD Pipeline** with GPU detection testing
+  - Added GPU detection tools installation in CI workflows
+  - New `gpu-detection` job for comprehensive GPU backend testing
+  - GPU-aware library downloading validation
 - **Download-based architecture** using pre-built binaries from official llama.cpp releases
 - Automatic library download system with platform detection
 - Library cache management with `clean-libs` target
@@ -30,6 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CPU and GPU acceleration support
 
 ### Changed
+- **Enhanced GPU Backend Priority**: Updated detection order to CUDA → HIP → Vulkan → OpenCL → SYCL → CPU
+- **Intelligent Library Selection**: Downloader now automatically selects optimal GPU variant based on available tools
+- **Expanded Platform Support**: Added comprehensive GPU backend support across Linux and Windows
+- **Updated GPU Configuration**: Enhanced context parameters with automatic GPU backend detection
 - **Dependencies**: Updated llama.cpp from build b6076 to b6099 (automated via Renovate)
 - **Breaking**: Migrated from compilation-based to download-based architecture
 - **Simplified build process**: No longer requires CMake, compilers, or GPU SDKs
@@ -38,6 +69,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Model download system**: Now uses hf.sh script from llama.cpp instead of direct curl commands
 - **Example projects**: Updated to use local hf.sh script from `scripts/` directory
 - **Documentation**: Updated to reflect hf.sh script integration and usage
+
+### GPU Backend Support Matrix
+| Backend | Platforms | GPU Vendors | Detection Command | Status |
+|---------|-----------|-------------|-------------------|--------|
+| **Metal** | macOS | Apple Silicon | `system_profiler` | ✅ Production |
+| **CUDA** | Linux, Windows | NVIDIA | `nvcc` | ✅ Production |
+| **HIP/ROCm** | Linux, Windows | AMD | `hipconfig` | ✅ Production |
+| **Vulkan** | Linux, Windows | NVIDIA, AMD, Intel | `vulkaninfo` | ✅ Production |
+| **OpenCL** | Windows, Linux | Qualcomm Adreno, Intel, AMD | `clinfo` | ✅ Production |
+| **SYCL** | Linux, Windows | Intel, NVIDIA | `sycl-ls` | ✅ Production |
+| **CPU** | All | All | N/A | ✅ Fallback |
 
 ### Dependencies
 - llama.cpp: Updated from b6076 to b6099 (managed by Renovate)
@@ -66,9 +108,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 - Pure Go implementation (no CGO required)
-- Metal support for macOS (Apple Silicon and Intel)
-- CUDA support for NVIDIA GPUs  
-- HIP support for AMD GPUs
+- **Enhanced GPU Support**:
+  - Metal support for macOS (Apple Silicon and Intel)
+  - CUDA support for NVIDIA GPUs
+  - HIP support for AMD GPUs
+  - **NEW**: Vulkan support for cross-platform GPU acceleration
+  - **NEW**: OpenCL support for diverse GPU vendors (including Qualcomm Adreno)
+  - **NEW**: SYCL support for Intel oneAPI and unified parallel programming
+  - **NEW**: Automatic GPU backend detection and selection
+  - **NEW**: GPU-aware library downloading with optimal variant selection
 - Memory mapping and locking options
 - Batch processing capabilities
 - Multiple sampling strategies
@@ -78,14 +126,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Platform Support
 - **macOS**: ✅ Intel x64, Apple Silicon (ARM64) with Metal - **Fully supported**
-- **Linux**: ✅ x86_64, ARM64 with CUDA/HIP - **Fully supported**  
-- **Windows**: 🚧 x86_64, ARM64 with CUDA - **Build compatibility implemented, runtime support in development**
+- **Linux**: ✅ x86_64, ARM64 with CUDA/HIP/Vulkan/SYCL - **Fully supported**  
+- **Windows**: 🚧 x86_64, ARM64 with CUDA/HIP/Vulkan/OpenCL/SYCL - **Build compatibility implemented, runtime support in development**
 
 ### Technical Details
 - **Unix-like platforms** (Linux, macOS): Use purego for dynamic library loading
 - **Windows platform**: Use native Windows syscalls for library management
 - **Build tags**: `!windows` for Unix-like, `windows` for Windows-specific code
 - **Zero runtime overhead**: Platform abstraction has no performance impact
+- **GPU Detection Priority**: CUDA → HIP → Vulkan → OpenCL → SYCL → CPU (Linux/Windows)
+- **Automatic Fallback**: Graceful degradation to CPU when GPU backends unavailable
+- **Command Detection**: Uses `exec.LookPath()` for cross-platform command availability
+- **Pattern Matching**: Regex-based asset selection for optimal GPU variant downloads
 
 ## [0.0.0-llamacpp.b6076] - 2025-01-XX
 

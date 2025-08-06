@@ -307,3 +307,78 @@ func TestTokenization(t *testing.T) {
 
 	t.Logf("Tokenized with BOS: %d tokens: %v", len(tokensWithBos), tokensWithBos)
 }
+
+// TestGpuBackendDetection tests GPU backend detection functionality
+func TestGpuBackendDetection(t *testing.T) {
+	backend := DetectGpuBackend()
+
+	t.Logf("Detected GPU backend: %s (%d)", backend.String(), int(backend))
+
+	// Verify the backend is valid
+	if backend < LLAMA_GPU_BACKEND_NONE || backend > LLAMA_GPU_BACKEND_SYCL {
+		t.Errorf("Invalid GPU backend detected: %d", backend)
+	}
+
+	// Platform-specific expectations
+	switch runtime.GOOS {
+	case "darwin":
+		// On macOS, we expect Metal (unless running in a container/VM)
+		if backend != LLAMA_GPU_BACKEND_METAL && backend != LLAMA_GPU_BACKEND_CPU {
+			t.Logf("Note: Expected Metal on macOS, got %s", backend.String())
+		}
+	case "linux", "windows":
+		// On Linux/Windows, we expect any valid backend
+		if backend == LLAMA_GPU_BACKEND_NONE {
+			t.Error("Expected valid GPU backend detection on Linux/Windows")
+		}
+	}
+}
+
+// TestGpuBackendString tests the String() method of LlamaGpuBackend
+func TestGpuBackendString(t *testing.T) {
+	tests := []struct {
+		backend  LlamaGpuBackend
+		expected string
+	}{
+		{LLAMA_GPU_BACKEND_NONE, "None"},
+		{LLAMA_GPU_BACKEND_CPU, "CPU"},
+		{LLAMA_GPU_BACKEND_CUDA, "CUDA"},
+		{LLAMA_GPU_BACKEND_METAL, "Metal"},
+		{LLAMA_GPU_BACKEND_HIP, "HIP"},
+		{LLAMA_GPU_BACKEND_VULKAN, "Vulkan"},
+		{LLAMA_GPU_BACKEND_OPENCL, "OpenCL"},
+		{LLAMA_GPU_BACKEND_SYCL, "SYCL"},
+		{LlamaGpuBackend(999), "Unknown"},
+	}
+
+	for _, tt := range tests {
+		result := tt.backend.String()
+		if result != tt.expected {
+			t.Errorf("Backend %d String() = %s, want %s", tt.backend, result, tt.expected)
+		}
+	}
+}
+
+// TestCommandDetection tests the hasCommand function
+func TestCommandDetection(t *testing.T) {
+	// Test with commands that should exist on most systems
+	commonCommands := []string{"go", "echo"}
+
+	for _, cmd := range commonCommands {
+		if !hasCommand(cmd) {
+			t.Logf("Command '%s' not found (this may be expected in some environments)", cmd)
+		}
+	}
+
+	// Test with a command that definitely shouldn't exist
+	if hasCommand("definitely-not-a-real-command-12345") {
+		t.Error("hasCommand should return false for non-existent commands")
+	}
+
+	// Test GPU-related commands (these may or may not be available)
+	gpuCommands := []string{"nvcc", "hipconfig", "vulkaninfo", "clinfo", "sycl-ls"}
+	for _, cmd := range gpuCommands {
+		found := hasCommand(cmd)
+		t.Logf("GPU command '%s' found: %t", cmd, found)
+	}
+}

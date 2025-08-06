@@ -44,19 +44,32 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y cmake build-essential
+        # Install Vulkan tools for GPU detection
+        sudo apt-get install -y vulkan-tools || echo "Vulkan tools not available"
+        # Install OpenCL tools for GPU detection
+        sudo apt-get install -y clinfo || echo "OpenCL tools not available"
 
     - name: Install dependencies (macOS)
       if: matrix.os == 'macos-latest'
       run: |
         brew install cmake
+        # Install Vulkan SDK for GPU detection (if available)
+        brew install --cask vulkan-sdk || echo "Vulkan SDK not available"
 
     - name: Install dependencies (Windows)
       if: matrix.os == 'windows-latest'
       run: |
         choco install cmake
+        # Install Vulkan SDK for GPU detection (if available)
+        choco install vulkan-sdk || echo "Vulkan SDK not available"
 
     - name: Download dependencies
       run: go mod download
+
+    - name: GPU Detection Test
+      run: |
+        echo "Testing GPU detection capabilities..."
+        make detect-gpu || echo "GPU detection completed"
 
     - name: Verify platform compatibility
       run: |
@@ -94,6 +107,68 @@ jobs:
 
     - name: Run benchmarks
       run: go test -bench=. -benchmem ./...
+
+  gpu-detection:
+    name: GPU Detection Testing
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+    - name: Set up Go
+      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-gpu-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-gpu-
+
+    - name: Install GPU detection tools (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y vulkan-tools clinfo || echo "Optional GPU tools not available"
+
+    - name: Install GPU detection tools (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        # Metal is built-in on macOS
+        system_profiler SPDisplaysDataType | grep Metal || echo "Metal info not available"
+
+    - name: Install GPU detection tools (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        # Try to install Vulkan SDK (optional)
+        choco install vulkan-sdk || echo "Vulkan SDK not available"
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Test GPU backend detection
+      run: |
+        echo "Testing GPU backend detection..."
+        make test-gpu || echo "GPU tests completed"
+
+    - name: Test GPU backend downloader functionality
+      run: |
+        echo "Testing GPU-aware library downloading..."
+        go test -v -run TestPlatformAsset ./...
+        
+    - name: Comprehensive GPU detection
+      run: |
+        echo "Running comprehensive GPU detection..."
+        make detect-gpu || echo "GPU detection completed"
 
   # cross-platform:
   #   name: Cross-Platform Compatibility

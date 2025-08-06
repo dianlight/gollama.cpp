@@ -93,6 +93,13 @@ test-download: deps
 	@echo "Testing library download functionality"
 	env GOOS= GOARCH= $(GO) run ./cmd/gollama-download -test-download
 
+# Test GPU detection and backend functionality
+.PHONY: test-gpu
+test-gpu: deps
+	@echo "Testing GPU detection and backend functionality"
+	$(GO) test -v -run TestGpu ./...
+	make detect-gpu
+
 # Run platform-specific tests
 .PHONY: test-platform
 test-platform:
@@ -198,6 +205,49 @@ sec:
 # Check everything
 .PHONY: check
 check: fmt vet lint sec test
+
+# GPU Detection Logic
+.PHONY: detect-gpu
+detect-gpu:
+	@echo "Detecting available GPU backends..."
+	@echo "Platform: $(GOOS)/$(GOARCH)"
+	@if command -v nvcc >/dev/null 2>&1; then \
+		echo "✅ CUDA detected (nvcc found)"; \
+		nvcc --version 2>/dev/null | head -1 || echo "   Version info not available"; \
+	else \
+		echo "❌ CUDA not detected"; \
+	fi
+	@if command -v hipconfig >/dev/null 2>&1; then \
+		echo "✅ HIP/ROCm detected (hipconfig found)"; \
+		hipconfig --version 2>/dev/null || echo "   Version info not available"; \
+	else \
+		echo "❌ HIP/ROCm not detected"; \
+	fi
+	@if command -v vulkaninfo >/dev/null 2>&1; then \
+		echo "✅ Vulkan detected (vulkaninfo found)"; \
+		vulkaninfo --summary 2>/dev/null | head -5 || echo "   Summary not available"; \
+	else \
+		echo "❌ Vulkan not detected"; \
+	fi
+	@if command -v clinfo >/dev/null 2>&1; then \
+		echo "✅ OpenCL detected (clinfo found)"; \
+		clinfo --list 2>/dev/null | head -10 || echo "   Device list not available"; \
+	else \
+		echo "❌ OpenCL not detected"; \
+	fi
+	@if command -v sycl-ls >/dev/null 2>&1; then \
+		echo "✅ SYCL detected (sycl-ls found)"; \
+		sycl-ls 2>/dev/null || echo "   Device list not available"; \
+	else \
+		echo "❌ SYCL not detected"; \
+	fi
+	@if [ "$(GOOS)" = "darwin" ]; then \
+		if system_profiler SPDisplaysDataType 2>/dev/null | grep -q "Metal"; then \
+			echo "✅ Metal detected"; \
+		else \
+			echo "❌ Metal not detected"; \
+		fi \
+	fi
 
 # Clone llama.cpp repository for cross-reference checks
 .PHONY: clone-llamacpp

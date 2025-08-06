@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"os/exec"
 	"runtime"
 	"sync"
 	"unsafe"
@@ -194,6 +195,43 @@ const (
 	LLAMA_SPLIT_MODE_LAYER LlamaSplitMode = 1
 	LLAMA_SPLIT_MODE_ROW   LlamaSplitMode = 2
 )
+
+type LlamaGpuBackend int32
+
+const (
+	LLAMA_GPU_BACKEND_NONE   LlamaGpuBackend = 0
+	LLAMA_GPU_BACKEND_CPU    LlamaGpuBackend = 1
+	LLAMA_GPU_BACKEND_CUDA   LlamaGpuBackend = 2
+	LLAMA_GPU_BACKEND_METAL  LlamaGpuBackend = 3
+	LLAMA_GPU_BACKEND_HIP    LlamaGpuBackend = 4
+	LLAMA_GPU_BACKEND_VULKAN LlamaGpuBackend = 5
+	LLAMA_GPU_BACKEND_OPENCL LlamaGpuBackend = 6
+	LLAMA_GPU_BACKEND_SYCL   LlamaGpuBackend = 7
+)
+
+// String returns the string representation of the GPU backend
+func (b LlamaGpuBackend) String() string {
+	switch b {
+	case LLAMA_GPU_BACKEND_NONE:
+		return "None"
+	case LLAMA_GPU_BACKEND_CPU:
+		return "CPU"
+	case LLAMA_GPU_BACKEND_CUDA:
+		return "CUDA"
+	case LLAMA_GPU_BACKEND_METAL:
+		return "Metal"
+	case LLAMA_GPU_BACKEND_HIP:
+		return "HIP"
+	case LLAMA_GPU_BACKEND_VULKAN:
+		return "Vulkan"
+	case LLAMA_GPU_BACKEND_OPENCL:
+		return "OpenCL"
+	case LLAMA_GPU_BACKEND_SYCL:
+		return "SYCL"
+	default:
+		return "Unknown"
+	}
+}
 
 // Opaque types (represented as pointers)
 type LlamaModel uintptr
@@ -1233,4 +1271,40 @@ func SamplerChainDefaultParams() LlamaSamplerChainParams {
 	return LlamaSamplerChainParams{
 		NoPerf: 0,
 	}
+}
+
+// DetectGpuBackend detects the available GPU backend on the current system
+func DetectGpuBackend() LlamaGpuBackend {
+	// Check for GPU backends in priority order based on platform
+	switch runtime.GOOS {
+	case "darwin":
+		// On macOS, Metal is the primary GPU backend
+		return LLAMA_GPU_BACKEND_METAL
+	case "linux", "windows":
+		// Check for available GPU SDKs in priority order
+		if hasCommand("nvcc") {
+			return LLAMA_GPU_BACKEND_CUDA
+		}
+		if hasCommand("hipconfig") {
+			return LLAMA_GPU_BACKEND_HIP
+		}
+		if hasCommand("vulkaninfo") {
+			return LLAMA_GPU_BACKEND_VULKAN
+		}
+		if hasCommand("clinfo") {
+			return LLAMA_GPU_BACKEND_OPENCL
+		}
+		if hasCommand("sycl-ls") {
+			return LLAMA_GPU_BACKEND_SYCL
+		}
+		return LLAMA_GPU_BACKEND_CPU
+	default:
+		return LLAMA_GPU_BACKEND_CPU
+	}
+}
+
+// hasCommand checks if a command is available in PATH
+func hasCommand(command string) bool {
+	_, err := exec.LookPath(command)
+	return err == nil
 }

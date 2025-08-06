@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -194,14 +195,82 @@ func (d *LibraryDownloader) GetPlatformAssetPattern() (string, error) {
 	case "darwin":
 		return fmt.Sprintf("llama-.*-bin-macos-%s.zip", arch), nil
 	case "linux":
-		// Prefer CPU version for compatibility, could be enhanced to detect GPU capabilities
-		return fmt.Sprintf("llama-.*-bin-ubuntu-%s.zip", arch), nil
+		// Auto-detect available GPU backends
+		return d.getLinuxVariantPattern(arch), nil
 	case "windows":
-		// Start with CPU version for compatibility
-		return fmt.Sprintf("llama-.*-bin-win-cpu-%s.zip", arch), nil
+		// Auto-detect available GPU backends
+		return d.getWindowsVariantPattern(arch), nil
 	default:
 		return "", fmt.Errorf("unsupported operating system: %s", goos)
 	}
+}
+
+// getLinuxVariantPattern detects and returns the best GPU variant pattern for Linux
+func (d *LibraryDownloader) getLinuxVariantPattern(arch string) string {
+	// Priority order: CUDA > HIP > Vulkan > SYCL > CPU
+
+	// Check for CUDA
+	if d.hasCommand("nvcc") {
+		// Try CUDA variant first
+		return fmt.Sprintf("llama-.*-bin-ubuntu-cuda-.*-%s.zip", arch)
+	}
+
+	// Check for HIP/ROCm
+	if d.hasCommand("hipconfig") {
+		return fmt.Sprintf("llama-.*-bin-ubuntu-hip-.*-%s.zip", arch)
+	}
+
+	// Check for Vulkan
+	if d.hasCommand("vulkaninfo") {
+		return fmt.Sprintf("llama-.*-bin-ubuntu-vulkan-%s.zip", arch)
+	}
+
+	// Check for SYCL (Intel oneAPI)
+	if d.hasCommand("sycl-ls") {
+		return fmt.Sprintf("llama-.*-bin-ubuntu-sycl-%s.zip", arch)
+	}
+
+	// Fallback to CPU
+	return fmt.Sprintf("llama-.*-bin-ubuntu-%s.zip", arch)
+}
+
+// getWindowsVariantPattern detects and returns the best GPU variant pattern for Windows
+func (d *LibraryDownloader) getWindowsVariantPattern(arch string) string {
+	// Priority order: CUDA > HIP > Vulkan > OpenCL > SYCL > CPU
+
+	// Check for CUDA
+	if d.hasCommand("nvcc") {
+		return fmt.Sprintf("llama-.*-bin-win-cuda-.*-%s.zip", arch)
+	}
+
+	// Check for HIP (Windows)
+	if d.hasCommand("hipconfig") {
+		return fmt.Sprintf("llama-.*-bin-win-hip-.*-%s.zip", arch)
+	}
+
+	// Check for Vulkan
+	if d.hasCommand("vulkaninfo") {
+		return fmt.Sprintf("llama-.*-bin-win-vulkan-%s.zip", arch)
+	}
+
+	// Check for OpenCL (especially for ARM64/Adreno)
+	if d.hasCommand("clinfo") || arch == "arm64" {
+		return fmt.Sprintf("llama-.*-bin-win-opencl-.*-%s.zip", arch)
+	}
+
+	// Check for SYCL (Intel oneAPI)
+	if d.hasCommand("sycl-ls") {
+		return fmt.Sprintf("llama-.*-bin-win-sycl-%s.zip", arch)
+	}
+
+	// Fallback to CPU
+	return fmt.Sprintf("llama-.*-bin-win-cpu-%s.zip", arch)
+}
+
+// hasCommand checks if a command is available in PATH
+func (d *LibraryDownloader) hasCommand(command string) bool {
+	_, err := exec.LookPath(command)
+	return err == nil
 }
 
 // FindAssetByPattern finds an asset that matches the given pattern
@@ -305,11 +374,11 @@ func (d *LibraryDownloader) GetPlatformAssetPatternForPlatform(goos, goarch stri
 	case "darwin":
 		return fmt.Sprintf("llama-.*-bin-macos-%s.zip", arch), nil
 	case "linux":
-		// Prefer CPU version for compatibility, could be enhanced to detect GPU capabilities
-		return fmt.Sprintf("llama-.*-bin-ubuntu-%s.zip", arch), nil
+		// Auto-detect available GPU backends for Linux
+		return d.getLinuxVariantPattern(arch), nil
 	case "windows":
-		// Start with CPU version for compatibility
-		return fmt.Sprintf("llama-.*-bin-win-cpu-%s.zip", arch), nil
+		// Auto-detect available GPU backends for Windows
+		return d.getWindowsVariantPattern(arch), nil
 	default:
 		return "", fmt.Errorf("unsupported operating system: %s", goos)
 	}

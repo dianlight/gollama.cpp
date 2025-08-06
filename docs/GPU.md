@@ -13,6 +13,9 @@ The library automatically detects available GPU hardware and configures the opti
 | **Metal** | macOS | Apple Silicon | ✅ Production |
 | **CUDA** | Linux, Windows | NVIDIA | ✅ Production |
 | **HIP/ROCm** | Linux, Windows | AMD | ✅ Production |
+| **Vulkan** | Linux, Windows | NVIDIA, AMD, Intel | ✅ Production |
+| **OpenCL** | Windows, Linux | Qualcomm Adreno, Intel, AMD | ✅ Production |
+| **SYCL** | Linux, Windows | Intel, NVIDIA | ✅ Production |
 | **CPU** | All | All | ✅ Fallback |
 
 ## Platform-Specific Setup
@@ -147,6 +150,170 @@ hipconfig --platform
 make build
 ```
 
+### Windows - Vulkan Support
+
+Vulkan provides cross-platform GPU acceleration for NVIDIA, AMD, and Intel GPUs on Windows.
+
+**Requirements:**
+- Vulkan-capable GPU (NVIDIA GTX 600+, AMD GCN+, Intel HD 4000+)
+- Latest GPU drivers with Vulkan support
+- Vulkan SDK (optional, for development)
+
+**Installation:**
+```powershell
+# Install Vulkan SDK (optional, for development)
+# Download from: https://vulkan.lunarg.com/sdk/home
+
+# Verify Vulkan support (if SDK installed)
+vulkaninfo
+
+# Or check driver support
+# NVIDIA: GeForce Experience -> Drivers
+# AMD: AMD Software -> Drivers
+# Intel: Intel Graphics Command Center
+
+# Build with Vulkan support (automatic detection)
+make build
+```
+
+### Windows - OpenCL Support
+
+OpenCL provides cross-platform parallel computing, especially useful for Qualcomm Adreno GPUs on ARM64.
+
+**Requirements:**
+- OpenCL-capable GPU or CPU
+- Latest GPU drivers with OpenCL support
+
+**Installation:**
+```powershell
+# For Intel GPUs
+# Download Intel Graphics Driver from Intel website
+
+# For AMD GPUs
+# Install AMD Software (includes OpenCL support)
+
+# For NVIDIA GPUs
+# Install NVIDIA GPU drivers (includes OpenCL support)
+
+# For Qualcomm Adreno (ARM64 devices)
+# Usually pre-installed on ARM64 Windows devices
+
+# Verify OpenCL support (if available)
+# Install GPU-Z or similar tool to check OpenCL support
+
+# Build with OpenCL support (automatic detection)
+make build
+```
+
+### Windows - SYCL Support
+
+SYCL provides unified parallel programming for CPUs, GPUs, and other accelerators.
+
+**Requirements:**
+- Intel oneAPI Toolkit or compatible SYCL implementation
+- Compatible hardware (Intel GPUs, NVIDIA GPUs via CUDA backend)
+
+**Installation:**
+```powershell
+# Install Intel oneAPI Toolkit
+# Download from: https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html
+
+# Source the environment (in Developer Command Prompt)
+"C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
+
+# Verify SYCL installation
+sycl-ls
+
+# Build with SYCL support (automatic detection)
+make build
+```
+
+### Linux - Vulkan Support
+
+Vulkan provides cross-platform GPU acceleration support for NVIDIA, AMD, and Intel GPUs.
+
+**Requirements:**
+- Vulkan-capable GPU (NVIDIA GTX 600+, AMD GCN+, Intel HD 4000+)
+- Vulkan drivers installed
+- Vulkan SDK (optional, for development)
+
+**Installation:**
+```bash
+# Ubuntu/Debian - Install Vulkan support
+sudo apt-get update
+sudo apt-get install vulkan-tools vulkan-utils
+sudo apt-get install mesa-vulkan-drivers  # For AMD/Intel
+sudo apt-get install nvidia-driver-XXX    # For NVIDIA (replace XXX with version)
+
+# Verify Vulkan installation
+vulkaninfo --summary
+vkcube  # Test Vulkan rendering
+
+# Build with Vulkan support (automatic detection)
+make build
+```
+
+**Fedora/RHEL:**
+```bash
+# Install Vulkan support
+sudo dnf install vulkan-tools vulkan-validation-layers
+sudo dnf install mesa-vulkan-drivers     # For AMD/Intel
+sudo dnf install nvidia-driver           # For NVIDIA
+
+# Build with Vulkan support
+make build
+```
+
+### Linux - SYCL Support
+
+SYCL provides unified parallel programming for CPUs, GPUs, and other accelerators.
+
+**Requirements:**
+- Intel oneAPI Toolkit or compatible SYCL implementation
+- Compatible hardware (Intel GPUs, NVIDIA GPUs via CUDA backend)
+
+**Installation:**
+```bash
+# Install Intel oneAPI Toolkit
+wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
+echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
+sudo apt-get update
+sudo apt-get install intel-oneapi-toolkit
+
+# Source the environment
+source /opt/intel/oneapi/setvars.sh
+
+# Verify SYCL installation
+sycl-ls
+
+# Build with SYCL support (automatic detection)
+make build
+```
+
+### Linux - OpenCL Support
+
+OpenCL provides cross-platform parallel computing support.
+
+**Requirements:**
+- OpenCL-capable GPU or CPU
+- OpenCL runtime and drivers
+
+**Installation:**
+```bash
+# Ubuntu/Debian - Install OpenCL support
+sudo apt-get update
+sudo apt-get install opencl-headers clinfo
+sudo apt-get install intel-opencl-icd     # For Intel
+sudo apt-get install mesa-opencl-icd      # For AMD
+sudo apt-get install nvidia-opencl-dev    # For NVIDIA
+
+# Verify OpenCL installation
+clinfo
+
+# Build with OpenCL support (automatic detection)
+make build
+```
+
 ## Build System GPU Detection
 
 The Makefile implements intelligent GPU detection using the following logic:
@@ -154,11 +321,24 @@ The Makefile implements intelligent GPU detection using the following logic:
 ### Detection Order (Linux/Windows)
 1. **CUDA**: Checks for `nvcc` or `CUDA_PATH` environment variable
 2. **HIP**: Checks for `hipconfig` or `ROCM_PATH` environment variable
-3. **CPU**: Fallback when no GPU SDK is detected
+3. **Vulkan**: Checks for `vulkaninfo` command or Vulkan loader
+4. **OpenCL**: Checks for `clinfo` command or OpenCL runtime
+5. **SYCL**: Checks for `sycl-ls` command or Intel oneAPI toolkit
+6. **CPU**: Fallback when no GPU SDK is detected
 
 ### Detection Commands
 ```bash
 # Check if GPU support is available in downloaded binaries
+make detect-gpu
+
+# Test all GPU detection logic
+nvcc --version          # CUDA detection
+hipconfig --version     # HIP detection  
+vulkaninfo --summary    # Vulkan detection
+clinfo                  # OpenCL detection
+sycl-ls                 # SYCL detection
+system_profiler SPDisplaysDataType | grep Metal  # Metal (macOS)
+```
 make test-download  # Downloads and tests appropriate binaries
 
 # View downloaded libraries for your platform

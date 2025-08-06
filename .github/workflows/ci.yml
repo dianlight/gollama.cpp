@@ -363,6 +363,24 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-${{ env.GO_VERSION }}-
 
+    - name: Validate release version in CHANGELOG.md
+      env:
+        VERSION: ${{ github.ref_name }}
+      run: |
+        # Extract version from tag (remove 'v' prefix)
+        export VERSION=${VERSION#v}
+        echo "Validating release version: $VERSION"
+        
+        # Check if the version exists in CHANGELOG.md
+        if ! grep -q "## \[$VERSION\]" CHANGELOG.md; then
+          echo "❌ Error: Version $VERSION not found in CHANGELOG.md"
+          echo "Please add a changelog entry for version $VERSION before creating a release."
+          echo "Expected format: ## [$VERSION] - YYYY-MM-DD"
+          exit 1
+        fi
+        
+        echo "✅ Version $VERSION found in CHANGELOG.md"
+
     - name: Create release packages using Makefile
       env:
         VERSION: ${{ github.ref_name }}
@@ -380,7 +398,25 @@ jobs:
         # Extract release notes from CHANGELOG.md
         VERSION=${{ github.ref_name }}
         VERSION=${VERSION#v}
-        sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$d' > release_notes.md
+        echo "Extracting release notes for version: $VERSION"
+        
+        # Extract the section for this version
+        if sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$d' > release_notes.md; then
+          # Check if we actually extracted content (more than just the header)
+          if [ $(wc -l < release_notes.md) -le 1 ]; then
+            echo "⚠️  Warning: No detailed release notes found for version $VERSION"
+            echo "Release $VERSION" > release_notes.md
+            echo "" >> release_notes.md
+            echo "See CHANGELOG.md for details." >> release_notes.md
+          else
+            echo "✅ Release notes extracted successfully"
+          fi
+        else
+          echo "❌ Failed to extract release notes"
+          echo "Release $VERSION" > release_notes.md
+          echo "" >> release_notes.md
+          echo "See CHANGELOG.md for details." >> release_notes.md
+        fi
 
     - name: Create GitHub Release
       uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1

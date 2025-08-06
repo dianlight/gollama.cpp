@@ -263,6 +263,12 @@ tag-release:
 	@bash scripts/update-changelog.sh "$(VERSION)" "release"
 	@echo "CHANGELOG.md updated successfully"
 	
+	# Commit the changelog update
+	@echo "Committing CHANGELOG.md update..."
+	@git add CHANGELOG.md
+	@git commit -m "Update CHANGELOG.md for release v$(VERSION)"
+	@echo "CHANGELOG.md committed successfully"
+	
 	# Check if current version tag exists
 	@tag_name="v$(VERSION)"; \
 	echo "Checking if tag $$tag_name exists..."; \

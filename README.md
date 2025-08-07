@@ -342,6 +342,19 @@ See the [examples](./examples/) directory for complete examples:
 
 Contributions are welcome! Please read our [Contributing Guide](./CONTRIBUTING.md) for details.
 
+## Funding
+
+If you find this project helpful and would like to support its development, you can:
+
+- ⭐ Star this repository on GitHub
+- 🐛 Report bugs and suggest improvements
+- 📖 Improve documentation
+
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub-pink?style=for-the-badge&logo=github)](https://github.com/sponsors/dianlight)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/ypKZ2I0)
+
+Your support helps maintain and improve this project for the entire community!
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

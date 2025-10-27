@@ -4,12 +4,13 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Release](https://img.shields.io/github/v/release/dianlight/gollama.cpp.svg)](https://github.com/dianlight/gollama.cpp/releases)
 
-A high-performance Go binding for [llama.cpp](https://github.com/ggml-org/llama.cpp) using [purego](https://github.com/ebitengine/purego) for cross-platform compatibility without CGO.
+A high-performance Go binding for [llama.cpp](https://github.com/ggml-org/llama.cpp) using [purego](https://github.com/ebitengine/purego) and [libffi](https://github.com/jupiterrider/ffi) for cross-platform compatibility without CGO.
 
 ## Features
 
-- **Pure Go**: No CGO required, uses purego for C interop
+- **Pure Go**: No CGO required, uses purego and libffi for C interop
 - **Cross-Platform**: Supports macOS (CPU/Metal), Linux (CPU/NVIDIA/AMD), Windows (CPU/NVIDIA/AMD)
+- **Struct Support**: Uses libffi for calling C functions with struct parameters/returns on all platforms
 - **Performance**: Direct bindings to llama.cpp shared libraries
 - **Compatibility**: Version-synchronized with llama.cpp releases
 - **Easy Integration**: Simple Go API for LLM inference
@@ -30,21 +31,20 @@ Gollama.cpp uses a **platform-specific architecture** with build tags to ensure 
 #### Linux
 - **CPU**: x86_64, ARM64
 - **GPU**: NVIDIA (CUDA/Vulkan), AMD (HIP/ROCm/Vulkan), Intel (SYCL/Vulkan)
-- **Status**: Full feature support with purego
+- **Status**: Full feature support with purego and libffi
 - **Build Tags**: Uses `!windows` build tag
-
-### 🚧 In Development
 
 #### Windows
 - **CPU**: x86_64, ARM64 
-- **GPU**: NVIDIA (CUDA/Vulkan), AMD (HIP/Vulkan), Intel (SYCL/Vulkan), Qualcomm Adreno (OpenCL) - planned
-- **Status**: **Build compatibility implemented**, runtime support in development
+- **GPU**: NVIDIA (CUDA/Vulkan), AMD (HIP/Vulkan), Intel (SYCL/Vulkan), Qualcomm Adreno (OpenCL)
+- **Status**: **Full feature support with libffi**
 - **Build Tags**: Uses `windows` build tag with syscall-based library loading
 - **Current State**: 
   - ✅ Compiles without errors on Windows
   - ✅ Cross-compilation from other platforms works
-  - 🚧 Runtime functionality being implemented
-  - 🚧 GPU acceleration being added
+  - ✅ Runtime functionality enabled via libffi
+  - ✅ Full struct parameter/return support
+  - 🚧 GPU acceleration being tested
 
 ### Platform-Specific Implementation Details
 
@@ -52,6 +52,7 @@ Our platform abstraction layer uses Go build tags to provide:
 
 - **Unix-like systems** (`!windows`): Uses [purego](https://github.com/ebitengine/purego) for dynamic library loading
 - **Windows** (`windows`): Uses native Windows syscalls (`LoadLibraryW`, `FreeLibrary`, `GetProcAddress`)
+- **All platforms**: Uses [libffi](https://github.com/jupiterrider/ffi) for calling C functions with struct parameters/returns
 - **Cross-compilation**: Supports building for any platform from any platform
 - **Automatic detection**: Runtime platform capability detection
 

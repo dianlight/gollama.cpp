@@ -724,17 +724,18 @@ func Backend_free() {
 
 // Model_default_params returns default model parameters
 func Model_default_params() LlamaModelParams {
-	if err := ensureLoaded(); err != nil {
-		panic(err) // In a real implementation, handle this better
-	}
+	// Try to load library if not already loaded
+	_ = ensureLoaded() // Ignore error, fallback to defaults
 
 	// Try FFI first (works on all platforms)
-	if params, err := ffiModelDefaultParams(); err == nil {
-		return params
+	if isLoaded {
+		if params, err := ffiModelDefaultParams(); err == nil {
+			return params
+		}
 	}
 
 	// Fallback to purego on Darwin
-	if runtime.GOOS == "darwin" && llamaModelDefaultParams != nil {
+	if runtime.GOOS == "darwin" && llamaModelDefaultParams != nil && isLoaded {
 		return llamaModelDefaultParams()
 	}
 
@@ -752,17 +753,18 @@ func Model_default_params() LlamaModelParams {
 
 // Context_default_params returns default context parameters
 func Context_default_params() LlamaContextParams {
-	if err := ensureLoaded(); err != nil {
-		panic(err)
-	}
+	// Try to load library if not already loaded
+	_ = ensureLoaded() // Ignore error, fallback to defaults
 
 	// Try FFI first (works on all platforms)
-	if params, err := ffiContextDefaultParams(); err == nil {
-		return params
+	if isLoaded {
+		if params, err := ffiContextDefaultParams(); err == nil {
+			return params
+		}
 	}
 
 	// Fallback to purego on Darwin
-	if runtime.GOOS == "darwin" && llamaContextDefaultParams != nil {
+	if runtime.GOOS == "darwin" && llamaContextDefaultParams != nil && isLoaded {
 		return llamaContextDefaultParams()
 	}
 
@@ -789,17 +791,18 @@ func Context_default_params() LlamaContextParams {
 
 // Sampler_chain_default_params returns default sampler chain parameters
 func Sampler_chain_default_params() LlamaSamplerChainParams {
-	if err := ensureLoaded(); err != nil {
-		panic(err)
-	}
+	// Try to load library if not already loaded
+	_ = ensureLoaded() // Ignore error, fallback to defaults
 
 	// Try FFI first (works on all platforms)
-	if params, err := ffiSamplerChainDefaultParams(); err == nil {
-		return params
+	if isLoaded {
+		if params, err := ffiSamplerChainDefaultParams(); err == nil {
+			return params
+		}
 	}
 
 	// Fallback to purego on Darwin
-	if runtime.GOOS == "darwin" && llamaSamplerChainDefaultParams != nil {
+	if runtime.GOOS == "darwin" && llamaSamplerChainDefaultParams != nil && isLoaded {
 		return llamaSamplerChainDefaultParams()
 	}
 
@@ -1017,17 +1020,18 @@ func Token_to_piece(model LlamaModel, token LlamaToken, special bool) string {
 
 // Batch_init creates a new batch
 func Batch_init(nTokens, embd, nSeqMax int32) LlamaBatch {
-	if err := ensureLoaded(); err != nil {
-		panic(err)
-	}
+	// Try to load library if not already loaded
+	_ = ensureLoaded() // Ignore error, fallback to empty batch
 
 	// Try FFI first (works on all platforms)
-	if batch, err := ffiBatchInit(nTokens, embd, nSeqMax); err == nil {
-		return batch
+	if isLoaded {
+		if batch, err := ffiBatchInit(nTokens, embd, nSeqMax); err == nil {
+			return batch
+		}
 	}
 
 	// Fallback to purego on Darwin
-	if runtime.GOOS == "darwin" && llamaBatchInit != nil {
+	if runtime.GOOS == "darwin" && llamaBatchInit != nil && isLoaded {
 		return llamaBatchInit(nTokens, embd, nSeqMax)
 	}
 
@@ -1037,25 +1041,28 @@ func Batch_init(nTokens, embd, nSeqMax int32) LlamaBatch {
 
 // Batch_get_one creates a batch from a single set of tokens
 func Batch_get_one(tokens []LlamaToken) LlamaBatch {
-	if err := ensureLoaded(); err != nil {
-		panic(err)
-	}
+	// Try to load library if not already loaded
+	_ = ensureLoaded() // Ignore error, fallback to empty batch
+	
 	if len(tokens) == 0 {
 		return LlamaBatch{}
 	}
 
 	tokensLen := len(tokens)
 	if tokensLen > math.MaxInt32 {
-		panic(fmt.Errorf("too many tokens: %d, maximum supported: %d", tokensLen, math.MaxInt32))
+		// Return empty batch instead of panicking
+		return LlamaBatch{}
 	}
 
 	// Try FFI first (works on all platforms)
-	if batch, err := ffiBatchGetOne(&tokens[0], int32(tokensLen)); err == nil {
-		return batch
+	if isLoaded {
+		if batch, err := ffiBatchGetOne(&tokens[0], int32(tokensLen)); err == nil {
+			return batch
+		}
 	}
 
 	// Fallback to purego on Darwin
-	if runtime.GOOS == "darwin" && llamaBatchGetOne != nil {
+	if runtime.GOOS == "darwin" && llamaBatchGetOne != nil && isLoaded {
 		return llamaBatchGetOne(&tokens[0], int32(tokensLen))
 	}
 

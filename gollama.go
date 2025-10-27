@@ -1043,14 +1043,15 @@ func Batch_init(nTokens, embd, nSeqMax int32) LlamaBatch {
 func Batch_get_one(tokens []LlamaToken) LlamaBatch {
 	// Try to load library if not already loaded
 	_ = ensureLoaded() // Ignore error, fallback to empty batch
-	
+
 	if len(tokens) == 0 {
 		return LlamaBatch{}
 	}
 
 	tokensLen := len(tokens)
 	if tokensLen > math.MaxInt32 {
-		// Return empty batch instead of panicking
+		// Token count exceeds maximum supported size
+		// Return empty batch instead of panicking (safer than previous panic behavior)
 		return LlamaBatch{}
 	}
 

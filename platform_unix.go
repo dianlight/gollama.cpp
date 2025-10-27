@@ -26,7 +26,7 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 	}
 
 	libgoffiLibrary = lib
-	
+
 	// Return a dummy handle (libgoffi manages the library internally)
 	// We use 1 as a non-zero handle to indicate success
 	return 1, nil

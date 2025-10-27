@@ -21,6 +21,11 @@ func registerLibFunc(fptr interface{}, handle uintptr, fname string) {
 	purego.RegisterLibFunc(fptr, handle, fname)
 }
 
+// getProcAddressPlatform gets the address of a symbol in a loaded library
+func getProcAddressPlatform(handle uintptr, name string) (uintptr, error) {
+	return purego.Dlsym(handle, name)
+}
+
 // isPlatformSupported returns whether the current platform is supported
 func isPlatformSupported() bool {
 	return true

@@ -728,11 +728,17 @@ func Model_default_params() LlamaModelParams {
 		panic(err) // In a real implementation, handle this better
 	}
 
-	if runtime.GOOS == "darwin" {
+	// Try FFI first (works on all platforms)
+	if params, err := ffiModelDefaultParams(); err == nil {
+		return params
+	}
+
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaModelDefaultParams != nil {
 		return llamaModelDefaultParams()
 	}
 
-	// For non-Darwin platforms, return a default struct since we can't call the C function
+	// Last resort: return hardcoded defaults
 	return LlamaModelParams{
 		NGpuLayers:   0,
 		SplitMode:    LLAMA_SPLIT_MODE_NONE,
@@ -750,11 +756,17 @@ func Context_default_params() LlamaContextParams {
 		panic(err)
 	}
 
-	if runtime.GOOS == "darwin" {
+	// Try FFI first (works on all platforms)
+	if params, err := ffiContextDefaultParams(); err == nil {
+		return params
+	}
+
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaContextDefaultParams != nil {
 		return llamaContextDefaultParams()
 	}
 
-	// For non-Darwin platforms, return a default struct
+	// Last resort: return hardcoded defaults
 	return LlamaContextParams{
 		Seed:            LLAMA_DEFAULT_SEED,
 		NCtx:            0, // Auto-detect from model
@@ -781,11 +793,17 @@ func Sampler_chain_default_params() LlamaSamplerChainParams {
 		panic(err)
 	}
 
-	if runtime.GOOS == "darwin" {
+	// Try FFI first (works on all platforms)
+	if params, err := ffiSamplerChainDefaultParams(); err == nil {
+		return params
+	}
+
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaSamplerChainDefaultParams != nil {
 		return llamaSamplerChainDefaultParams()
 	}
 
-	// For non-Darwin platforms, return a default struct
+	// Last resort: return hardcoded defaults
 	return LlamaSamplerChainParams{
 		NoPerf: 0, // Enable performance measurement by default
 	}
@@ -797,16 +815,23 @@ func Model_load_from_file(pathModel string, params LlamaModelParams) (LlamaModel
 		return 0, err
 	}
 
-	if runtime.GOOS != "darwin" {
-		return 0, errors.New("Model_load_from_file not yet implemented for non-Darwin platforms - blocks ROADMAP Priority 1 (wait for purego struct support)")
+	pathBytes := append([]byte(pathModel), 0) // null-terminate
+	
+	// Try FFI first (works on all platforms)
+	if model, err := ffiModelLoadFromFile((*byte)(unsafe.Pointer(&pathBytes[0])), params); err == nil {
+		return model, nil
 	}
 
-	pathBytes := append([]byte(pathModel), 0) // null-terminate
-	model := llamaModelLoadFromFile((*byte)(unsafe.Pointer(&pathBytes[0])), params)
-	if model == 0 {
-		return 0, errors.New("failed to load model")
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaModelLoadFromFile != nil {
+		model := llamaModelLoadFromFile((*byte)(unsafe.Pointer(&pathBytes[0])), params)
+		if model == 0 {
+			return 0, errors.New("failed to load model")
+		}
+		return model, nil
 	}
-	return model, nil
+
+	return 0, errors.New("Model_load_from_file not available on this platform")
 }
 
 // Model_free frees a model
@@ -879,15 +904,21 @@ func Init_from_model(model LlamaModel, params LlamaContextParams) (LlamaContext,
 		return 0, err
 	}
 
-	if runtime.GOOS != "darwin" {
-		return 0, errors.New("Init_from_model not yet implemented for non-Darwin platforms - blocks ROADMAP Priority 1 (wait for purego struct support)")
+	// Try FFI first (works on all platforms)
+	if ctx, err := ffiInitFromModel(model, params); err == nil {
+		return ctx, nil
 	}
 
-	ctx := llamaInitFromModel(model, params)
-	if ctx == 0 {
-		return 0, errors.New("failed to create context")
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaInitFromModel != nil {
+		ctx := llamaInitFromModel(model, params)
+		if ctx == 0 {
+			return 0, errors.New("failed to create context")
+		}
+		return ctx, nil
 	}
-	return ctx, nil
+
+	return 0, errors.New("Init_from_model not available on this platform")
 }
 
 // Free frees a context
@@ -990,12 +1021,18 @@ func Batch_init(nTokens, embd, nSeqMax int32) LlamaBatch {
 		panic(err)
 	}
 
-	if runtime.GOOS != "darwin" {
-		// Return a zero-initialized batch for non-Darwin platforms - blocks ROADMAP "wait for purego struct support"
-		return LlamaBatch{}
+	// Try FFI first (works on all platforms)
+	if batch, err := ffiBatchInit(nTokens, embd, nSeqMax); err == nil {
+		return batch
 	}
 
-	return llamaBatchInit(nTokens, embd, nSeqMax)
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaBatchInit != nil {
+		return llamaBatchInit(nTokens, embd, nSeqMax)
+	}
+
+	// Last resort: return zero-initialized batch
+	return LlamaBatch{}
 }
 
 // Batch_get_one creates a batch from a single set of tokens
@@ -1007,16 +1044,23 @@ func Batch_get_one(tokens []LlamaToken) LlamaBatch {
 		return LlamaBatch{}
 	}
 
-	if runtime.GOOS != "darwin" {
-		// Return a zero-initialized batch for non-Darwin platforms - blocks ROADMAP "wait for purego struct support"
-		return LlamaBatch{}
-	}
-
 	tokensLen := len(tokens)
 	if tokensLen > math.MaxInt32 {
 		panic(fmt.Errorf("too many tokens: %d, maximum supported: %d", tokensLen, math.MaxInt32))
 	}
-	return llamaBatchGetOne(&tokens[0], int32(tokensLen))
+
+	// Try FFI first (works on all platforms)
+	if batch, err := ffiBatchGetOne(&tokens[0], int32(tokensLen)); err == nil {
+		return batch
+	}
+
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaBatchGetOne != nil {
+		return llamaBatchGetOne(&tokens[0], int32(tokensLen))
+	}
+
+	// Last resort: return zero-initialized batch
+	return LlamaBatch{}
 }
 
 // Batch_free frees a batch
@@ -1037,15 +1081,24 @@ func Decode(ctx LlamaContext, batch LlamaBatch) error {
 		return err
 	}
 
-	if runtime.GOOS != "darwin" {
-		return errors.New("Decode not yet implemented for non-Darwin platforms - blocks ROADMAP Priority 1 (wait for purego struct support)")
+	// Try FFI first (works on all platforms)
+	if result, err := ffiDecode(ctx, batch); err == nil {
+		if result != 0 {
+			return fmt.Errorf("decode failed with code %d", result)
+		}
+		return nil
 	}
 
-	result := llamaDecode(ctx, batch)
-	if result != 0 {
-		return fmt.Errorf("decode failed with code %d", result)
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaDecode != nil {
+		result := llamaDecode(ctx, batch)
+		if result != 0 {
+			return fmt.Errorf("decode failed with code %d", result)
+		}
+		return nil
 	}
-	return nil
+
+	return errors.New("Decode not available on this platform")
 }
 
 // Get_logits gets logits for all tokens

@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	kernel32         = syscall.NewLazyDLL("kernel32.dll")
-	procLoadLibraryW = kernel32.NewProc("LoadLibraryW")
-	procFreeLibrary  = kernel32.NewProc("FreeLibrary")
-	//procGetProcAddress = kernel32.NewProc("GetProcAddress")
+	kernel32           = syscall.NewLazyDLL("kernel32.dll")
+	procLoadLibraryW   = kernel32.NewProc("LoadLibraryW")
+	procFreeLibrary    = kernel32.NewProc("FreeLibrary")
+	procGetProcAddress = kernel32.NewProc("GetProcAddress")
 )
 
 // loadLibraryPlatform loads a shared library using platform-specific methods
@@ -47,14 +47,28 @@ func registerLibFunc(fptr interface{}, handle uintptr, fname string) {
 	// For now, this is a no-op to prevent build failures
 }
 
+// getProcAddressPlatform gets the address of a symbol in a loaded library
+func getProcAddressPlatform(handle uintptr, name string) (uintptr, error) {
+	namePtr, err := syscall.BytePtrFromString(name)
+	if err != nil {
+		return 0, fmt.Errorf("failed to convert name to byte pointer: %w", err)
+	}
+
+	ret, _, err := procGetProcAddress.Call(handle, uintptr(unsafe.Pointer(namePtr)))
+	if ret == 0 {
+		return 0, fmt.Errorf("GetProcAddress failed for %s: %w", name, err)
+	}
+
+	return ret, nil
+}
+
 // isPlatformSupported returns whether the current platform is supported
 func isPlatformSupported() bool {
-	// For now, return false to indicate Windows support is not complete
-	// This can be changed to true once full Windows support is implemented
-	return false
+	// Now we support Windows with FFI
+	return true
 }
 
 // getPlatformError returns a platform-specific error message
 func getPlatformError() error {
-	return fmt.Errorf("support for windows platform not yet implemented")
+	return nil
 }

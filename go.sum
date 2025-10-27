@@ -2,9 +2,3 @@ github.com/achille-roussel/go-dl v0.0.0-20160112015913-00e9c7be8e78 h1:aQWa3STEX
 github.com/achille-roussel/go-dl v0.0.0-20160112015913-00e9c7be8e78/go.mod h1:lQecrvDcglA5p8CU7gWNzKTL3PdaerDKSoM6hNY0FcE=
 github.com/clevabit/libgoffi v0.0.0-20200823130220-596cf88fbe7a h1:Xv3FzQqP3pTmo0+eWcXQN2CYbVOoK3A6MEQ/jgTN7vE=
 github.com/clevabit/libgoffi v0.0.0-20200823130220-596cf88fbe7a/go.mod h1:MLfUu607WjB6xYQGG121SAii3pPfEWZUPXg0Z+3g5x4=
-github.com/ebitengine/purego v0.9.0-alpha.10 h1:audsHbrB2mnadP/fVRdQRDc0lymjY7oWTNfzT59XICo=
-github.com/ebitengine/purego v0.9.0-alpha.10/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
-github.com/ebitengine/purego v0.9.0-alpha.11 h1:57SN16jVQ18/C8SmvrMpsDPZr/gTfjpEGaOCICpTi1s=
-github.com/ebitengine/purego v0.9.0-alpha.11/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
-github.com/ebitengine/purego v0.9.0 h1:mh0zpKBIXDceC63hpvPuGLiJ8ZAa3DfrFTudmfi8A4k=
-github.com/ebitengine/purego v0.9.0/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=

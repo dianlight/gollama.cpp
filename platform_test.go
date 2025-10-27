@@ -59,7 +59,7 @@ func TestPlatformSpecific(t *testing.T) {
 		} else {
 			// For Unix-like systems, we can test that the functions exist
 			// but we don't want to actually load libraries in unit tests
-			t.Log("Unix-like platform functions are available through purego")
+			t.Log("Unix-like platform functions are available through libgoffi")
 		}
 	})
 }

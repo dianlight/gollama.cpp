@@ -1,5 +1,5 @@
 # Makefile for gollama.cpp
-# Cross-platform Go bindings for llama.cpp using purego
+# Go bindings for llama.cpp using libgoffi (CGO-based FFI)
 
 # Version information
 VERSION ?= 0.2.1

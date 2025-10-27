@@ -1,5 +1,5 @@
-// Package gollama provides Go bindings for llama.cpp using purego.
-// This package allows you to use llama.cpp functionality from Go without CGO.
+// Package gollama provides Go bindings for llama.cpp using libgoffi.
+// This package allows you to use llama.cpp functionality from Go using CGO-based FFI.
 //
 // The bindings are designed to be as close to the original llama.cpp C API as possible,
 // while providing Go-friendly interfaces where appropriate.
@@ -561,7 +561,7 @@ func registerFunctions() error {
 	registerLibFunc(&llamaBackendFree, libHandle, "llama_backend_free")
 	registerLibFunc(&llamaLogSet, libHandle, "llama_log_set")
 
-	// Model functions - Skip functions that use structs on non-Darwin platforms - moved to ROADMAP "wait for purego struct support" section
+	// Model functions - Skip functions that use structs on non-Darwin platforms - moved to ROADMAP "wait for FFI struct support" section
 	if runtime.GOOS == "darwin" {
 		registerLibFunc(&llamaModelDefaultParams, libHandle, "llama_model_default_params")
 		registerLibFunc(&llamaContextDefaultParams, libHandle, "llama_context_default_params")
@@ -608,14 +608,14 @@ func registerFunctions() error {
 	registerLibFunc(&llamaVocabNl, libHandle, "llama_vocab_nl")
 	registerLibFunc(&llamaVocabPad, libHandle, "llama_vocab_pad")
 
-	// Batch functions - Skip functions that use structs on non-Darwin platforms - moved to ROADMAP "wait for purego struct support" section
+	// Batch functions - Skip functions that use structs on non-Darwin platforms - moved to ROADMAP "wait for FFI struct support" section
 	if runtime.GOOS == "darwin" {
 		registerLibFunc(&llamaBatchInit, libHandle, "llama_batch_init")
 		registerLibFunc(&llamaBatchGetOne, libHandle, "llama_batch_get_one")
 		registerLibFunc(&llamaBatchFree, libHandle, "llama_batch_free")
 	}
 
-	// Decode functions - Skip functions that use structs on non-Darwin platforms - moved to ROADMAP "wait for purego struct support" section
+	// Decode functions - Skip functions that use structs on non-Darwin platforms - moved to ROADMAP "wait for FFI struct support" section
 	if runtime.GOOS == "darwin" {
 		registerLibFunc(&llamaDecode, libHandle, "llama_decode")
 		registerLibFunc(&llamaEncode, libHandle, "llama_encode")
@@ -631,7 +631,7 @@ func registerFunctions() error {
 	registerLibFunc(&llamaMemoryClear, libHandle, "llama_memory_clear")
 	registerLibFunc(&llamaGetMemory, libHandle, "llama_get_memory")
 
-	// Sampling functions - Skip functions that use structs on non-Darwin platforms - moved to ROADMAP "wait for purego struct support" section
+	// Sampling functions - Skip functions that use structs on non-Darwin platforms - moved to ROADMAP "wait for FFI struct support" section
 	if runtime.GOOS == "darwin" {
 		registerLibFunc(&llamaSamplerChainInit, libHandle, "llama_sampler_chain_init")
 	}
@@ -798,7 +798,7 @@ func Model_load_from_file(pathModel string, params LlamaModelParams) (LlamaModel
 	}
 
 	if runtime.GOOS != "darwin" {
-		return 0, errors.New("Model_load_from_file not yet implemented for non-Darwin platforms - blocks ROADMAP Priority 1 (wait for purego struct support)")
+		return 0, errors.New("Model_load_from_file not yet implemented for non-Darwin platforms - blocks ROADMAP Priority 1 (wait for FFI struct support)")
 	}
 
 	pathBytes := append([]byte(pathModel), 0) // null-terminate
@@ -880,7 +880,7 @@ func Init_from_model(model LlamaModel, params LlamaContextParams) (LlamaContext,
 	}
 
 	if runtime.GOOS != "darwin" {
-		return 0, errors.New("Init_from_model not yet implemented for non-Darwin platforms - blocks ROADMAP Priority 1 (wait for purego struct support)")
+		return 0, errors.New("Init_from_model not yet implemented for non-Darwin platforms - blocks ROADMAP Priority 1 (wait for FFI struct support)")
 	}
 
 	ctx := llamaInitFromModel(model, params)
@@ -991,7 +991,7 @@ func Batch_init(nTokens, embd, nSeqMax int32) LlamaBatch {
 	}
 
 	if runtime.GOOS != "darwin" {
-		// Return a zero-initialized batch for non-Darwin platforms - blocks ROADMAP "wait for purego struct support"
+		// Return a zero-initialized batch for non-Darwin platforms - blocks ROADMAP "wait for FFI struct support"
 		return LlamaBatch{}
 	}
 
@@ -1008,7 +1008,7 @@ func Batch_get_one(tokens []LlamaToken) LlamaBatch {
 	}
 
 	if runtime.GOOS != "darwin" {
-		// Return a zero-initialized batch for non-Darwin platforms - blocks ROADMAP "wait for purego struct support"
+		// Return a zero-initialized batch for non-Darwin platforms - blocks ROADMAP "wait for FFI struct support"
 		return LlamaBatch{}
 	}
 
@@ -1038,7 +1038,7 @@ func Decode(ctx LlamaContext, batch LlamaBatch) error {
 	}
 
 	if runtime.GOOS != "darwin" {
-		return errors.New("Decode not yet implemented for non-Darwin platforms - blocks ROADMAP Priority 1 (wait for purego struct support)")
+		return errors.New("Decode not yet implemented for non-Darwin platforms - blocks ROADMAP Priority 1 (wait for FFI struct support)")
 	}
 
 	result := llamaDecode(ctx, batch)
@@ -1211,12 +1211,12 @@ func Max_devices() uint64 {
 	return llamaMaxDevices()
 }
 
-// Helper functions for platforms where struct returns aren't supported - moved to ROADMAP "wait for purego struct support" section
+// Helper functions for platforms where struct returns aren't supported - moved to ROADMAP "wait for FFI struct support" section
 func ModelDefaultParams() LlamaModelParams {
 	if runtime.GOOS == "darwin" && llamaModelDefaultParams != nil {
 		return llamaModelDefaultParams()
 	}
-	// Return default values for non-Darwin platforms - blocks ROADMAP "wait for purego struct support"
+	// Return default values for non-Darwin platforms - blocks ROADMAP "wait for FFI struct support"
 	return LlamaModelParams{
 		NGpuLayers:    0,
 		SplitMode:     LLAMA_SPLIT_MODE_LAYER,
@@ -1233,7 +1233,7 @@ func ContextDefaultParams() LlamaContextParams {
 	if runtime.GOOS == "darwin" && llamaContextDefaultParams != nil {
 		return llamaContextDefaultParams()
 	}
-	// Return default values for non-Darwin platforms - blocks ROADMAP "wait for purego struct support"
+	// Return default values for non-Darwin platforms - blocks ROADMAP "wait for FFI struct support"
 	return LlamaContextParams{
 		Seed:            LLAMA_DEFAULT_SEED,
 		NCtx:            0, // 0 = from model
@@ -1267,7 +1267,7 @@ func SamplerChainDefaultParams() LlamaSamplerChainParams {
 	if runtime.GOOS == "darwin" && llamaSamplerChainDefaultParams != nil {
 		return llamaSamplerChainDefaultParams()
 	}
-	// Return default values for non-Darwin platforms - blocks ROADMAP "wait for purego struct support"
+	// Return default values for non-Darwin platforms - blocks ROADMAP "wait for FFI struct support"
 	return LlamaSamplerChainParams{
 		NoPerf: 0,
 	}

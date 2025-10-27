@@ -4,16 +4,32 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Release](https://img.shields.io/github/v/release/dianlight/gollama.cpp.svg)](https://github.com/dianlight/gollama.cpp/releases)
 
-A high-performance Go binding for [llama.cpp](https://github.com/ggml-org/llama.cpp) using [purego](https://github.com/ebitengine/purego) for cross-platform compatibility without CGO.
+A high-performance Go binding for [llama.cpp](https://github.com/ggml-org/llama.cpp) using [libgoffi](https://github.com/noctarius/libgoffi) for robust FFI support.
+
+> **⚠️ Important Change**: This project now uses libgoffi (CGO-based) instead of purego. This provides better struct support and type mapping, but requires CGO and a C compiler. See [Requirements](#requirements) below.
 
 ## Features
 
-- **Pure Go**: No CGO required, uses purego for C interop
-- **Cross-Platform**: Supports macOS (CPU/Metal), Linux (CPU/NVIDIA/AMD), Windows (CPU/NVIDIA/AMD)
+- **CGO-based FFI**: Uses libgoffi for robust C interoperability
+- **Cross-Platform**: Supports macOS (CPU/Metal), Linux (CPU/NVIDIA/AMD)
 - **Performance**: Direct bindings to llama.cpp shared libraries
 - **Compatibility**: Version-synchronized with llama.cpp releases
 - **Easy Integration**: Simple Go API for LLM inference
 - **GPU Acceleration**: Supports Metal, CUDA, HIP, Vulkan, OpenCL, SYCL, and other backends
+- **Better Struct Support**: libgoffi provides improved handling of C structs
+
+## Requirements
+
+Since this project now uses libgoffi, you need:
+
+1. **CGO enabled**: `CGO_ENABLED=1` (default on most systems)
+2. **C compiler**: 
+   - Linux: `gcc` or `clang`
+   - macOS: Xcode Command Line Tools (`xcode-select --install`)
+   - Windows: Not currently supported by libgoffi
+3. **libffi**: The libffi library must be installed
+   - Linux: `sudo apt-get install libffi-dev` (Debian/Ubuntu) or `sudo yum install libffi-devel` (RHEL/CentOS)
+   - macOS: `brew install libffi` (or use system libffi)
 
 ## Supported Platforms
 
@@ -24,73 +40,103 @@ Gollama.cpp uses a **platform-specific architecture** with build tags to ensure 
 #### macOS
 - **CPU**: Intel x64, Apple Silicon (ARM64)
 - **GPU**: Metal (Apple Silicon)
-- **Status**: Full feature support with purego
+- **Status**: Full feature support with libgoffi
 - **Build Tags**: Uses `!windows` build tag
 
 #### Linux
 - **CPU**: x86_64, ARM64
 - **GPU**: NVIDIA (CUDA/Vulkan), AMD (HIP/ROCm/Vulkan), Intel (SYCL/Vulkan)
-- **Status**: Full feature support with purego
+- **Status**: Full feature support with libgoffi
 - **Build Tags**: Uses `!windows` build tag
 
-### 🚧 In Development
+### ❌ Not Supported
 
 #### Windows
-- **CPU**: x86_64, ARM64 
-- **GPU**: NVIDIA (CUDA/Vulkan), AMD (HIP/Vulkan), Intel (SYCL/Vulkan), Qualcomm Adreno (OpenCL) - planned
-- **Status**: **Build compatibility implemented**, runtime support in development
-- **Build Tags**: Uses `windows` build tag with syscall-based library loading
-- **Current State**: 
-  - ✅ Compiles without errors on Windows
-  - ✅ Cross-compilation from other platforms works
-  - 🚧 Runtime functionality being implemented
-  - 🚧 GPU acceleration being added
+- **Status**: libgoffi does not support Windows
+- Windows support would require either:
+  - Returning to the previous purego implementation for Windows
+  - Implementing a Windows-specific libffi wrapper
+  - Using a different FFI solution for Windows
 
 ### Platform-Specific Implementation Details
 
 Our platform abstraction layer uses Go build tags to provide:
 
-- **Unix-like systems** (`!windows`): Uses [purego](https://github.com/ebitengine/purego) for dynamic library loading
-- **Windows** (`windows`): Uses native Windows syscalls (`LoadLibraryW`, `FreeLibrary`, `GetProcAddress`)
-- **Cross-compilation**: Supports building for any platform from any platform
+- **Unix-like systems** (`!windows`): Uses [libgoffi](https://github.com/noctarius/libgoffi) (CGO-based, wraps libffi)
+- **Windows** (`windows`): Not supported by libgoffi (would need alternative implementation)
 - **Automatic detection**: Runtime platform capability detection
 
 ## Installation
 
+### Prerequisites
+
+Before installing, ensure you have the required dependencies:
+
+**Linux:**
 ```bash
-go get github.com/dianlight/gollama.cpp
+# Debian/Ubuntu
+sudo apt-get install build-essential libffi-dev
+
+# RHEL/CentOS/Fedora
+sudo yum install gcc libffi-devel
+
+# Arch Linux
+sudo pacman -S base-devel libffi
 ```
 
-The Go module automatically downloads pre-built llama.cpp libraries from the official [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) releases on first use. No manual compilation required!
+**macOS:**
+```bash
+# Install Xcode Command Line Tools (if not already installed)
+xcode-select --install
+
+# libffi is usually included, but you can also install via Homebrew
+brew install libffi
+```
+
+### Install Package
+
+```bash
+CGO_ENABLED=1 go get github.com/dianlight/gollama.cpp
+```
+
+The Go module automatically downloads pre-built llama.cpp libraries from the official [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) releases on first use. No manual compilation of llama.cpp required!
+
+## Build Requirements
+
+Since this project uses CGO via libgoffi:
+
+- **CGO must be enabled**: Set `CGO_ENABLED=1` environment variable
+- **C compiler required**: gcc, clang, or compatible C compiler
+- **libffi required**: The Foreign Function Interface library
+- **Cross-compilation**: More complex than pure Go due to CGO requirements
 
 ## Cross-Platform Development
 
 ### Build Compatibility Matrix
 
-Our CI system tests compilation across all platforms:
+**Note**: With CGO and libgoffi, cross-compilation is more complex than with pure Go:
 
-| Target Platform | Build From Linux | Build From macOS | Build From Windows |
-|------------------|:----------------:|:----------------:|:------------------:|
-| Linux (amd64)    | ✅               | ✅               | ✅                 |
-| Linux (arm64)    | ✅               | ✅               | ✅                 |
-| macOS (amd64)    | ✅               | ✅               | ✅                 |
-| macOS (arm64)    | ✅               | ✅               | ✅                 |
-| Windows (amd64)  | ✅               | ✅               | ✅                 |
-| Windows (arm64)  | ✅               | ✅               | ✅                 |
+| Target Platform | Build Support | Runtime Support | Notes |
+|------------------|:-------------:|:---------------:|-------|
+| Linux (amd64)    | ✅            | ✅              | Full support with libgoffi |
+| Linux (arm64)    | ✅            | ✅              | Full support with libgoffi |
+| macOS (amd64)    | ✅            | ✅              | Full support with libgoffi |
+| macOS (arm64)    | ✅            | ✅              | Full support with libgoffi |
+| Windows (amd64)  | ❌            | ❌              | libgoffi does not support Windows |
+| Windows (arm64)  | ❌            | ❌              | libgoffi does not support Windows |
 
 ### Development Workflow
 
 ```bash
-# Test cross-compilation for all platforms
-make test-cross-compile
+# Build for current platform (requires CGO)
+CGO_ENABLED=1 go build ./...
 
-# Build for specific platform
-GOOS=windows GOARCH=amd64 go build ./...
-GOOS=linux GOARCH=arm64 go build ./...
-GOOS=darwin GOARCH=arm64 go build ./...
+# Build for specific platform (requires cross-compilation toolchain)
+# Cross-compiling with CGO is more complex - you need the target platform's
+# C compiler and libraries. See Go CGO cross-compilation documentation.
 
 # Run platform-specific tests
-go test -v -run TestPlatformSpecific ./...
+CGO_ENABLED=1 go test -v -run TestPlatformSpecific ./...
 ```
 
 ## Quick Start

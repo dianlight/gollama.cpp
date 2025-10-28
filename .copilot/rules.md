@@ -55,6 +55,30 @@ When making changes that affect the build process, testing, or deployment:
    - Update library paths and download URLs
    - Update build scripts and Makefiles
 
+## Git Operations
+
+### Rule: NO Automatic Git Operations
+**CRITICAL**: Never perform git operations automatically without explicit user request:
+
+1. **Prohibited Actions**:
+   - Do NOT run `git add` without explicit user request
+   - Do NOT run `git commit` without explicit user request
+   - Do NOT run `git push` without explicit user request
+   - Do NOT run `git pull` without explicit user request
+   - Do NOT create branches without explicit user request
+   - Do NOT merge branches without explicit user request
+
+2. **When to Ask**:
+   - Always ask the user if they want to commit changes
+   - Always ask the user if they want to push changes
+   - Always ask the user which files should be staged
+   - Always ask the user for commit messages
+
+3. **Allowed Git Operations**:
+   - Read-only operations like `git status` or `git diff` are acceptable
+   - Informing the user about uncommitted changes is acceptable
+   - Suggesting git commands for the user to run manually is acceptable
+
 ## Code Quality Rules
 
 ### Rule: Automatic Code Validation

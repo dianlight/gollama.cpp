@@ -12,3 +12,4 @@ examples/simple-chat-with-loader/simple-chat-with-loader
 examples/retrieval/retrieval
 examples/batched/batched
 examples/diffusion/diffusion
+coverage.out

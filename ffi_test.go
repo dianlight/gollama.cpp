@@ -55,7 +55,7 @@ func TestFFIModelDefaultParams(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Skipf("Skipping FFI model params test: library not available: %v", err)
+			t.Fatalf("FFI model params test requires library to be available: %v", err)
 		}
 	}
 
@@ -81,7 +81,7 @@ func TestFFIContextDefaultParams(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Skipf("Skipping FFI context params test: library not available: %v", err)
+			t.Fatalf("FFI context params test requires library to be available: %v", err)
 		}
 	}
 
@@ -109,7 +109,7 @@ func TestFFISamplerChainDefaultParams(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Skipf("Skipping FFI sampler chain params test: library not available: %v", err)
+			t.Fatalf("FFI sampler chain params test requires library to be available: %v", err)
 		}
 	}
 
@@ -133,7 +133,7 @@ func TestFFIBatchInit(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Skipf("Skipping FFI batch init test: library not available: %v", err)
+			t.Fatalf("FFI batch init test requires library to be available: %v", err)
 		}
 	}
 
@@ -157,7 +157,7 @@ func TestFFIEncode(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Skipf("Skipping FFI encode test: library not available: %v", err)
+			t.Fatalf("FFI encode test requires library to be available: %v", err)
 		}
 	}
 
@@ -181,7 +181,7 @@ func TestFFISamplerChainInit(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Skipf("Skipping FFI sampler chain init test: library not available: %v", err)
+			t.Fatalf("FFI sampler chain init test requires library to be available: %v", err)
 		}
 	}
 
@@ -229,7 +229,7 @@ func TestPlatformGetProcAddress(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Skipf("Skipping GetProcAddress test: library not available: %v", err)
+			t.Fatalf("GetProcAddress test requires library to be available: %v", err)
 		}
 	}
 

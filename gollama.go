@@ -561,15 +561,13 @@ func registerFunctions() error {
 	registerLibFunc(&llamaBackendFree, libHandle, "llama_backend_free")
 	registerLibFunc(&llamaLogSet, libHandle, "llama_log_set")
 
-	// Model functions - Skip functions that use structs on non-Darwin platforms - moved to ROADMAP "wait for purego struct support" section
-	if runtime.GOOS == "darwin" {
-		registerLibFunc(&llamaModelDefaultParams, libHandle, "llama_model_default_params")
-		registerLibFunc(&llamaContextDefaultParams, libHandle, "llama_context_default_params")
-		registerLibFunc(&llamaSamplerChainDefaultParams, libHandle, "llama_sampler_chain_default_params")
-		registerLibFunc(&llamaModelLoadFromFile, libHandle, "llama_model_load_from_file")
-		registerLibFunc(&llamaModelLoadFromSplits, libHandle, "llama_model_load_from_splits")
-		registerLibFunc(&llamaInitFromModel, libHandle, "llama_init_from_model")
-	}
+	// Model functions - Now supported on all platforms with FFI
+	registerLibFunc(&llamaModelDefaultParams, libHandle, "llama_model_default_params")
+	registerLibFunc(&llamaContextDefaultParams, libHandle, "llama_context_default_params")
+	registerLibFunc(&llamaSamplerChainDefaultParams, libHandle, "llama_sampler_chain_default_params")
+	registerLibFunc(&llamaModelLoadFromFile, libHandle, "llama_model_load_from_file")
+	registerLibFunc(&llamaModelLoadFromSplits, libHandle, "llama_model_load_from_splits")
+	registerLibFunc(&llamaInitFromModel, libHandle, "llama_init_from_model")
 	registerLibFunc(&llamaModelSaveToFile, libHandle, "llama_model_save_to_file")
 	registerLibFunc(&llamaModelFree, libHandle, "llama_model_free")
 
@@ -608,18 +606,14 @@ func registerFunctions() error {
 	registerLibFunc(&llamaVocabNl, libHandle, "llama_vocab_nl")
 	registerLibFunc(&llamaVocabPad, libHandle, "llama_vocab_pad")
 
-	// Batch functions - Skip functions that use structs on non-Darwin platforms - moved to ROADMAP "wait for purego struct support" section
-	if runtime.GOOS == "darwin" {
-		registerLibFunc(&llamaBatchInit, libHandle, "llama_batch_init")
-		registerLibFunc(&llamaBatchGetOne, libHandle, "llama_batch_get_one")
-		registerLibFunc(&llamaBatchFree, libHandle, "llama_batch_free")
-	}
+	// Batch functions - Now supported on all platforms with FFI
+	registerLibFunc(&llamaBatchInit, libHandle, "llama_batch_init")
+	registerLibFunc(&llamaBatchGetOne, libHandle, "llama_batch_get_one")
+	registerLibFunc(&llamaBatchFree, libHandle, "llama_batch_free")
 
-	// Decode functions - Skip functions that use structs on non-Darwin platforms - moved to ROADMAP "wait for purego struct support" section
-	if runtime.GOOS == "darwin" {
-		registerLibFunc(&llamaDecode, libHandle, "llama_decode")
-		registerLibFunc(&llamaEncode, libHandle, "llama_encode")
-	}
+	// Decode functions - Now supported on all platforms with FFI
+	registerLibFunc(&llamaDecode, libHandle, "llama_decode")
+	registerLibFunc(&llamaEncode, libHandle, "llama_encode")
 
 	// Logits and embeddings
 	registerLibFunc(&llamaGetLogits, libHandle, "llama_get_logits")
@@ -631,10 +625,8 @@ func registerFunctions() error {
 	registerLibFunc(&llamaMemoryClear, libHandle, "llama_memory_clear")
 	registerLibFunc(&llamaGetMemory, libHandle, "llama_get_memory")
 
-	// Sampling functions - Skip functions that use structs on non-Darwin platforms - moved to ROADMAP "wait for purego struct support" section
-	if runtime.GOOS == "darwin" {
-		registerLibFunc(&llamaSamplerChainInit, libHandle, "llama_sampler_chain_init")
-	}
+	// Sampling functions - Now supported on all platforms with FFI
+	registerLibFunc(&llamaSamplerChainInit, libHandle, "llama_sampler_chain_init")
 	registerLibFunc(&llamaSamplerChainAdd, libHandle, "llama_sampler_chain_add")
 	registerLibFunc(&llamaSamplerChainGet, libHandle, "llama_sampler_chain_get")
 	registerLibFunc(&llamaSamplerChainN, libHandle, "llama_sampler_chain_n")

@@ -1109,6 +1109,32 @@ func Decode(ctx LlamaContext, batch LlamaBatch) error {
 	return errors.New("Decode not available on this platform")
 }
 
+// Encode encodes a batch
+func Encode(ctx LlamaContext, batch LlamaBatch) error {
+	if err := ensureLoaded(); err != nil {
+		return err
+	}
+
+	// Try FFI first (works on all platforms)
+	if result, err := ffiEncode(ctx, batch); err == nil {
+		if result != 0 {
+			return fmt.Errorf("encode failed with code %d", result)
+		}
+		return nil
+	}
+
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaEncode != nil {
+		result := llamaEncode(ctx, batch)
+		if result != 0 {
+			return fmt.Errorf("encode failed with code %d", result)
+		}
+		return nil
+	}
+
+	return errors.New("Encode not available on this platform")
+}
+
 // Get_logits gets logits for all tokens
 func Get_logits(ctx LlamaContext) *float32 {
 	if err := ensureLoaded(); err != nil {
@@ -1206,6 +1232,27 @@ func Sampler_init_greedy() LlamaSampler {
 		panic(err)
 	}
 	return llamaSamplerInitGreedy()
+}
+
+// Sampler_chain_init creates a sampler chain
+func Sampler_chain_init(params LlamaSamplerChainParams) LlamaSampler {
+	// Try to load library if not already loaded
+	_ = ensureLoaded() // Ignore error, return 0 on failure
+
+	// Try FFI first (works on all platforms)
+	if isLoaded {
+		if sampler, err := ffiSamplerChainInit(params); err == nil {
+			return sampler
+		}
+	}
+
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaSamplerChainInit != nil && isLoaded {
+		return llamaSamplerChainInit(params)
+	}
+
+	// Last resort: return null sampler
+	return 0
 }
 
 // Sampler_free frees a sampler

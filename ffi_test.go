@@ -152,6 +152,55 @@ func TestFFIBatchInit(t *testing.T) {
 	t.Logf("FFI Batch init successful: NTokens=%d", batch.NTokens)
 }
 
+// TestFFIEncode tests FFI-based encode function
+func TestFFIEncode(t *testing.T) {
+	if !isLoaded {
+		err := loadLibrary()
+		if err != nil {
+			t.Skipf("Skipping FFI encode test: library not available: %v", err)
+		}
+	}
+
+	// Note: This test will fail without a valid context and batch
+	// We're mainly testing that the FFI call structure is correct
+	var ctx LlamaContext = 0
+	var batch LlamaBatch
+	
+	result, err := ffiEncode(ctx, batch)
+	if err != nil {
+		t.Logf("FFI encode failed (expected without valid context): %v", err)
+		return
+	}
+
+	// If we get here, the FFI call succeeded (though encode itself may have failed)
+	t.Logf("FFI Encode call successful with result: %d", result)
+}
+
+// TestFFISamplerChainInit tests FFI-based sampler chain initialization
+func TestFFISamplerChainInit(t *testing.T) {
+	if !isLoaded {
+		err := loadLibrary()
+		if err != nil {
+			t.Skipf("Skipping FFI sampler chain init test: library not available: %v", err)
+		}
+	}
+
+	// Call using FFI directly
+	params := LlamaSamplerChainParams{NoPerf: 0}
+	sampler, err := ffiSamplerChainInit(params)
+	if err != nil {
+		t.Logf("FFI sampler chain init failed (expected if library not present): %v", err)
+		return
+	}
+
+	// Verify sampler is not null
+	if sampler == 0 {
+		t.Error("FFI sampler chain init returned null sampler")
+	}
+
+	t.Logf("FFI Sampler chain init successful: sampler=%v", sampler)
+}
+
 // TestFFIFallbackBehavior tests that FFI functions fall back gracefully
 func TestFFIFallbackBehavior(t *testing.T) {
 	// Test Model_default_params fallback

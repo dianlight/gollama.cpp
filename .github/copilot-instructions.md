@@ -1,13 +1,6 @@
 # Copilot Rules for Gollama.cpp
 
-> **Note**: This file has been migrated to `.github/copilot-instructions.md` (the official standard location).
-> Please refer to that file for the current rules. This file is kept for reference only.
-
----
-
-**👉 See [.github/copilot-instructions.md](../.github/copilot-instructions.md) for the active Copilot rules.**
-
----
+This file defines automatic rules for GitHub Copilot to follow when making changes to the codebase.
 
 ## Documentation Updates
 

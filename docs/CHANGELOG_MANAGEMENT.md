@@ -18,10 +18,10 @@ The `scripts/update-changelog.sh` script automates the management of the `CHANGE
 
 ```bash
 # Convert [Unreleased] to versioned entry
-bash scripts/update-changelog.sh "v1.0.0-llamacpp.b6099" "release"
+bash scripts/update-changelog.sh "v1.0.0-llamacpp.b6862" "release"
 
 # Add new [Unreleased] section
-bash scripts/update-changelog.sh "v1.0.1-llamacpp.b6099" "unreleased"
+bash scripts/update-changelog.sh "v1.0.1-llamacpp.b6862" "unreleased"
 ```
 
 ### Automatic Usage (via Makefile)
@@ -40,7 +40,7 @@ The `tag-release` target in the Makefile now includes these steps:
 2. **After tagging**: Increments the semantic version number for next development cycle
 3. **After version increment**: Adds a new `[Unreleased]` section for future changes
 
-Note: The tagging and CHANGELOG now use the full version format (e.g., `v1.0.0-llamacpp.b6099`) which includes both the semantic version and the llama.cpp build number.
+Note: The tagging and CHANGELOG now use the full version format (e.g., `v1.0.0-llamacpp.b6862`) which includes both the semantic version and the llama.cpp build number.
 
 ## Workflow Example
 
@@ -52,7 +52,7 @@ Starting state:
 - New feature Y
 ```
 
-After `make tag-release` (version v1.0.0-llamacpp.b6099):
+After `make tag-release` (version v1.0.0-llamacpp.b6862):
 ```markdown
 ## [Unreleased]
 
@@ -64,7 +64,7 @@ After `make tag-release` (version v1.0.0-llamacpp.b6099):
 
 ### Removed
 
-## [v1.0.0-llamacpp.b6099] - 2025-08-06
+## [v1.0.0-llamacpp.b6862] - 2025-08-06
 ### Added
 - New feature X
 - New feature Y
@@ -74,7 +74,7 @@ After `make tag-release` (version v1.0.0-llamacpp.b6099):
 
 ### Release Action
 - Searches for `## [Unreleased]` heading
-- Replaces it with `## [FULL_VERSION] - YYYY-MM-DD` (e.g., `## [v1.0.0-llamacpp.b6099] - 2025-08-06`)
+- Replaces it with `## [FULL_VERSION] - YYYY-MM-DD` (e.g., `## [v1.0.0-llamacpp.b6862] - 2025-08-06`)
 - If the version already exists, updates the date
 - Verifies the change was successful
 

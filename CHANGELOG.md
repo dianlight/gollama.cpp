@@ -8,8 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **libffi Support**: Cross-platform struct handling for C function calls on all platforms (Windows, Linux, macOS)
+  - Added `github.com/jupiterrider/ffi v0.5.1` dependency for FFI support
+  - Implemented FFI wrapper layer (`ffi.go`) with 10 wrapper functions for struct-based operations
+  - Added `Encode()` and `Sampler_chain_init()` public wrapper functions
+  - Platform-agnostic GetProcAddress helper for symbol resolution
 
 ### Changed
+- **llama.cpp Version**: Updated from b6099 to b6862
+  - Updated Makefile, CI workflows, and all documentation
+  - Improved compatibility with latest llama.cpp features
+- **CI/CD Improvements**: 
+  - Added automatic library download step before running tests
+  - Configured platform-specific library paths (LD_LIBRARY_PATH, DYLD_LIBRARY_PATH, PATH)
+- **Windows Support**: Enabled full runtime support with FFI (previously build-only)
+- **Test Behavior**: FFI tests now fail instead of skip when library is unavailable
 
 ### Fixed
 

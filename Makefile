@@ -3,7 +3,7 @@
 
 # Version information
 VERSION ?= 0.2.1
-LLAMA_CPP_BUILD ?= b6364
+LLAMA_CPP_BUILD ?= b6862
 FULL_VERSION = v$(VERSION)-llamacpp.$(LLAMA_CPP_BUILD)
 
 # Check everything

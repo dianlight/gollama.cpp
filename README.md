@@ -223,7 +223,7 @@ Gollama.cpp automatically downloads pre-built binaries from the official llama.c
 
 ```go
 // Load a specific version
-err := gollama.LoadLibraryWithVersion("b6099")
+err := gollama.LoadLibraryWithVersion("b6862")
 
 // Clean cache to force re-download
 err := gollama.CleanLibraryCache()
@@ -318,7 +318,7 @@ Where:
 - `X.Y.Z` is the gollama.cpp semantic version
 - `ABCD` is the corresponding llama.cpp build number
 
-For example: `v0.2.0-llamacpp.b6099` uses llama.cpp build b6099.
+For example: `v0.2.0-llamacpp.b6862` uses llama.cpp build b6862.
 
 ## Documentation
 

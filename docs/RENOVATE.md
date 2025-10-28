@@ -15,11 +15,11 @@ The project uses [Renovate](https://docs.renovatebot.com/) to automatically trac
 
 Renovate monitors the following files for llama.cpp version references:
 
-- **Makefile**: `LLAMA_CPP_BUILD ?= b6099`
-- **gollama.go**: `LlamaCppBuild = "b6099"`
-- **.github/workflows/ci.yml**: `LLAMA_CPP_BUILD: 'b6099'`
-- **CONTRIBUTING.md**: `export LLAMA_CPP_BUILD=b6099`
-- **docs/BUILD.md**: `export LLAMA_CPP_BUILD=b6099`
+- **Makefile**: `LLAMA_CPP_BUILD ?= b6862`
+- **gollama.go**: `LlamaCppBuild = "b6862"`
+- **.github/workflows/ci.yml**: `LLAMA_CPP_BUILD: 'b6862'`
+- **CONTRIBUTING.md**: `export LLAMA_CPP_BUILD=b6862`
+- **docs/BUILD.md**: `export LLAMA_CPP_BUILD=b6862`
 
 ## Version Bumping
 
@@ -39,10 +39,10 @@ The version is updated in both:
 
 Renovate uses custom regex managers to detect llama.cpp version references:
 
-1. **GitHub Workflows**: Matches `LLAMA_CPP_BUILD: 'b6099'` patterns
-2. **Makefile**: Matches `LLAMA_CPP_BUILD ?= b6099` patterns  
-3. **Go Source**: Matches `LlamaCppBuild = "b6099"` patterns
-4. **Documentation**: Matches `export LLAMA_CPP_BUILD=b6099` patterns
+1. **GitHub Workflows**: Matches `LLAMA_CPP_BUILD: 'b6862'` patterns
+2. **Makefile**: Matches `LLAMA_CPP_BUILD ?= b6862` patterns  
+3. **Go Source**: Matches `LlamaCppBuild = "b6862"` patterns
+4. **Documentation**: Matches `export LLAMA_CPP_BUILD=b6862` patterns
 
 ### Post-Upgrade Tasks
 

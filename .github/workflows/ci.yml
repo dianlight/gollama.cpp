@@ -9,7 +9,7 @@ on:
 
 env:
   GO_VERSION: '1.21'
-  LLAMA_CPP_BUILD: 'b6364'
+  LLAMA_CPP_BUILD: 'b6862'
 
 jobs:
   test:

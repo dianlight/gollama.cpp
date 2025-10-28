@@ -77,9 +77,11 @@ build-examples: build
 
 # Test with library download
 .PHONY: test
-test: deps
+test: deps download-libs
 	@echo "Running tests (libraries will be downloaded automatically)"
-	$(GO) test -v ./...
+	$(GO) tool gotest -p 1 -failfast  -timeout 120s -tags embedallowed_no  -coverprofile=coverage.out -cover ./... && \
+	$(GO) tool cover -func=coverage.out | grep total: | awk '{print "Total coverage: " $$3}'
+
 
 # Test with race detection
 .PHONY: test-race

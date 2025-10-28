@@ -184,7 +184,7 @@ func TestTokenDataArrayFromLogits(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Skipf("Skipping token data array test: library not available: %v", err)
+			t.Fatalf("Skipping token data array test: library not available: %v", err)
 		}
 	}
 

@@ -33,6 +33,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"unsafe"
@@ -490,7 +491,7 @@ func getLibraryPath() (string, error) {
 		return "", fmt.Errorf("unsupported architecture: %s on %s", goarch, goos)
 	}
 
-	// Try to find the library in the current directory, parent directory, or system path
+	// Start with standard search paths
 	candidates := []string{
 		libName,                         // Current directory
 		"libs/darwin_arm64/" + libName,  // macOS
@@ -504,6 +505,42 @@ func getLibraryPath() (string, error) {
 		"/usr/local/lib/" + libName,     // System library path
 		"/usr/lib/" + libName,           // Common system library path
 		"/lib/" + libName,               // Another common system library path
+	}
+
+	// Add cache directory paths
+	// Determine cache directory using the same logic as downloader
+	var cacheDir string
+	if globalConfig != nil && globalConfig.CacheDir != "" {
+		cacheDir = globalConfig.CacheDir
+	} else if envCacheDir := os.Getenv("GOLLAMA_CACHE_DIR"); envCacheDir != "" {
+		cacheDir = filepath.Join(envCacheDir, "libs")
+	} else {
+		userCacheDir, err := os.UserCacheDir()
+		if err == nil {
+			cacheDir = filepath.Join(userCacheDir, "gollama", "libs")
+		} else {
+			cacheDir = filepath.Join(os.TempDir(), "gollama", "libs")
+		}
+	}
+
+	// Try to find library in cache directory subdirectories
+	if cacheDir != "" {
+		entries, err := os.ReadDir(cacheDir)
+		if err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() {
+					// Check for library in build/bin subdirectory (standard structure)
+					cachePath := filepath.Join(cacheDir, entry.Name(), "build", "bin", libName)
+					candidates = append(candidates, cachePath)
+					// Check for library in bin subdirectory
+					cachePath = filepath.Join(cacheDir, entry.Name(), "bin", libName)
+					candidates = append(candidates, cachePath)
+					// Also check directly in subdirectory
+					cachePath = filepath.Join(cacheDir, entry.Name(), libName)
+					candidates = append(candidates, cachePath)
+				}
+			}
+		}
 	}
 
 	for _, candidate := range candidates {

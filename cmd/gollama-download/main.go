@@ -102,7 +102,11 @@ func main() {
 			log.Fatalf("Failed to get release info: %v", err)
 		}
 
-		fmt.Printf("Found release: %s\n", release.TagName)
+		tagName := ""
+		if release.TagName != nil {
+			tagName = *release.TagName
+		}
+		fmt.Printf("Found release: %s\n", tagName)
 
 		pattern, err := downloader.GetPlatformAssetPattern()
 		if err != nil {

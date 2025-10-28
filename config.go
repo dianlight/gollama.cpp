@@ -14,6 +14,7 @@ import (
 type Config struct {
 	// Library settings
 	LibraryPath   string `json:"library_path,omitempty"`
+	CacheDir      string `json:"cache_dir,omitempty"`
 	UseEmbedded   bool   `json:"use_embedded"`
 	EnableLogging bool   `json:"enable_logging"`
 	LogLevel      int    `json:"log_level"`
@@ -115,6 +116,9 @@ func LoadConfigFromEnv() *Config {
 	// Library settings
 	if path := os.Getenv("GOLLAMA_LIBRARY_PATH"); path != "" {
 		config.LibraryPath = path
+	}
+	if cacheDir := os.Getenv("GOLLAMA_CACHE_DIR"); cacheDir != "" {
+		config.CacheDir = cacheDir
 	}
 	if embedded := os.Getenv("GOLLAMA_USE_EMBEDDED"); embedded != "" {
 		config.UseEmbedded = parseEnvBool(embedded, config.UseEmbedded)
@@ -259,6 +263,15 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	// Validate cache directory if specified
+	if c.CacheDir != "" {
+		// Clean the cache directory path to prevent traversal attacks
+		cleanPath := filepath.Clean(c.CacheDir)
+		if strings.Contains(cleanPath, "..") {
+			return fmt.Errorf("invalid cache_dir: path traversal detected")
+		}
+	}
+
 	// Validate model path if specified
 	if c.ModelPath != "" {
 		if _, err := os.Stat(c.ModelPath); os.IsNotExist(err) {
@@ -344,6 +357,9 @@ func LoadDefaultConfig() *Config {
 func mergeConfigs(target, source *Config) {
 	if target.LibraryPath == "" && source.LibraryPath != "" {
 		target.LibraryPath = source.LibraryPath
+	}
+	if target.CacheDir == "" && source.CacheDir != "" {
+		target.CacheDir = source.CacheDir
 	}
 	if target.ModelPath == "" && source.ModelPath != "" {
 		target.ModelPath = source.ModelPath

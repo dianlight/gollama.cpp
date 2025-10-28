@@ -71,13 +71,13 @@ The Go module automatically downloads pre-built llama.cpp libraries from the off
 Our CI system tests compilation across all platforms:
 
 | Target Platform | Build From Linux | Build From macOS | Build From Windows |
-|------------------|:----------------:|:----------------:|:------------------:|
-| Linux (amd64)    | ✅               | ✅               | ✅                 |
-| Linux (arm64)    | ✅               | ✅               | ✅                 |
-| macOS (amd64)    | ✅               | ✅               | ✅                 |
-| macOS (arm64)    | ✅               | ✅               | ✅                 |
-| Windows (amd64)  | ✅               | ✅               | ✅                 |
-| Windows (arm64)  | ✅               | ✅               | ✅                 |
+| --------------- | :--------------: | :--------------: | :----------------: |
+| Linux (amd64)   |        ✅         |        ✅         |         ✅          |
+| Linux (arm64)   |        ✅         |        ✅         |         ✅          |
+| macOS (amd64)   |        ✅         |        ✅         |         ✅          |
+| macOS (arm64)   |        ✅         |        ✅         |         ✅          |
+| Windows (amd64) |        ✅         |        ✅         |         ✅          |
+| Windows (arm64) |        ✅         |        ✅         |         ✅          |
 
 ### Development Workflow
 
@@ -185,25 +185,25 @@ params.split_mode = gollama.LLAMA_SPLIT_MODE_LAYER
 
 #### GPU Support Matrix
 
-| Platform | GPU Type | Backend | Status |
-|----------|----------|---------|--------|
-| macOS | Apple Silicon | Metal | ✅ Supported |
-| macOS | Intel/AMD | CPU only | ✅ Supported |
-| Linux | NVIDIA | CUDA | ✅ Available in releases |
-| Linux | NVIDIA | Vulkan | ✅ Available in releases |
-| Linux | AMD | HIP/ROCm | ✅ Available in releases |
-| Linux | AMD | Vulkan | ✅ Available in releases |
-| Linux | Intel | SYCL | ✅ Available in releases |
-| Linux | Intel/Other | Vulkan | ✅ Available in releases |
-| Linux | Intel/Other | CPU | ✅ Fallback |
-| Windows | NVIDIA | CUDA | ✅ Available in releases |
-| Windows | NVIDIA | Vulkan | ✅ Available in releases |
-| Windows | AMD | HIP | ✅ Available in releases |
-| Windows | AMD | Vulkan | ✅ Available in releases |
-| Windows | Intel | SYCL | ✅ Available in releases |
-| Windows | Qualcomm Adreno | OpenCL | ✅ Available in releases |
-| Windows | Intel/Other | Vulkan | ✅ Available in releases |
-| Windows | Intel/Other | CPU | ✅ Fallback |
+| Platform | GPU Type        | Backend  | Status                  |
+| -------- | --------------- | -------- | ----------------------- |
+| macOS    | Apple Silicon   | Metal    | ✅ Supported             |
+| macOS    | Intel/AMD       | CPU only | ✅ Supported             |
+| Linux    | NVIDIA          | CUDA     | ✅ Available in releases |
+| Linux    | NVIDIA          | Vulkan   | ✅ Available in releases |
+| Linux    | AMD             | HIP/ROCm | ✅ Available in releases |
+| Linux    | AMD             | Vulkan   | ✅ Available in releases |
+| Linux    | Intel           | SYCL     | ✅ Available in releases |
+| Linux    | Intel/Other     | Vulkan   | ✅ Available in releases |
+| Linux    | Intel/Other     | CPU      | ✅ Fallback              |
+| Windows  | NVIDIA          | CUDA     | ✅ Available in releases |
+| Windows  | NVIDIA          | Vulkan   | ✅ Available in releases |
+| Windows  | AMD             | HIP      | ✅ Available in releases |
+| Windows  | AMD             | Vulkan   | ✅ Available in releases |
+| Windows  | Intel           | SYCL     | ✅ Available in releases |
+| Windows  | Qualcomm Adreno | OpenCL   | ✅ Available in releases |
+| Windows  | Intel/Other     | Vulkan   | ✅ Available in releases |
+| Windows  | Intel/Other     | CPU      | ✅ Fallback              |
 
 The library automatically downloads pre-built binaries from the official llama.cpp releases with the appropriate GPU support for your platform. The download happens automatically on first use!
 
@@ -261,9 +261,39 @@ The downloader automatically selects the best variant for your platform:
 
 #### Cache Location
 
-Downloaded libraries are cached in:
+Downloaded libraries are cached in platform-specific locations:
 - **Linux/macOS**: `~/.cache/gollama/libs/`
 - **Windows**: `%LOCALAPPDATA%/gollama/libs/`
+
+You can customize the cache directory in several ways:
+
+**Environment Variable:**
+```bash
+export GOLLAMA_CACHE_DIR=/custom/path/to/cache
+```
+
+**Configuration File:**
+```json
+{
+  "cache_dir": "/custom/path/to/cache"
+}
+```
+
+**Programmatically:**
+```go
+config := gollama.DefaultConfig()
+config.CacheDir = "/custom/path/to/cache"
+gollama.SetGlobalConfig(config)
+```
+
+To get the current cache directory:
+```go
+cacheDir, err := gollama.GetLibraryCacheDir()
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Using cache directory: %s\n", cacheDir)
+```
 
 ## Building from Source
 

@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **llama.cpp Version**: Updated from b6099 to b6862
   - Updated Makefile, CI workflows, and all documentation
   - Improved compatibility with latest llama.cpp features
-  - Updated KV cache function names: `llama_kv_self_*` → `llama_kv_cache_*`
+  - Deprecated KV cache functions (removed from b6862 API): `llama_kv_cache_clear`, `llama_kv_cache_seq_*`, `llama_kv_cache_defrag`, `llama_kv_cache_update`
   - Removed non-existent functions: `llama_sampler_init_softmax`
 - **CI/CD Improvements**: 
   - Added automatic library download step before running tests

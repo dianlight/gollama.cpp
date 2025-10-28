@@ -452,15 +452,15 @@ var (
 	llamaPrintSystemInfo    func() *byte
 
 	// KV cache functions
-	llamaKvCacheClear   func(ctx LlamaContext)
-	llamaKvCacheSeqRm   func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos) bool
-	llamaKvCacheSeqCp   func(ctx LlamaContext, seqIdSrc LlamaSeqId, seqIdDst LlamaSeqId, p0 LlamaPos, p1 LlamaPos)
-	llamaKvCacheSeqKeep func(ctx LlamaContext, seqId LlamaSeqId)
-	llamaKvCacheSeqAdd  func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos, delta LlamaPos)
-	llamaKvCacheSeqDiv  func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos, d int32)
+	llamaKvCacheClear   func(ctx LlamaContext)      // Deprecated in b6862
+	llamaKvCacheSeqRm   func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos) bool // Deprecated in b6862
+	llamaKvCacheSeqCp   func(ctx LlamaContext, seqIdSrc LlamaSeqId, seqIdDst LlamaSeqId, p0 LlamaPos, p1 LlamaPos) // Deprecated in b6862
+	llamaKvCacheSeqKeep func(ctx LlamaContext, seqId LlamaSeqId) // Deprecated in b6862
+	llamaKvCacheSeqAdd  func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos, delta LlamaPos) // Deprecated in b6862
+	llamaKvCacheSeqDiv  func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos, d int32) // Deprecated in b6862
 	// llamaKvCacheSeqPos  func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos, delta LlamaPos)  // Function doesn't exist
-	llamaKvCacheDefrag func(ctx LlamaContext)
-	llamaKvCacheUpdate func(ctx LlamaContext)
+	llamaKvCacheDefrag func(ctx LlamaContext) // Deprecated in b6862
+	llamaKvCacheUpdate func(ctx LlamaContext) // Deprecated in b6862
 
 	// State functions
 	llamaStateGetSize  func(ctx LlamaContext) uint64
@@ -671,15 +671,16 @@ func registerFunctions() error {
 	registerLibFunc(&llamaPrintSystemInfo, libHandle, "llama_print_system_info")
 
 	// KV cache functions
-	registerLibFunc(&llamaKvCacheClear, libHandle, "llama_kv_cache_clear")
-	registerLibFunc(&llamaKvCacheSeqRm, libHandle, "llama_kv_cache_seq_rm")
-	registerLibFunc(&llamaKvCacheSeqCp, libHandle, "llama_kv_cache_seq_cp")
-	registerLibFunc(&llamaKvCacheSeqKeep, libHandle, "llama_kv_cache_seq_keep")
-	registerLibFunc(&llamaKvCacheSeqAdd, libHandle, "llama_kv_cache_seq_add")
-	registerLibFunc(&llamaKvCacheSeqDiv, libHandle, "llama_kv_cache_seq_div")
+	// KV cache functions - deprecated/removed in b6862
+	// registerLibFunc(&llamaKvCacheClear, libHandle, "llama_kv_cache_clear")
+	// registerLibFunc(&llamaKvCacheSeqRm, libHandle, "llama_kv_cache_seq_rm")
+	// registerLibFunc(&llamaKvCacheSeqCp, libHandle, "llama_kv_cache_seq_cp")
+	// registerLibFunc(&llamaKvCacheSeqKeep, libHandle, "llama_kv_cache_seq_keep")
+	// registerLibFunc(&llamaKvCacheSeqAdd, libHandle, "llama_kv_cache_seq_add")
+	// registerLibFunc(&llamaKvCacheSeqDiv, libHandle, "llama_kv_cache_seq_div")
 	// registerLibFunc(&llamaKvCacheSeqPos, libHandle, "llama_kv_cache_seq_pos")  // Might not exist
-	registerLibFunc(&llamaKvCacheDefrag, libHandle, "llama_kv_cache_defrag")
-	registerLibFunc(&llamaKvCacheUpdate, libHandle, "llama_kv_cache_update")
+	// registerLibFunc(&llamaKvCacheDefrag, libHandle, "llama_kv_cache_defrag")
+	// registerLibFunc(&llamaKvCacheUpdate, libHandle, "llama_kv_cache_update")
 
 	// State functions
 	registerLibFunc(&llamaStateGetSize, libHandle, "llama_state_get_size")

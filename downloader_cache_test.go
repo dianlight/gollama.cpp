@@ -51,8 +51,14 @@ func TestCacheDirectoryConfiguration(t *testing.T) {
 
 		// Set environment variable
 		oldEnv := os.Getenv("GOLLAMA_CACHE_DIR")
-		os.Setenv("GOLLAMA_CACHE_DIR", envCache)
-		defer os.Setenv("GOLLAMA_CACHE_DIR", oldEnv)
+		if err := os.Setenv("GOLLAMA_CACHE_DIR", envCache); err != nil {
+			t.Fatalf("Failed to set environment variable: %v", err)
+		}
+		defer func() {
+			if err := os.Setenv("GOLLAMA_CACHE_DIR", oldEnv); err != nil {
+				t.Errorf("Failed to restore environment variable: %v", err)
+			}
+		}()
 
 		downloader, err := NewLibraryDownloader()
 		if err != nil {

@@ -2,9 +2,6 @@ build/
 dist/
 .DS_Store
 models/*.gguf
-libs/darwin_*
-libs/linux_*
-libs/windows_*
 examples/gen-docs/test-output/
 examples/gen-docs/validate-test/
 examples/gritlm/gritlm
@@ -15,5 +12,3 @@ examples/simple-chat-with-loader/simple-chat-with-loader
 examples/retrieval/retrieval
 examples/batched/batched
 examples/diffusion/diffusion
-
-gollama-download

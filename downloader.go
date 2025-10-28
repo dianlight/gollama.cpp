@@ -57,15 +57,18 @@ type DownloadTask struct {
 	DownloadURL  string
 	TargetDir    string
 	ExpectedSHA2 string
+	ResultIndex  int
 }
 
 // DownloadResult represents the result of a download task
 type DownloadResult struct {
-	Platform    string
-	Success     bool
-	Error       error
-	LibraryPath string
-	SHA256Sum   string
+	Platform     string
+	Success      bool
+	Error        error
+	LibraryPath  string
+	SHA256Sum    string
+	ExtractedDir string
+	Embedded     bool
 }
 
 // LibraryDownloader handles downloading pre-built llama.cpp binaries
@@ -374,51 +377,123 @@ func (d *LibraryDownloader) GetPlatformAssetPatternForPlatform(goos, goarch stri
 
 // DownloadMultiplePlatforms downloads libraries for multiple platforms in parallel
 func (d *LibraryDownloader) DownloadMultiplePlatforms(platforms []string, version string) ([]DownloadResult, error) {
-	var release *ReleaseInfo
-	var err error
-
-	// Get release information
-	if version != "" {
-		release, err = d.GetReleaseByTag(version)
-	} else {
-		release, err = d.GetLatestRelease()
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to get release information: %w (%s)", err, version)
+	preferEmbedded := version == "" || version == LlamaCppBuild
+	effectiveVersion := version
+	if effectiveVersion == "" {
+		effectiveVersion = LlamaCppBuild
 	}
 
-	// Create download tasks
+	results := make([]DownloadResult, 0, len(platforms))
 	var tasks []DownloadTask
+	var release *ReleaseInfo
+
+	fetchRelease := func() error {
+		if release != nil {
+			return nil
+		}
+		var err error
+		if version != "" {
+			release, err = d.GetReleaseByTag(version)
+		} else {
+			release, err = d.GetLatestRelease()
+			if err == nil && release != nil && release.TagName != nil {
+				effectiveVersion = release.GetTagName()
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("failed to get release information: %w (%s)", err, version)
+		}
+		return nil
+	}
+
 	for _, platform := range platforms {
 		parts := strings.Split(platform, "/")
 		if len(parts) != 2 {
-			continue // Skip invalid platform specifications
+			continue
 		}
 		goos, goarch := parts[0], parts[1]
 
+		// Attempt to use embedded libraries when allowed and available.
+		if preferEmbedded && effectiveVersion == LlamaCppBuild && hasEmbeddedLibraryForPlatform(goos, goarch) {
+			targetDir := filepath.Join(d.cacheDir, "embedded", embeddedPlatformDirName(goos, goarch))
+			if !d.isLibraryReady(targetDir) {
+				if err := extractEmbeddedLibrariesTo(targetDir, goos, goarch); err == nil {
+					// extracted successfully
+				} else {
+					targetDir = ""
+				}
+			}
+
+			if targetDir != "" {
+				if libPath, err := d.FindLibraryPathForPlatform(targetDir, goos); err == nil {
+					results = append(results, DownloadResult{
+						Platform:     platform,
+						Success:      true,
+						LibraryPath:  libPath,
+						ExtractedDir: targetDir,
+						Embedded:     true,
+					})
+					continue
+				}
+			}
+		}
+
+		if err := fetchRelease(); err != nil {
+			return nil, err
+		}
+
 		pattern, err := d.GetPlatformAssetPatternForPlatform(goos, goarch)
 		if err != nil {
-			continue // Skip unsupported platforms
+			results = append(results, DownloadResult{
+				Platform: platform,
+				Success:  false,
+				Error:    err,
+			})
+			continue
 		}
 
 		assetName, downloadURL, err := d.FindAssetByPattern(release, pattern)
 		if err != nil {
-			continue // Skip platforms without available assets
+			results = append(results, DownloadResult{
+				Platform: platform,
+				Success:  false,
+				Error:    err,
+			})
+			continue
 		}
 
 		targetDir := filepath.Join(d.cacheDir, strings.TrimSuffix(assetName, ".zip"))
+		idx := len(results)
+		results = append(results, DownloadResult{Platform: platform})
 		tasks = append(tasks, DownloadTask{
-			Platform:    platform,
-			AssetName:   assetName,
-			DownloadURL: downloadURL,
-			TargetDir:   targetDir,
-			// No expected checksum since llama.cpp doesn't provide them
+			Platform:     platform,
+			AssetName:    assetName,
+			DownloadURL:  downloadURL,
+			TargetDir:    targetDir,
 			ExpectedSHA2: "",
+			ResultIndex:  idx,
 		})
 	}
 
-	// Execute downloads in parallel
-	return d.executeParallelDownloads(tasks)
+	if len(tasks) == 0 {
+		return results, nil
+	}
+
+	taskResults, err := d.executeParallelDownloads(tasks)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, taskResult := range taskResults {
+		idx := tasks[i].ResultIndex
+		if idx < len(results) {
+			results[idx] = taskResult
+		} else {
+			results = append(results, taskResult)
+		}
+	}
+
+	return results, nil
 }
 
 // executeParallelDownloads executes multiple download tasks concurrently
@@ -439,8 +514,9 @@ func (d *LibraryDownloader) executeParallelDownloads(tasks []DownloadTask) ([]Do
 			defer func() { <-semaphore }()
 
 			result := DownloadResult{
-				Platform: t.Platform,
-				Success:  false,
+				Platform:     t.Platform,
+				Success:      false,
+				ExtractedDir: t.TargetDir,
 			}
 
 			// Check if already exists and ready
@@ -459,6 +535,7 @@ func (d *LibraryDownloader) executeParallelDownloads(tasks []DownloadTask) ([]Do
 				if checksum, err := d.calculateSHA256(archivePath); err == nil {
 					result.SHA256Sum = checksum
 				}
+				result.ExtractedDir = t.TargetDir
 				results[index] = result
 				return
 			}
@@ -489,6 +566,7 @@ func (d *LibraryDownloader) executeParallelDownloads(tasks []DownloadTask) ([]Do
 			result.Success = true
 			result.LibraryPath = libPath
 			result.SHA256Sum = checksum
+			result.ExtractedDir = extractedDir
 			results[index] = result
 		}(i, task)
 	}

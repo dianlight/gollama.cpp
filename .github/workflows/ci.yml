@@ -262,6 +262,31 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Populate embedded libraries and publish sync branch
+        env:
+          LLAMA_CPP_BUILD: ${{ env.LLAMA_CPP_BUILD }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin automation/embedded-libs || true
+          git checkout -B automation/embedded-libs
+
+          make populate-libs
+
+          if ! git diff --quiet -- libs; then
+            git add libs
+            git commit -m "chore: sync embedded libs for ${LLAMA_CPP_BUILD}"
+            git push origin HEAD:automation/embedded-libs
+          else
+            echo "Embedded libraries already up to date"
+          fi
+
+          git checkout "${GITHUB_SHA}"
+          make populate-libs
+
       - name: Cache Go modules
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
         with:

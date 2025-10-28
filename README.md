@@ -15,6 +15,7 @@ A high-performance Go binding for [llama.cpp](https://github.com/ggml-org/llama.
 - **Compatibility**: Version-synchronized with llama.cpp releases
 - **Easy Integration**: Simple Go API for LLM inference
 - **GPU Acceleration**: Supports Metal, CUDA, HIP, Vulkan, OpenCL, SYCL, and other backends
+- **Embedded Runtime Libraries**: Optional go:embed bundle for all supported platforms
 
 ## Supported Platforms
 
@@ -63,6 +64,20 @@ go get github.com/dianlight/gollama.cpp
 ```
 
 The Go module automatically downloads pre-built llama.cpp libraries from the official [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) releases on first use. No manual compilation required!
+
+### Embedding Libraries
+
+For reproducible builds you can embed the pre-built libraries directly into the Go module. A helper Makefile target downloads the configured llama.cpp build (`LLAMA_CPP_BUILD`) for every supported platform and synchronises the `./libs` directory which is picked up by `go:embed`:
+
+```bash
+# Download all platform builds for the configured llama.cpp version and populate ./libs
+make populate-libs
+
+# Alternatively, use the CLI directly
+go run ./cmd/gollama-download -download-all -version b6862 -copy-libs
+```
+
+Only a single llama.cpp version is stored in `./libs` at a time. Running `populate-libs` removes outdated directories automatically. Subsequent `go build` invocations embed the freshly synchronised libraries and `LoadLibraryWithVersion("")` will prefer the embedded bundle.
 
 ## Cross-Platform Development
 

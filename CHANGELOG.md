@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Implemented FFI wrapper layer (`ffi.go`) with 10 wrapper functions for struct-based operations
   - Added `Encode()` and `Sampler_chain_init()` public wrapper functions
   - Platform-agnostic GetProcAddress helper for symbol resolution
+- **Embedded Library Packaging**: `go:embed` support for pre-built llama.cpp binaries across all platforms
+  - New `make populate-libs` target and `-copy-libs` CLI flag to sync the `./libs` directory
+  - Runtime prefers embedded libraries when requesting the bundled llama.cpp build
+  - Release workflow auto-populates and commits the embedded library bundle
 
 ### Changed
 - **llama.cpp Version**: Updated from b6099 to b6862
@@ -98,15 +102,15 @@ This release significantly expands GPU support with **three new GPU backends** a
 - **Documentation**: Updated to reflect hf.sh script integration and usage
 
 ### GPU Backend Support Matrix
-| Backend | Platforms | GPU Vendors | Detection Command | Status |
-|---------|-----------|-------------|-------------------|--------|
-| **Metal** | macOS | Apple Silicon | `system_profiler` | ✅ Production |
-| **CUDA** | Linux, Windows | NVIDIA | `nvcc` | ✅ Production |
-| **HIP/ROCm** | Linux, Windows | AMD | `hipconfig` | ✅ Production |
-| **Vulkan** | Linux, Windows | NVIDIA, AMD, Intel | `vulkaninfo` | ✅ Production |
-| **OpenCL** | Windows, Linux | Qualcomm Adreno, Intel, AMD | `clinfo` | ✅ Production |
-| **SYCL** | Linux, Windows | Intel, NVIDIA | `sycl-ls` | ✅ Production |
-| **CPU** | All | All | N/A | ✅ Fallback |
+| Backend      | Platforms      | GPU Vendors                 | Detection Command | Status       |
+| ------------ | -------------- | --------------------------- | ----------------- | ------------ |
+| **Metal**    | macOS          | Apple Silicon               | `system_profiler` | ✅ Production |
+| **CUDA**     | Linux, Windows | NVIDIA                      | `nvcc`            | ✅ Production |
+| **HIP/ROCm** | Linux, Windows | AMD                         | `hipconfig`       | ✅ Production |
+| **Vulkan**   | Linux, Windows | NVIDIA, AMD, Intel          | `vulkaninfo`      | ✅ Production |
+| **OpenCL**   | Windows, Linux | Qualcomm Adreno, Intel, AMD | `clinfo`          | ✅ Production |
+| **SYCL**     | Linux, Windows | Intel, NVIDIA               | `sycl-ls`         | ✅ Production |
+| **CPU**      | All            | All                         | N/A               | ✅ Fallback   |
 
 ### Dependencies
 - llama.cpp: Updated from b6076 to b6099 (managed by Renovate)

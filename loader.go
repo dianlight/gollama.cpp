@@ -3,7 +3,9 @@ package gollama
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 )
 
@@ -34,6 +36,11 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 		return nil
 	}
 
+	resolvedVersion := version
+	if resolvedVersion == "" {
+		resolvedVersion = LlamaCppBuild
+	}
+
 	// Initialize downloader if not already done
 	if l.downloader == nil {
 		// Check if global config has a custom cache directory
@@ -49,20 +56,32 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 		l.downloader = downloader
 	}
 
-	// Get the appropriate release
-	var release *ReleaseInfo
-	var err error
+	// Prefer embedded libraries if available for the requested version
+	if resolvedVersion == LlamaCppBuild && hasEmbeddedLibraryForPlatform(runtime.GOOS, runtime.GOARCH) {
+		targetDir := filepath.Join(l.downloader.cacheDir, "embedded", embeddedPlatformDirName(runtime.GOOS, runtime.GOARCH))
+		if !l.downloader.isLibraryReady(targetDir) {
+			if err := extractEmbeddedLibrariesTo(targetDir, runtime.GOOS, runtime.GOARCH); err != nil {
+				return fmt.Errorf("failed to extract embedded libraries: %w", err)
+			}
+		}
 
-	if version == "" {
-		release, err = l.downloader.GetLatestRelease()
-		if err != nil {
-			return fmt.Errorf("failed to get latest release: %w", err)
+		libPath, err := l.downloader.FindLibraryPathForPlatform(targetDir, runtime.GOOS)
+		if err == nil {
+			handle, err := l.loadSharedLibrary(libPath)
+			if err != nil {
+				return fmt.Errorf("failed to load embedded library %s: %w", libPath, err)
+			}
+			l.handle = handle
+			l.libPath = libPath
+			l.loaded = true
+			return nil
 		}
-	} else {
-		release, err = l.downloader.GetReleaseByTag(version)
-		if err != nil {
-			return fmt.Errorf("failed to get release %s: %w", version, err)
-		}
+	}
+
+	// Get the appropriate release when embedded libs are unavailable
+	release, err := l.getReleaseForVersion(version)
+	if err != nil {
+		return err
 	}
 
 	// Get platform-specific asset pattern
@@ -78,10 +97,9 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 	}
 
 	// Check if library is already cached and ready
-	extractedDir := l.downloader.cacheDir + "/" + assetName[:len(assetName)-4] // Remove .zip extension
+	extractedDir := filepath.Join(l.downloader.cacheDir, strings.TrimSuffix(assetName, ".zip"))
 	libPath, err := l.downloader.FindLibraryPath(extractedDir)
 	if err == nil {
-		// Library already exists, load it directly without downloading
 		handle, err := l.loadSharedLibrary(libPath)
 		if err != nil {
 			return fmt.Errorf("failed to load library %s: %w", libPath, err)
@@ -117,6 +135,22 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 	l.loaded = true
 
 	return nil
+}
+
+func (l *LibraryLoader) getReleaseForVersion(version string) (*ReleaseInfo, error) {
+	if version == "" {
+		release, err := l.downloader.GetLatestRelease()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get latest release: %w", err)
+		}
+		return release, nil
+	}
+
+	release, err := l.downloader.GetReleaseByTag(version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get release %s: %w", version, err)
+	}
+	return release, nil
 }
 
 // UnloadLibrary unloads the library and cleans up resources

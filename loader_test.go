@@ -53,11 +53,8 @@ func TestLibraryLoader_LoadSharedLibrary(t *testing.T) {
 		}
 
 		_, err := loader.loadSharedLibrary("test.dll")
-		if err == nil {
-			t.Error("Expected error for Windows, but got none")
-		}
-		if err.Error() != "support for windows platform not yet implemented" {
-			t.Errorf("Unexpected error message: %v", err)
+		if err != nil {
+			t.Error("Unexpected error for Windows platform:", err)
 		}
 	})
 

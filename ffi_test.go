@@ -165,7 +165,7 @@ func TestFFIEncode(t *testing.T) {
 	// We're mainly testing that the FFI call structure is correct
 	var ctx LlamaContext = 0
 	var batch LlamaBatch
-	
+
 	result, err := ffiEncode(ctx, batch)
 	if err != nil {
 		t.Logf("FFI encode failed (expected without valid context): %v", err)

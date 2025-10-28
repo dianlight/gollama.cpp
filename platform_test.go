@@ -56,7 +56,7 @@ func TestPlatformSpecific(t *testing.T) {
 			var dummy uintptr
 			registerLibFunc(&dummy, 0, "test_function")
 			t.Log("Windows registerLibFunc completed without panic")
-			
+
 			// Test getProcAddressPlatform with invalid handle
 			_, err = getProcAddressPlatform(0, "test_function")
 			if err == nil {

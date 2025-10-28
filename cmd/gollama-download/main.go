@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dianlight/gollama.cpp"
+	gollama "github.com/dianlight/gollama.cpp"
 )
 
 func main() {

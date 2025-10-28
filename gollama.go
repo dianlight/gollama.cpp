@@ -429,12 +429,12 @@ var (
 	llamaSamplerReset              func(smpl LlamaSampler)
 
 	// Built-in samplers
-	llamaSamplerInitGreedy  func() LlamaSampler
-	llamaSamplerInitDist    func(seed uint32) LlamaSampler
+	llamaSamplerInitGreedy func() LlamaSampler
+	llamaSamplerInitDist   func(seed uint32) LlamaSampler
 	// llamaSamplerInitSoftmax func() LlamaSampler  // Function doesn't exist in b6862
-	llamaSamplerInitTopK    func(k int32) LlamaSampler
-	llamaSamplerInitTopP    func(p float32, minKeep uint64) LlamaSampler
-	llamaSamplerInitMinP    func(p float32, minKeep uint64) LlamaSampler
+	llamaSamplerInitTopK func(k int32) LlamaSampler
+	llamaSamplerInitTopP func(p float32, minKeep uint64) LlamaSampler
+	llamaSamplerInitMinP func(p float32, minKeep uint64) LlamaSampler
 	// llamaSamplerInitTailFree   func(z float32, minKeep uint64) LlamaSampler  // Function doesn't exist
 	llamaSamplerInitTypical    func(p float32, minKeep uint64) LlamaSampler
 	llamaSamplerInitTemp       func(temp float32) LlamaSampler
@@ -452,12 +452,12 @@ var (
 	llamaPrintSystemInfo    func() *byte
 
 	// KV cache functions
-	llamaKvCacheClear   func(ctx LlamaContext)      // Deprecated in b6862
-	llamaKvCacheSeqRm   func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos) bool // Deprecated in b6862
+	llamaKvCacheClear   func(ctx LlamaContext)                                                                     // Deprecated in b6862
+	llamaKvCacheSeqRm   func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos) bool                    // Deprecated in b6862
 	llamaKvCacheSeqCp   func(ctx LlamaContext, seqIdSrc LlamaSeqId, seqIdDst LlamaSeqId, p0 LlamaPos, p1 LlamaPos) // Deprecated in b6862
-	llamaKvCacheSeqKeep func(ctx LlamaContext, seqId LlamaSeqId) // Deprecated in b6862
-	llamaKvCacheSeqAdd  func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos, delta LlamaPos) // Deprecated in b6862
-	llamaKvCacheSeqDiv  func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos, d int32) // Deprecated in b6862
+	llamaKvCacheSeqKeep func(ctx LlamaContext, seqId LlamaSeqId)                                                   // Deprecated in b6862
+	llamaKvCacheSeqAdd  func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos, delta LlamaPos)         // Deprecated in b6862
+	llamaKvCacheSeqDiv  func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos, d int32)                // Deprecated in b6862
 	// llamaKvCacheSeqPos  func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos, delta LlamaPos)  // Function doesn't exist
 	llamaKvCacheDefrag func(ctx LlamaContext) // Deprecated in b6862
 	llamaKvCacheUpdate func(ctx LlamaContext) // Deprecated in b6862

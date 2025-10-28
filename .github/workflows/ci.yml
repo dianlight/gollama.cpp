@@ -66,6 +66,39 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
+    - name: Download libllama libraries
+      run: make download-libs
+
+    - name: Set library path (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        CACHE_DIR="$HOME/.cache/gollama/libs"
+        LIB_DIR=$(find "$CACHE_DIR" -type d -name "build" -o -name "bin" | grep -E "build/bin|bin$" | head -1)
+        if [ -n "$LIB_DIR" ]; then
+          echo "LD_LIBRARY_PATH=$LIB_DIR:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "Library path set to: $LIB_DIR"
+        fi
+
+    - name: Set library path (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        CACHE_DIR="$HOME/Library/Caches/gollama/libs"
+        LIB_DIR=$(find "$CACHE_DIR" -type d -name "build" -o -name "bin" | grep -E "build/bin|bin$" | head -1)
+        if [ -n "$LIB_DIR" ]; then
+          echo "DYLD_LIBRARY_PATH=$LIB_DIR:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "Library path set to: $LIB_DIR"
+        fi
+
+    - name: Set library path (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        $CacheDir = "$env:LOCALAPPDATA\gollama\libs"
+        $LibDir = Get-ChildItem -Path $CacheDir -Recurse -Directory | Where-Object { $_.Name -eq "bin" -or $_.FullName -like "*\build\bin" } | Select-Object -First 1 -ExpandProperty FullName
+        if ($LibDir) {
+          echo "PATH=$LibDir;$env:PATH" >> $env:GITHUB_ENV
+          echo "Library path set to: $LibDir"
+        }
+
     #- name: GPU Detection Test
     #  run: |
     #    echo "Testing GPU detection capabilities..."

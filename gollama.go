@@ -819,7 +819,7 @@ func Model_load_from_file(pathModel string, params LlamaModelParams) (LlamaModel
 	}
 
 	pathBytes := append([]byte(pathModel), 0) // null-terminate
-	
+
 	// Try FFI first (works on all platforms)
 	if model, err := ffiModelLoadFromFile((*byte)(unsafe.Pointer(&pathBytes[0])), params); err == nil {
 		return model, nil

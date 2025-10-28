@@ -13,20 +13,20 @@ var (
 	ffiTypeLlamaModelParams = ffi.Type{
 		Type: ffi.Struct,
 		Elements: &[]*ffi.Type{
-			&ffi.TypePointer,  // devices
-			&ffi.TypePointer,  // tensor_buft_overrides
-			&ffi.TypeSint32,   // n_gpu_layers
-			&ffi.TypeSint32,   // split_mode
-			&ffi.TypeSint32,   // main_gpu
-			&ffi.TypePointer,  // tensor_split
-			&ffi.TypePointer,  // progress_callback
-			&ffi.TypePointer,  // progress_callback_user_data
-			&ffi.TypePointer,  // kv_overrides
-			&ffi.TypeUint8,    // vocab_only
-			&ffi.TypeUint8,    // use_mmap
-			&ffi.TypeUint8,    // use_mlock
-			&ffi.TypeUint8,    // check_tensors
-			&ffi.TypeUint8,    // use_extra_bufts
+			&ffi.TypePointer, // devices
+			&ffi.TypePointer, // tensor_buft_overrides
+			&ffi.TypeSint32,  // n_gpu_layers
+			&ffi.TypeSint32,  // split_mode
+			&ffi.TypeSint32,  // main_gpu
+			&ffi.TypePointer, // tensor_split
+			&ffi.TypePointer, // progress_callback
+			&ffi.TypePointer, // progress_callback_user_data
+			&ffi.TypePointer, // kv_overrides
+			&ffi.TypeUint8,   // vocab_only
+			&ffi.TypeUint8,   // use_mmap
+			&ffi.TypeUint8,   // use_mlock
+			&ffi.TypeUint8,   // check_tensors
+			&ffi.TypeUint8,   // use_extra_bufts
 			nil,
 		}[0],
 	}
@@ -188,7 +188,7 @@ func ffiModelLoadFromFile(pathModel *byte, params LlamaModelParams) (LlamaModel,
 		unsafe.Pointer(&params),
 	}
 	ffi.Call(&cif, fnAddr, unsafe.Pointer(&result), aValues...)
-	
+
 	if result == 0 {
 		return 0, fmt.Errorf("failed to load model")
 	}
@@ -214,7 +214,7 @@ func ffiInitFromModel(model LlamaModel, params LlamaContextParams) (LlamaContext
 		unsafe.Pointer(&params),
 	}
 	ffi.Call(&cif, fnAddr, unsafe.Pointer(&result), aValues...)
-	
+
 	if result == 0 {
 		return 0, fmt.Errorf("failed to create context")
 	}

@@ -71,8 +71,8 @@ func TestFFIModelDefaultParams(t *testing.T) {
 	if params.NGpuLayers < -1 {
 		t.Errorf("NGpuLayers should be >= -1, got %d", params.NGpuLayers)
 	}
-	
-	t.Logf("FFI Model default params: NGpuLayers=%d, SplitMode=%d, UseMmap=%d", 
+
+	t.Logf("FFI Model default params: NGpuLayers=%d, SplitMode=%d, UseMmap=%d",
 		params.NGpuLayers, params.SplitMode, params.UseMmap)
 }
 
@@ -100,7 +100,7 @@ func TestFFIContextDefaultParams(t *testing.T) {
 		t.Error("NBatch should not be zero in default params")
 	}
 
-	t.Logf("FFI Context default params: Seed=%d, NCtx=%d, NBatch=%d, NThreads=%d", 
+	t.Logf("FFI Context default params: Seed=%d, NCtx=%d, NBatch=%d, NThreads=%d",
 		params.Seed, params.NCtx, params.NBatch, params.NThreads)
 }
 
@@ -200,7 +200,7 @@ func TestPlatformGetProcAddress(t *testing.T) {
 func TestFFICrossCompileCompatibility(t *testing.T) {
 	// This test verifies that the FFI implementation doesn't break cross-compilation
 	// It checks that all platform-specific functions are properly defined
-	
+
 	// These should compile on all platforms
 	_ = loadLibraryPlatform
 	_ = closeLibraryPlatform
@@ -208,7 +208,7 @@ func TestFFICrossCompileCompatibility(t *testing.T) {
 	_ = getProcAddressPlatform
 	_ = isPlatformSupported
 	_ = getPlatformError
-	
+
 	t.Log("All platform-specific functions are properly defined")
 }
 

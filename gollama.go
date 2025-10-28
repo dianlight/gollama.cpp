@@ -452,16 +452,7 @@ var (
 	llamaTimeUs             func() int64
 	llamaPrintSystemInfo    func() *byte
 
-	// KV cache functions
-	llamaKvCacheClear   func(ctx LlamaContext)                                                                     // Deprecated in b6862
-	llamaKvCacheSeqRm   func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos) bool                    // Deprecated in b6862
-	llamaKvCacheSeqCp   func(ctx LlamaContext, seqIdSrc LlamaSeqId, seqIdDst LlamaSeqId, p0 LlamaPos, p1 LlamaPos) // Deprecated in b6862
-	llamaKvCacheSeqKeep func(ctx LlamaContext, seqId LlamaSeqId)                                                   // Deprecated in b6862
-	llamaKvCacheSeqAdd  func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos, delta LlamaPos)         // Deprecated in b6862
-	llamaKvCacheSeqDiv  func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos, d int32)                // Deprecated in b6862
-	// llamaKvCacheSeqPos  func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos, delta LlamaPos)  // Function doesn't exist
-	llamaKvCacheDefrag func(ctx LlamaContext) // Deprecated in b6862
-	llamaKvCacheUpdate func(ctx LlamaContext) // Deprecated in b6862
+	// KV cache functions (deprecated functions removed in b6862)
 
 	// State functions
 	llamaStateGetSize  func(ctx LlamaContext) uint64

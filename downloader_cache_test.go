@@ -72,8 +72,8 @@ func TestCacheDirectoryConfiguration(t *testing.T) {
 
 		config := DefaultConfig()
 		config.CacheDir = configCache
-		SetGlobalConfig(config)
-		defer SetGlobalConfig(LoadDefaultConfig()) // Reset to default
+		_ = SetGlobalConfig(config)
+		defer func() { _ = SetGlobalConfig(LoadDefaultConfig()) }() // Reset to default
 
 		cacheDir, err := GetLibraryCacheDir()
 		if err != nil {

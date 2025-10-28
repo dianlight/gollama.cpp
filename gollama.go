@@ -671,15 +671,15 @@ func registerFunctions() error {
 	registerLibFunc(&llamaPrintSystemInfo, libHandle, "llama_print_system_info")
 
 	// KV cache functions
-	registerLibFunc(&llamaKvCacheClear, libHandle, "llama_kv_self_clear")
-	registerLibFunc(&llamaKvCacheSeqRm, libHandle, "llama_kv_self_seq_rm")
-	registerLibFunc(&llamaKvCacheSeqCp, libHandle, "llama_kv_self_seq_cp")
-	registerLibFunc(&llamaKvCacheSeqKeep, libHandle, "llama_kv_self_seq_keep")
-	registerLibFunc(&llamaKvCacheSeqAdd, libHandle, "llama_kv_self_seq_add")
-	registerLibFunc(&llamaKvCacheSeqDiv, libHandle, "llama_kv_self_seq_div")
-	// registerLibFunc(&llamaKvCacheSeqPos, libHandle, "llama_kv_self_seq_pos")  // Might not exist
-	registerLibFunc(&llamaKvCacheDefrag, libHandle, "llama_kv_self_defrag")
-	registerLibFunc(&llamaKvCacheUpdate, libHandle, "llama_kv_self_update")
+	registerLibFunc(&llamaKvCacheClear, libHandle, "llama_kv_cache_clear")
+	registerLibFunc(&llamaKvCacheSeqRm, libHandle, "llama_kv_cache_seq_rm")
+	registerLibFunc(&llamaKvCacheSeqCp, libHandle, "llama_kv_cache_seq_cp")
+	registerLibFunc(&llamaKvCacheSeqKeep, libHandle, "llama_kv_cache_seq_keep")
+	registerLibFunc(&llamaKvCacheSeqAdd, libHandle, "llama_kv_cache_seq_add")
+	registerLibFunc(&llamaKvCacheSeqDiv, libHandle, "llama_kv_cache_seq_div")
+	// registerLibFunc(&llamaKvCacheSeqPos, libHandle, "llama_kv_cache_seq_pos")  // Might not exist
+	registerLibFunc(&llamaKvCacheDefrag, libHandle, "llama_kv_cache_defrag")
+	registerLibFunc(&llamaKvCacheUpdate, libHandle, "llama_kv_cache_update")
 
 	// State functions
 	registerLibFunc(&llamaStateGetSize, libHandle, "llama_state_get_size")

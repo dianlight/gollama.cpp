@@ -18,9 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **llama.cpp Version**: Updated from b6099 to b6862
   - Updated Makefile, CI workflows, and all documentation
   - Improved compatibility with latest llama.cpp features
+  - Updated KV cache function names: `llama_kv_self_*` → `llama_kv_cache_*`
+  - Removed non-existent functions: `llama_sampler_init_softmax`
 - **CI/CD Improvements**: 
   - Added automatic library download step before running tests
   - Configured platform-specific library paths (LD_LIBRARY_PATH, DYLD_LIBRARY_PATH, PATH)
+  - Updated GO_VERSION to 1.25
 - **Windows Support**: Enabled full runtime support with FFI (previously build-only)
 - **Test Behavior**: FFI tests now fail instead of skip when library is unavailable
 

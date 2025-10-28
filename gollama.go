@@ -431,7 +431,7 @@ var (
 	// Built-in samplers
 	llamaSamplerInitGreedy  func() LlamaSampler
 	llamaSamplerInitDist    func(seed uint32) LlamaSampler
-	llamaSamplerInitSoftmax func() LlamaSampler
+	// llamaSamplerInitSoftmax func() LlamaSampler  // Function doesn't exist in b6862
 	llamaSamplerInitTopK    func(k int32) LlamaSampler
 	llamaSamplerInitTopP    func(p float32, minKeep uint64) LlamaSampler
 	llamaSamplerInitMinP    func(p float32, minKeep uint64) LlamaSampler
@@ -650,7 +650,7 @@ func registerFunctions() error {
 	// Built-in samplers
 	registerLibFunc(&llamaSamplerInitGreedy, libHandle, "llama_sampler_init_greedy")
 	registerLibFunc(&llamaSamplerInitDist, libHandle, "llama_sampler_init_dist")
-	registerLibFunc(&llamaSamplerInitSoftmax, libHandle, "llama_sampler_init_softmax")
+	// registerLibFunc(&llamaSamplerInitSoftmax, libHandle, "llama_sampler_init_softmax")  // Function doesn't exist in b6862
 	registerLibFunc(&llamaSamplerInitTopK, libHandle, "llama_sampler_init_top_k")
 	registerLibFunc(&llamaSamplerInitTopP, libHandle, "llama_sampler_init_top_p")
 	registerLibFunc(&llamaSamplerInitMinP, libHandle, "llama_sampler_init_min_p")

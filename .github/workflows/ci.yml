@@ -8,7 +8,7 @@ on:
     branches: [ main, develop ]
 
 env:
-  GO_VERSION: '1.21'
+  GO_VERSION: '1.25'
   LLAMA_CPP_BUILD: 'b6862'
 
 jobs:

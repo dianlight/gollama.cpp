@@ -82,6 +82,36 @@ jobs:
       - name: Download libllama libraries
         run: make download-libs
 
+      - name: Verify and setup libraries (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Write-Output "=== Windows Library Setup Debug ==="
+          $CacheDir = "$env:LOCALAPPDATA\gollama\libs"
+          Write-Output "Expected cache directory: $CacheDir"
+
+          # Check if cache directory exists
+          if (Test-Path $CacheDir) {
+            Write-Output "✓ Cache directory exists"
+            
+            # List directory structure
+            Write-Output "Directory structure:"
+            Get-ChildItem -Path $CacheDir -Recurse | Select-Object -First 50 | ForEach-Object {
+              $level = ([System.IO.Path]::GetRelativePath($CacheDir, $_.FullName).Split([System.IO.Path]::DirectorySeparatorChar).Count - 1) * 2
+              $indent = " " * $level
+              Write-Output "$indent$($_.Name)"
+            }
+            
+            # Check for DLL files
+            $DllFiles = @(Get-ChildItem -Path $CacheDir -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue)
+            Write-Output ""
+            Write-Output "DLL files found: $($DllFiles.Count)"
+            foreach ($dll in $DllFiles) {
+              Write-Output "  - $($dll.FullName)"
+            }
+          } else {
+            Write-Output "✗ Cache directory does not exist yet (will be created on first test run)"
+          }
+
       - name: Set library path (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -106,10 +136,33 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           $CacheDir = "$env:LOCALAPPDATA\gollama\libs"
-          $LibDir = Get-ChildItem -Path $CacheDir -Recurse -Directory | Where-Object { $_.Name -eq "bin" -or $_.FullName -like "*\build\bin" } | Select-Object -First 1 -ExpandProperty FullName
+          Write-Output "Cache directory: $CacheDir"
+
+          # List the cache directory structure for debugging
+          if (Test-Path $CacheDir) {
+            Write-Output "Contents of cache directory:"
+            Get-ChildItem -Path $CacheDir -Recurse | Select-Object -First 20 | ForEach-Object { Write-Output "  $_" }
+          } else {
+            Write-Output "Cache directory does not exist yet"
+          }
+
+          # Find library directory - look for build/bin or just bin directories
+          $LibDir = $null
+          if (Test-Path $CacheDir) {
+            $LibDir = Get-ChildItem -Path $CacheDir -Recurse -Directory -ErrorAction SilentlyContinue | 
+              Where-Object { ($_.Name -eq "bin") -or ($_.FullName -match "\\build\\bin$") } | 
+              Select-Object -First 1 -ExpandProperty FullName
+          }
+
           if ($LibDir) {
+            Write-Output "Library directory found: $LibDir"
+            Write-Output "Verifying DLL presence:"
+            Get-ChildItem -Path $LibDir -Filter "*.dll" | ForEach-Object { Write-Output "  Found: $($_.Name)" }
             echo "PATH=$LibDir;$env:PATH" >> $env:GITHUB_ENV
-            echo "Library path set to: $LibDir"
+            echo "LD_LIBRARY_PATH=$LibDir" >> $env:GITHUB_ENV
+            Write-Output "Library path set to: $LibDir"
+          } else {
+            Write-Output "Library directory not found - tests will attempt to download libraries at runtime"
           }
 
       #- name: GPU Detection Test
@@ -122,6 +175,24 @@ jobs:
           echo "Testing platform compatibility..."
           go build -v ./...
           echo "Build successful for ${{ runner.os }}"
+
+      - name: Verify library availability (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Write-Output "Checking for library DLLs..."
+          $CacheDir = "$env:LOCALAPPDATA\gollama\libs"
+          $DllCount = (Get-ChildItem -Path $CacheDir -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue | Measure-Object).Count
+          Write-Output "Found $DllCount DLL files"
+
+          # List all DLL files found
+          if ($DllCount -gt 0) {
+            Write-Output "DLL files:"
+            Get-ChildItem -Path $CacheDir -Recurse -Filter "*.dll" | ForEach-Object { Write-Output "  $_" }
+          }
+
+          # Check PATH
+          Write-Output "Current PATH components (Windows relevant):"
+          $env:PATH.Split(";") | Where-Object { $_ -match "gollama|llama" -or $_ -match "$([System.IO.Path]::GetTempPath())" } | ForEach-Object { Write-Output "  $_" }
 
       - name: Run tests
         run: go test -v ./...

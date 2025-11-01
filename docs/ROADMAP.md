@@ -14,8 +14,10 @@ This document outlines the planned development path for gollama.cpp, prioritized
 - **CI/CD Pipeline**: Cross-platform testing, automated releases, documentation generation
 
 ### 🚧 In Progress
-- **Windows Runtime Support**: Build compatibility complete, runtime functionality in development
 - **Renovate Integration**: Automated llama.cpp dependency updates (Phase 5)
+
+### ✅ Recently Completed
+- **Windows Runtime Support**: Implemented proper function registration using GetProcAddress for Windows FFI support
 
 ## Short-term Goals (Q3-Q4 2025)
 

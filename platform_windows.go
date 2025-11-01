@@ -121,11 +121,20 @@ func closeLibraryPlatform(handle uintptr) error {
 }
 
 // registerLibFunc registers a library function using platform-specific methods
-// For Windows, this is a placeholder implementation
+// For Windows, this uses GetProcAddress to resolve the function and stores it in the function pointer
 func registerLibFunc(fptr interface{}, handle uintptr, fname string) {
-	// TODO: Implement proper function registration for Windows - blocks ROADMAP Priority 1 (Windows Runtime Completion)
-	// This would need to use GetProcAddress and set the function pointer
-	// For now, this is a no-op to prevent build failures
+	procAddr, err := getProcAddressPlatform(handle, fname)
+	if err != nil {
+		// Log the error but don't panic - let the caller handle unresolved functions
+		fmt.Printf("warning: failed to register %s: %v\n", fname, err)
+		return
+	}
+
+	// Cast the function pointer interface to a *uintptr and store the resolved address
+	// This works because purego uses *uintptr to store function addresses
+	if ptr, ok := fptr.(*uintptr); ok {
+		*ptr = procAddr
+	}
 }
 
 // getProcAddressPlatform gets the address of a symbol in a loaded library

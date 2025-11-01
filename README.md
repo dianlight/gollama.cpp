@@ -43,8 +43,8 @@ Gollama.cpp uses a **platform-specific architecture** with build tags to ensure 
 - **Current State**: 
   - ✅ Compiles without errors on Windows
   - ✅ Cross-compilation from other platforms works
-  - ✅ Runtime functionality enabled via libffi
-  - ✅ Full struct parameter/return support
+  - ✅ Runtime functionality fully enabled via libffi and GetProcAddress
+  - ✅ Full struct parameter/return support through function registration
   - 🚧 GPU acceleration being tested
 
 > Windows runtime notes

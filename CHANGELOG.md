@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Windows Function Registration**: Implemented proper `registerLibFunc` for Windows using `GetProcAddress` to resolve function addresses from loaded DLLs. This enables cross-platform struct parameter/return support on Windows through libffi.
 - **libffi Support**: Cross-platform struct handling for C function calls on all platforms (Windows, Linux, macOS)
   - Added `github.com/jupiterrider/ffi v0.5.1` dependency for FFI support
   - Implemented FFI wrapper layer (`ffi.go`) with 10 wrapper functions for struct-based operations

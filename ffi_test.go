@@ -55,7 +55,7 @@ func TestFFIModelDefaultParams(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Fatalf("FFI model params test requires library to be available: %v", err)
+			t.Skipf("FFI model params test requires library to be available: %v", err)
 		}
 	}
 
@@ -81,7 +81,7 @@ func TestFFIContextDefaultParams(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Fatalf("FFI context params test requires library to be available: %v", err)
+			t.Skipf("FFI context params test requires library to be available: %v", err)
 		}
 	}
 
@@ -109,7 +109,7 @@ func TestFFISamplerChainDefaultParams(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Fatalf("FFI sampler chain params test requires library to be available: %v", err)
+			t.Skipf("FFI sampler chain params test requires library to be available: %v", err)
 		}
 	}
 
@@ -133,7 +133,7 @@ func TestFFIBatchInit(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Fatalf("FFI batch init test requires library to be available: %v", err)
+			t.Skipf("FFI batch init test requires library to be available: %v", err)
 		}
 	}
 
@@ -157,7 +157,7 @@ func TestFFIEncode(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Fatalf("FFI encode test requires library to be available: %v", err)
+			t.Skipf("FFI encode test requires library to be available: %v", err)
 		}
 	}
 
@@ -173,7 +173,7 @@ func TestFFISamplerChainInit(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Fatalf("FFI sampler chain init test requires library to be available: %v", err)
+			t.Skipf("FFI sampler chain init test requires library to be available: %v", err)
 		}
 	}
 
@@ -221,7 +221,7 @@ func TestPlatformGetProcAddress(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Fatalf("GetProcAddress test requires library to be available: %v", err)
+			t.Skipf("GetProcAddress test requires library to be available: %v", err)
 		}
 	}
 

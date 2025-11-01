@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Windows DLL loading: Improve reliability by adding the library directory to the DLL search path and preferring `LoadLibraryExW` with safe search flags. This resolves "The specified module could not be found" when loading embedded `llama.dll` on CI.
+
 ### Removed
 
 

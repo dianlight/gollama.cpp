@@ -47,6 +47,12 @@ Gollama.cpp uses a **platform-specific architecture** with build tags to ensure 
   - ✅ Full struct parameter/return support
   - 🚧 GPU acceleration being tested
 
+> Windows runtime notes
+>
+> - The loader now adds the DLL's directory to the Windows DLL search path and uses `LoadLibraryExW` with safe search flags to reliably resolve sibling dependencies (ggml, libomp, libcurl, etc.).
+> - If you see “The specified module could not be found.” while loading `llama.dll`, it often indicates a missing system runtime (e.g., Microsoft Visual C++ Redistributable 2015–2022). Installing the latest x64/x86 redistributable typically resolves it.
+> - CI runners set PATH for later steps, but the downloader verifies loading immediately after download; the improved loader handles dependency resolution without relying on PATH.
+
 ### Platform-Specific Implementation Details
 
 Our platform abstraction layer uses Go build tags to provide:

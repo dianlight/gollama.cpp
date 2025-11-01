@@ -60,6 +60,8 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           choco install cmake
+          # Ensure Microsoft Visual C++ Redistributable is present (needed by prebuilt DLLs)
+          choco install vcredist140 -y || echo "vcredist already installed"
           # Install Vulkan SDK for GPU detection (if available)
           #choco install vulkan-sdk || echo "Vulkan SDK not available"
 

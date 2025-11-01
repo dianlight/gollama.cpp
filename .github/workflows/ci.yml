@@ -59,7 +59,7 @@ jobs:
       - name: Install dependencies (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          choco install cmake
+          choco install cmake -y
           # Ensure Microsoft Visual C++ Redistributable is present (needed by prebuilt DLLs)
           choco install vcredist140 -y || echo "vcredist already installed"
           # Install Vulkan SDK for GPU detection (if available)
@@ -80,7 +80,7 @@ jobs:
             ${{ runner.os }}-libllama-
 
       - name: Download libllama libraries
-        run: make download-libs
+        run: go run ./cmd/gollama-download -download
 
       - name: Verify and setup libraries (Windows)
         if: runner.os == 'Windows'
@@ -192,7 +192,11 @@ jobs:
 
           # Check PATH
           Write-Output "Current PATH components (Windows relevant):"
-          $env:PATH.Split(";") | Where-Object { $_ -match "gollama|llama" -or $_ -match "$([System.IO.Path]::GetTempPath())" } | ForEach-Object { Write-Output "  $_" }
+          $tempPath = [System.IO.Path]::GetTempPath()
+          $tempPattern = [regex]::Escape($tempPath)
+          $env:PATH.Split(";") |
+            Where-Object { $_ -match "gollama|llama" -or $_ -match $tempPattern } |
+            ForEach-Object { Write-Output "  $_" }
 
       - name: Run tests
         run: go test -v ./...

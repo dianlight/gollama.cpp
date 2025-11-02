@@ -480,7 +480,7 @@ jobs:
         run: go install go.abhg.dev/doc2go@latest
 
       - name: Generate API reference for release
-        run: doc2go --root github.com/dianlight/gollama.cpp ./...
+        run: doc2go ./...
 
       - name: Upload pages artifact for release
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1

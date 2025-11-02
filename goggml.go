@@ -198,10 +198,10 @@ const (
 // Function pointers for GGML functions
 var (
 	// Type size functions
-	ggmlTypeSize        func(typ GgmlType) uint64
-	ggmlTypeSizeof      func(typ GgmlType) uint64
-	ggmlBlckSize        func(typ GgmlType) int32
-	ggmlTypeIsQuantized func(typ GgmlType) bool
+	ggmlTypeSize    func(typ GgmlType) uint64
+	ggmlTypeSizeof  func(typ GgmlType) uint64
+	ggmlBlckSize    func(typ GgmlType) int32
+	ggmlIsQuantized func(typ GgmlType) bool
 
 	// Backend device functions
 	ggmlBackendDevCount       func() uint64
@@ -233,7 +233,6 @@ var (
 	// Backend functions
 	ggmlBackendFree            func(backend GgmlBackend)
 	ggmlBackendName            func(backend GgmlBackend) *byte
-	ggmlBackendIsCpu           func(backend GgmlBackend) bool
 	ggmlBackendSupports        func(backend GgmlBackend, buft GgmlBackendBufferType) bool
 	ggmlBackendLoad            func(name *byte, search_path *byte) GgmlBackend
 	ggmlBackendLoadAll         func()
@@ -241,21 +240,12 @@ var (
 
 	// Tensor utility functions
 	ggmlNbytes       func(tensor GgmlTensor) uint64
-	ggmlNbytesAll    func(tensor GgmlTensor) uint64
-	ggmlTypeNbytes   func(typ GgmlType, ne int64) uint64
 	ggmlRowSize      func(typ GgmlType, ne int64) uint64
 	ggmlTypeToString func(typ GgmlType) *byte
 	ggmlElementSize  func(tensor GgmlTensor) uint64
 
 	// Quantization functions
-	ggmlQuantizeQ4_0   func(src *float32, dst unsafe.Pointer, n int32, k int32, hist *int64) uint64
-	ggmlQuantizeQ4_1   func(src *float32, dst unsafe.Pointer, n int32, k int32, hist *int64) uint64
-	ggmlQuantizeQ5_0   func(src *float32, dst unsafe.Pointer, n int32, k int32, hist *int64) uint64
-	ggmlQuantizeQ5_1   func(src *float32, dst unsafe.Pointer, n int32, k int32, hist *int64) uint64
-	ggmlQuantizeQ8_0   func(src *float32, dst unsafe.Pointer, n int32, k int32, hist *int64) uint64
-	ggmlQuantizeChunk  func(typ GgmlType, src *float32, dst unsafe.Pointer, start int32, nrows int32, ncols int64, hist *int64) uint64
-	ggmlCanMulMat      func(t0 GgmlTensor, t1 GgmlTensor) bool
-	ggmlGetRowsNumCols func(tensor GgmlTensor) int32
+	ggmlQuantizeChunk func(typ GgmlType, src *float32, dst unsafe.Pointer, start int32, nrows int32, ncols int64, hist *int64) uint64
 )
 
 // registerGgmlFunctions registers all GGML function pointers
@@ -269,7 +259,7 @@ func registerGgmlFunctions() error {
 	_ = tryRegisterLibFunc(&ggmlTypeSize, libHandle, "ggml_type_size")
 	_ = tryRegisterLibFunc(&ggmlTypeSizeof, libHandle, "ggml_type_sizef")
 	_ = tryRegisterLibFunc(&ggmlBlckSize, libHandle, "ggml_blck_size")
-	_ = tryRegisterLibFunc(&ggmlTypeIsQuantized, libHandle, "ggml_type_is_quantized")
+	_ = tryRegisterLibFunc(&ggmlIsQuantized, libHandle, "ggml_is_quantized")
 
 	// Backend device functions
 	_ = tryRegisterLibFunc(&ggmlBackendDevCount, libHandle, "ggml_backend_dev_count")
@@ -301,7 +291,6 @@ func registerGgmlFunctions() error {
 	// Backend functions
 	_ = tryRegisterLibFunc(&ggmlBackendFree, libHandle, "ggml_backend_free")
 	_ = tryRegisterLibFunc(&ggmlBackendName, libHandle, "ggml_backend_name")
-	_ = tryRegisterLibFunc(&ggmlBackendIsCpu, libHandle, "ggml_backend_is_cpu")
 	_ = tryRegisterLibFunc(&ggmlBackendSupports, libHandle, "ggml_backend_supports_buft")
 	_ = tryRegisterLibFunc(&ggmlBackendLoad, libHandle, "ggml_backend_load")
 	_ = tryRegisterLibFunc(&ggmlBackendLoadAll, libHandle, "ggml_backend_load_all")
@@ -309,21 +298,12 @@ func registerGgmlFunctions() error {
 
 	// Tensor utility functions
 	_ = tryRegisterLibFunc(&ggmlNbytes, libHandle, "ggml_nbytes")
-	_ = tryRegisterLibFunc(&ggmlNbytesAll, libHandle, "ggml_nbytes_all")
-	_ = tryRegisterLibFunc(&ggmlTypeNbytes, libHandle, "ggml_type_nbytes")
 	_ = tryRegisterLibFunc(&ggmlRowSize, libHandle, "ggml_row_size")
 	_ = tryRegisterLibFunc(&ggmlTypeToString, libHandle, "ggml_type_name")
 	_ = tryRegisterLibFunc(&ggmlElementSize, libHandle, "ggml_element_size")
 
 	// Quantization functions
-	_ = tryRegisterLibFunc(&ggmlQuantizeQ4_0, libHandle, "ggml_quantize_q4_0")
-	_ = tryRegisterLibFunc(&ggmlQuantizeQ4_1, libHandle, "ggml_quantize_q4_1")
-	_ = tryRegisterLibFunc(&ggmlQuantizeQ5_0, libHandle, "ggml_quantize_q5_0")
-	_ = tryRegisterLibFunc(&ggmlQuantizeQ5_1, libHandle, "ggml_quantize_q5_1")
-	_ = tryRegisterLibFunc(&ggmlQuantizeQ8_0, libHandle, "ggml_quantize_q8_0")
 	_ = tryRegisterLibFunc(&ggmlQuantizeChunk, libHandle, "ggml_quantize_chunk")
-	_ = tryRegisterLibFunc(&ggmlCanMulMat, libHandle, "ggml_can_mul_mat")
-	_ = tryRegisterLibFunc(&ggmlGetRowsNumCols, libHandle, "ggml_get_rows_num_cols")
 
 	return nil
 }
@@ -368,10 +348,10 @@ func Ggml_type_is_quantized(typ GgmlType) (bool, error) {
 	if err := ensureLoaded(); err != nil {
 		return false, err
 	}
-	if ggmlTypeIsQuantized == nil {
-		return false, fmt.Errorf("ggml_type_is_quantized function not available")
+	if ggmlIsQuantized == nil {
+		return false, fmt.Errorf("ggml_is_quantized function not available")
 	}
-	return ggmlTypeIsQuantized(typ), nil
+	return ggmlIsQuantized(typ), nil
 }
 
 // Ggml_backend_dev_count returns the number of available backend devices
@@ -526,14 +506,13 @@ func Ggml_backend_free(backend GgmlBackend) error {
 }
 
 // Ggml_backend_is_cpu checks if a backend is CPU-based
+// Note: This function is not available in current GGML builds
 func Ggml_backend_is_cpu(backend GgmlBackend) (bool, error) {
 	if err := ensureLoaded(); err != nil {
 		return false, err
 	}
-	if ggmlBackendIsCpu == nil {
-		return false, fmt.Errorf("ggml_backend_is_cpu function not available")
-	}
-	return ggmlBackendIsCpu(backend), nil
+	// This function is not exported in GGML, return error
+	return false, fmt.Errorf("ggml_backend_is_cpu function not available")
 }
 
 // Ggml_type_name returns the string name of a GGML type

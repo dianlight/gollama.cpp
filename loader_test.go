@@ -256,18 +256,17 @@ func TestLibraryLoader_LoadLibrary(t *testing.T) {
 		}
 	})
 
-	t.Run("Load library - expected failure on missing libs", func(t *testing.T) {
-		// Since we don't have actual libraries embedded, this should fail
-		// but not panic or cause other issues
+	t.Run("Load library - downloads when embedded libs disabled", func(t *testing.T) {
+		// When embedded libraries are disabled (via build tags), the loader
+		// should fall back to downloading libraries, which should succeed
 		err := loader.LoadLibrary()
-		if err == nil {
-			// This is unexpected but not necessarily wrong
-			t.Log("LoadLibrary succeeded unexpectedly - may have found system library")
+		if err != nil {
+			t.Errorf("Expected LoadLibrary to succeed by downloading libraries, but got error: %v", err)
 		} else {
-			t.Logf("LoadLibrary failed as expected: %v", err)
+			t.Log("LoadLibrary succeeded by downloading libraries as expected")
 		}
 
-		// Clean up if somehow it succeeded
+		// Clean up
 		if loader.loaded {
 			_ = loader.UnloadLibrary() // Ignore error in test cleanup
 		}

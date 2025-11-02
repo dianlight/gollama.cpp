@@ -295,18 +295,12 @@ update-hf-script: clone-llamacpp
 .PHONY: tag-release
 tag-release:
 	@echo "Starting automated tag and release process..."
-	
-	# Save starting commit for potential rollback
 	@starting_commit=$$(git rev-parse HEAD); \
-	\
-	# Check if we're on the main branch
 	current_branch=$$(git rev-parse --abbrev-ref HEAD); \
 	if [ "$$current_branch" != "main" ]; then \
 		echo "Error: tag-release can only be run from the main branch. Current branch: $$current_branch"; \
 		exit 1; \
 	fi; \
-	\
-	# Check if current branch is up to date with origin
 	echo "Checking if main branch is up to date with origin..."; \
 	git fetch origin main >/dev/null 2>&1; \
 	local_commit=$$(git rev-parse HEAD); \
@@ -318,16 +312,12 @@ tag-release:
 		echo "Please pull latest changes: git pull origin main"; \
 		exit 1; \
 	fi; \
-	\
-	# Update CHANGELOG.md for release
 	echo "Updating CHANGELOG.md for release $(FULL_VERSION)..."; \
 	if ! bash scripts/update-changelog.sh "$(FULL_VERSION)" "release"; then \
 		echo "Error: Failed to update CHANGELOG.md"; \
 		exit 1; \
 	fi; \
 	echo "CHANGELOG.md updated successfully"; \
-	\
-	# Commit the changelog update (but don't push yet)
 	echo "Committing CHANGELOG.md update..."; \
 	git add CHANGELOG.md; \
 	if ! git commit -m ":rocket: chore(release): update CHANGELOG.md for $(FULL_VERSION)"; then \
@@ -336,16 +326,12 @@ tag-release:
 		exit 1; \
 	fi; \
 	echo "CHANGELOG.md committed successfully"; \
-	\
-	# Check if current version tag exists and handle it
 	tag_name="$(FULL_VERSION)"; \
 	echo "Checking if tag $$tag_name exists..."; \
 	tag_existed=false; \
 	if git tag -l | grep -q "^$$tag_name$$"; then \
 		echo "Tag $$tag_name already exists"; \
 		tag_existed=true; \
-		\
-		# Check if GitHub release exists for this tag
 		echo "Checking if GitHub release exists for tag $$tag_name..."; \
 		if command -v gh >/dev/null 2>&1; then \
 			if gh release view $$tag_name >/dev/null 2>&1; then \
@@ -357,12 +343,8 @@ tag-release:
 		else \
 			echo "Warning: GitHub CLI (gh) not found. Cannot check for existing releases."; \
 		fi; \
-		\
-		# Delete local tag (will be recreated later)
 		git tag -d $$tag_name; \
 	fi; \
-	\
-	# Create the tag locally (but don't push yet)
 	echo "Creating tag $$tag_name..."; \
 	if ! git tag $$tag_name HEAD; then \
 		echo "Error: Failed to create tag $$tag_name"; \
@@ -370,8 +352,6 @@ tag-release:
 		exit 1; \
 	fi; \
 	echo "Tag $$tag_name created locally"; \
-	\
-	# Increment patch version for next development cycle
 	echo "Incrementing patch version for next development cycle..."; \
 	if ! bash scripts/increment-version.sh patch; then \
 		echo "Error: Failed to increment version"; \
@@ -383,8 +363,6 @@ tag-release:
 		exit 1; \
 	fi; \
 	echo "Version incremented successfully"; \
-	\
-	# Add new [Unreleased] section to CHANGELOG.md
 	echo "Adding new [Unreleased] section to CHANGELOG.md..."; \
 	new_version=$$(echo $(VERSION) | awk -F. '{print $$1"."$$2"."$$3+1}'); \
 	new_full_version="v$$new_version-llamacpp.$(LLAMA_CPP_BUILD)"; \
@@ -398,11 +376,7 @@ tag-release:
 		exit 1; \
 	fi; \
 	echo "[Unreleased] section added successfully"; \
-	\
-	# All steps succeeded - now push everything
 	echo "All steps completed successfully. Pushing changes to origin..."; \
-	\
-	# Push the CHANGELOG commit
 	if ! git push origin main; then \
 		echo "Error: Failed to push CHANGELOG commit to origin"; \
 		git tag -d $$tag_name; \
@@ -413,16 +387,12 @@ tag-release:
 		exit 1; \
 	fi; \
 	echo "CHANGELOG commit pushed successfully"; \
-	\
-	# Delete remote tag if it existed
 	if [ "$$tag_existed" = "true" ]; then \
 		echo "Deleting remote tag $$tag_name..."; \
 		if ! git push origin :refs/tags/$$tag_name; then \
 			echo "Warning: Failed to delete remote tag $$tag_name"; \
 		fi; \
 	fi; \
-	\
-	# Push the tag
 	if ! git push origin $$tag_name; then \
 		echo "Error: Failed to push tag $$tag_name to origin"; \
 		echo "CHANGELOG commit was pushed, but tag push failed"; \
@@ -430,11 +400,8 @@ tag-release:
 		exit 1; \
 	fi; \
 	echo "Tag $$tag_name pushed successfully"; \
-	\
-	# Wait for GitHub Actions to process the tag and create the release
 	echo "Waiting for GitHub Actions to process the tag and create release artifacts..."; \
 	echo "You can monitor the progress at: https://github.com/$$(git config --get remote.origin.url | sed 's/.*github.com[:/]\([^/]*\/[^/]*\)\.git/\1/')/actions"; \
-	\
 	echo ""; \
 	echo "Tag and release process completed successfully!"; \
 	echo "Released version: $(FULL_VERSION)"; \

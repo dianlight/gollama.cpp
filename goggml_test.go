@@ -112,6 +112,12 @@ func TestGgmlBackendDevCount(t *testing.T) {
 	}
 	defer Backend_free()
 
+	err := Ggml_backend_load_all()
+	if err != nil {
+		t.Errorf("ggml_backend_load not available or failed: %v", err)
+		return
+	}
+
 	count, err := Ggml_backend_dev_count()
 	if err != nil {
 		t.Skipf("Ggml_backend_dev_count() not available: %v", err)
@@ -120,7 +126,7 @@ func TestGgmlBackendDevCount(t *testing.T) {
 	// Note: Function may return 0 if GGML functions are not exported
 	// This is expected in some llama.cpp builds
 	if count == 0 {
-		t.Skip("GGML backend device functions not available in this build")
+		t.Error("GGML no backend device functions available in this build")
 	}
 
 	t.Logf("Found %d backend device(s)", count)
@@ -134,13 +140,19 @@ func TestGgmlBackendDevInfo(t *testing.T) {
 	}
 	defer Backend_free()
 
+	err := Ggml_backend_load_all()
+	if err != nil {
+		t.Errorf("ggml_backend_load not available or failed: %v", err)
+		return
+	}
+
 	count, err := Ggml_backend_dev_count()
 	if err != nil {
 		t.Fatalf("Ggml_backend_dev_count() error = %v", err)
 	}
 
 	if count == 0 {
-		t.Skip("No backend devices available")
+		t.Error("No backend devices available")
 	}
 
 	// Get info for the first device (usually CPU)
@@ -238,7 +250,7 @@ func TestGgmlBackendLoad(t *testing.T) {
 	// Try loading CPU backend (this may not work in all builds)
 	backend, err := Ggml_backend_load("CPU", "")
 	if err != nil {
-		t.Logf("ggml_backend_load not available or failed: %v", err)
+		t.Errorf("ggml_backend_load not available or failed: %v", err)
 		return
 	}
 

@@ -11,12 +11,13 @@ import (
 
 // Library loader manages the loading and lifecycle of llama.cpp shared libraries
 type LibraryLoader struct {
-	handle     uintptr
-	loaded     bool
-	libPath    string
-	downloader *LibraryDownloader
-	tempDir    string
-	mutex      sync.RWMutex
+	handle       uintptr
+	loaded       bool
+	llamaLibPath string
+	rootLibPath  string
+	downloader   *LibraryDownloader
+	tempDir      string
+	mutex        sync.RWMutex
 }
 
 var globalLoader = &LibraryLoader{}
@@ -77,8 +78,9 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 				return fmt.Errorf("failed to load embedded library %s: %w", libPath, err)
 			}
 			l.handle = handle
-			l.libPath = libPath
+			l.llamaLibPath = libPath
 			l.loaded = true
+			l.rootLibPath = targetDir
 			return nil
 		}
 	}
@@ -116,7 +118,7 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 		}
 
 		l.handle = handle
-		l.libPath = libPath
+		l.llamaLibPath = libPath
 		l.loaded = true
 
 		return nil
@@ -146,7 +148,7 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 	}
 
 	l.handle = handle
-	l.libPath = libPath
+	l.llamaLibPath = libPath
 	l.loaded = true
 
 	return nil
@@ -194,7 +196,7 @@ func (l *LibraryLoader) UnloadLibrary() error {
 
 	l.handle = 0
 	l.loaded = false
-	l.libPath = ""
+	l.llamaLibPath = ""
 	l.tempDir = ""
 
 	return nil

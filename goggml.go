@@ -52,6 +52,7 @@ package gollama
 
 import (
 	"fmt"
+	"log/slog"
 	"unsafe"
 )
 
@@ -557,7 +558,17 @@ func Ggml_backend_load_all() error {
 	if ggmlBackendLoadAll == nil {
 		return fmt.Errorf("ggml_backend_load_all function not available")
 	}
-	ggmlBackendLoadAll()
+
+	//	os.Setenv("GGML_BACKEND_PATH", globalLoader.libPath)
+	if globalLoader.rootLibPath == "" {
+
+		err := globalLoader.LoadLibrary()
+		if err != nil {
+			return fmt.Errorf("failed to load library for backend loading: %v", err)
+		}
+	}
+	slog.Info("Loading GGML backends from path", "path", globalLoader.rootLibPath)
+	ggmlBackendLoadAllFromPath(&[]byte(globalLoader.rootLibPath + "\x00")[0])
 	return nil
 }
 

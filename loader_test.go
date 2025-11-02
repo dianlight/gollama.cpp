@@ -215,7 +215,7 @@ func TestLibraryLoader_UnloadLibrary(t *testing.T) {
 		loader.loaded = true
 		loader.handle = uintptr(12345)
 		loader.tempDir = tempDir
-		loader.libPath = filepath.Join(tempDir, "test.so")
+		loader.llamaLibPath = filepath.Join(tempDir, "test.so")
 
 		err = loader.UnloadLibrary()
 		if err != nil {
@@ -232,7 +232,7 @@ func TestLibraryLoader_UnloadLibrary(t *testing.T) {
 		if loader.tempDir != "" {
 			t.Error("Expected tempDir to be empty after unload")
 		}
-		if loader.libPath != "" {
+		if loader.llamaLibPath != "" {
 			t.Error("Expected libPath to be empty after unload")
 		}
 
@@ -485,7 +485,7 @@ func TestLibraryLoader_InitialState(t *testing.T) {
 	if loader.tempDir != "" {
 		t.Error("Expected initial tempDir to be empty")
 	}
-	if loader.libPath != "" {
+	if loader.llamaLibPath != "" {
 		t.Error("Expected initial libPath to be empty")
 	}
 }

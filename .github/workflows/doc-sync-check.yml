@@ -2,192 +2,192 @@ name: Documentation Sync Check
 
 on:
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
   doc-sync-check:
     name: Check Documentation Sync
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
-      with:
-        fetch-depth: 0  # Need full history to check what changed
+      - name: Checkout code
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        with:
+          fetch-depth: 0 # Need full history to check what changed
 
-    - name: Set up Go
-      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
-      with:
-        go-version: '1.21'
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version: "1.25"
 
-    - name: Check if code changes require doc updates
-      run: |
-        # Get list of changed files
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
-          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.sha }})
-        else
-          CHANGED_FILES=$(git diff --name-only HEAD~1..HEAD)
-        fi
-        
-        echo "Changed files:"
-        echo "$CHANGED_FILES"
-        echo ""
-        
-        # Check if any Go files changed
-        GO_FILES_CHANGED=$(echo "$CHANGED_FILES" | grep -E '\.go$' || true)
-        
-        # Check if any API files changed (main package files)
-        API_FILES_CHANGED=$(echo "$CHANGED_FILES" | grep -E '^(gollama\.go|platform_.*\.go|config\.go|loader\.go)$' || true)
-        
-        # Check if examples changed
-        EXAMPLE_FILES_CHANGED=$(echo "$CHANGED_FILES" | grep -E '^examples/' || true)
-        
-        # Check if CI files changed
-        CI_FILES_CHANGED=$(echo "$CHANGED_FILES" | grep -E '\.github/workflows/' || true)
-        
-        # Check if documentation was updated
-        DOC_FILES_CHANGED=$(echo "$CHANGED_FILES" | grep -E '\.(md|txt)$' || true)
-        
-        echo "Analysis:"
-        echo "- Go files changed: $([ -n "$GO_FILES_CHANGED" ] && echo "YES" || echo "NO")"
-        echo "- API files changed: $([ -n "$API_FILES_CHANGED" ] && echo "YES" || echo "NO")"
-        echo "- Example files changed: $([ -n "$EXAMPLE_FILES_CHANGED" ] && echo "YES" || echo "NO")"
-        echo "- CI files changed: $([ -n "$CI_FILES_CHANGED" ] && echo "YES" || echo "NO")"
-        echo "- Documentation changed: $([ -n "$DOC_FILES_CHANGED" ] && echo "YES" || echo "NO")"
-        echo ""
-        
-        # Create recommendations
-        RECOMMENDATIONS=""
-        
-        if [ -n "$API_FILES_CHANGED" ] && [ -z "$DOC_FILES_CHANGED" ]; then
-          RECOMMENDATIONS="$RECOMMENDATIONS
-        - API files changed but no documentation updated. Consider updating:
-          * README.md (if public API changed)
-          * Go doc comments in the changed files
-          * CHANGELOG.md with new features/changes"
-        fi
-        
-        if [ -n "$EXAMPLE_FILES_CHANGED" ]; then
-          EXAMPLE_READMES_CHANGED=$(echo "$CHANGED_FILES" | grep -E '^examples/[^/]+/README\.md$' || true)
-          if [ -z "$EXAMPLE_READMES_CHANGED" ]; then
-            RECOMMENDATIONS="$RECOMMENDATIONS
-        - Example files changed but corresponding README.md files may need updates"
+      - name: Check if code changes require doc updates
+        run: |
+          # Get list of changed files
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.sha }})
+          else
+            CHANGED_FILES=$(git diff --name-only HEAD~1..HEAD)
           fi
-        fi
-        
-        if [ -n "$GO_FILES_CHANGED" ]; then
-          # Check if go.mod changed, might need CI updates
-          GO_MOD_CHANGED=$(echo "$CHANGED_FILES" | grep -E 'go\.mod$' || true)
-          if [ -n "$GO_MOD_CHANGED" ] && [ -z "$CI_FILES_CHANGED" ]; then
-            RECOMMENDATIONS="$RECOMMENDATIONS
-        - go.mod changed but CI configuration unchanged. Check if:
-          * New system dependencies need to be added to CI
-          * Go version requirements changed
-          * New build flags or environment variables needed"
-          fi
-        fi
-        
-        if [ -n "$RECOMMENDATIONS" ]; then
-          echo "🔍 DOCUMENTATION SYNC RECOMMENDATIONS:"
-          echo "$RECOMMENDATIONS"
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
           echo ""
-          echo "These are suggestions to help keep documentation in sync with code changes."
-          echo "Review the changes and update documentation as needed."
-        else
-          echo "✅ No obvious documentation sync issues detected."
-        fi
 
-    - name: Validate examples compile
-      run: |
-        echo "Checking that all examples compile..."
-        
-        for example_dir in examples/*/; do
-          if [ -f "$example_dir/go.mod" ]; then
-            echo "Checking example: $(basename "$example_dir")"
-            cd "$example_dir"
+          # Check if any Go files changed
+          GO_FILES_CHANGED=$(echo "$CHANGED_FILES" | grep -E '\.go$' || true)
+
+          # Check if any API files changed (main package files)
+          API_FILES_CHANGED=$(echo "$CHANGED_FILES" | grep -E '^(gollama\.go|platform_.*\.go|config\.go|loader\.go)$' || true)
+
+          # Check if examples changed
+          EXAMPLE_FILES_CHANGED=$(echo "$CHANGED_FILES" | grep -E '^examples/' || true)
+
+          # Check if CI files changed
+          CI_FILES_CHANGED=$(echo "$CHANGED_FILES" | grep -E '\.github/workflows/' || true)
+
+          # Check if documentation was updated
+          DOC_FILES_CHANGED=$(echo "$CHANGED_FILES" | grep -E '\.(md|txt)$' || true)
+
+          echo "Analysis:"
+          echo "- Go files changed: $([ -n "$GO_FILES_CHANGED" ] && echo "YES" || echo "NO")"
+          echo "- API files changed: $([ -n "$API_FILES_CHANGED" ] && echo "YES" || echo "NO")"
+          echo "- Example files changed: $([ -n "$EXAMPLE_FILES_CHANGED" ] && echo "YES" || echo "NO")"
+          echo "- CI files changed: $([ -n "$CI_FILES_CHANGED" ] && echo "YES" || echo "NO")"
+          echo "- Documentation changed: $([ -n "$DOC_FILES_CHANGED" ] && echo "YES" || echo "NO")"
+          echo ""
+
+          # Create recommendations
+          RECOMMENDATIONS=""
+
+          if [ -n "$API_FILES_CHANGED" ] && [ -z "$DOC_FILES_CHANGED" ]; then
+            RECOMMENDATIONS="$RECOMMENDATIONS
+          - API files changed but no documentation updated. Consider updating:
+            * README.md (if public API changed)
+            * Go doc comments in the changed files
+            * CHANGELOG.md with new features/changes"
+          fi
+
+          if [ -n "$EXAMPLE_FILES_CHANGED" ]; then
+            EXAMPLE_READMES_CHANGED=$(echo "$CHANGED_FILES" | grep -E '^examples/[^/]+/README\.md$' || true)
+            if [ -z "$EXAMPLE_READMES_CHANGED" ]; then
+              RECOMMENDATIONS="$RECOMMENDATIONS
+          - Example files changed but corresponding README.md files may need updates"
+            fi
+          fi
+
+          if [ -n "$GO_FILES_CHANGED" ]; then
+            # Check if go.mod changed, might need CI updates
+            GO_MOD_CHANGED=$(echo "$CHANGED_FILES" | grep -E 'go\.mod$' || true)
+            if [ -n "$GO_MOD_CHANGED" ] && [ -z "$CI_FILES_CHANGED" ]; then
+              RECOMMENDATIONS="$RECOMMENDATIONS
+          - go.mod changed but CI configuration unchanged. Check if:
+            * New system dependencies need to be added to CI
+            * Go version requirements changed
+            * New build flags or environment variables needed"
+            fi
+          fi
+
+          if [ -n "$RECOMMENDATIONS" ]; then
+            echo "🔍 DOCUMENTATION SYNC RECOMMENDATIONS:"
+            echo "$RECOMMENDATIONS"
+            echo ""
+            echo "These are suggestions to help keep documentation in sync with code changes."
+            echo "Review the changes and update documentation as needed."
+          else
+            echo "✅ No obvious documentation sync issues detected."
+          fi
+
+      - name: Validate examples compile
+        run: |
+          echo "Checking that all examples compile..."
+
+          for example_dir in examples/*/; do
+            if [ -f "$example_dir/go.mod" ]; then
+              echo "Checking example: $(basename "$example_dir")"
+              cd "$example_dir"
+              
+              # Try to build the example
+              if ! go build -o /tmp/example-binary .; then
+                echo "❌ Example $(basename "$example_dir") failed to compile"
+                exit 1
+              else
+                echo "✅ Example $(basename "$example_dir") compiles successfully"
+              fi
+              
+              cd - > /dev/null
+            fi
+          done
+
+          echo "All examples compile successfully!"
+
+      - name: Check for TODO/FIXME in new code
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Check only new lines in PR
+            TODOS=$(git diff ${{ github.event.pull_request.base.sha }}..${{ github.sha }} | grep -E '^\+.*\b(TODO|FIXME|XXX|HACK)\b' || true)
+          else
+            # Check last commit
+            TODOS=$(git diff HEAD~1..HEAD | grep -E '^\+.*\b(TODO|FIXME|XXX|HACK)\b' || true)
+          fi
+
+          if [ -n "$TODOS" ]; then
+            echo "⚠️  Found TODO/FIXME comments in new code:"
+            echo "$TODOS"
+            echo ""
+            echo "Consider addressing these or creating GitHub issues to track them."
+          else
+            echo "✅ No TODO/FIXME comments found in new code."
+          fi
+
+      - name: Check CHANGELOG.md format
+        run: |
+          # Skip CHANGELOG check if last commit is a release commit
+          LAST_COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+          if echo "$LAST_COMMIT_MSG" | grep -q "chore(release)"; then
+            echo "🔄 Skipping CHANGELOG.md check - release commit detected: $LAST_COMMIT_MSG"
+            exit 0
+          fi
+
+          if [ -f "CHANGELOG.md" ]; then
+            echo "Checking CHANGELOG.md format..."
             
-            # Try to build the example
-            if ! go build -o /tmp/example-binary .; then
-              echo "❌ Example $(basename "$example_dir") failed to compile"
+            # Check if there's an "Unreleased" section
+            if ! grep -q "## \[Unreleased\]" CHANGELOG.md; then
+              echo "❌ CHANGELOG.md should have an [Unreleased] section for new changes"
               exit 1
-            else
-              echo "✅ Example $(basename "$example_dir") compiles successfully"
             fi
             
-            cd - > /dev/null
+            # Check basic format
+            if ! grep -q "### Added\|### Changed\|### Fixed" CHANGELOG.md; then
+              echo "ℹ️  Consider using standard CHANGELOG format with Added/Changed/Fixed sections"
+            fi
+            
+            echo "✅ CHANGELOG.md format looks good"
+          else
+            echo "⚠️  No CHANGELOG.md found - consider adding one to track changes"
           fi
-        done
-        
-        echo "All examples compile successfully!"
 
-    - name: Check for TODO/FIXME in new code
-      run: |
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
-          # Check only new lines in PR
-          TODOS=$(git diff ${{ github.event.pull_request.base.sha }}..${{ github.sha }} | grep -E '^\+.*\b(TODO|FIXME|XXX|HACK)\b' || true)
-        else
-          # Check last commit
-          TODOS=$(git diff HEAD~1..HEAD | grep -E '^\+.*\b(TODO|FIXME|XXX|HACK)\b' || true)
-        fi
-        
-        if [ -n "$TODOS" ]; then
-          echo "⚠️  Found TODO/FIXME comments in new code:"
-          echo "$TODOS"
-          echo ""
-          echo "Consider addressing these or creating GitHub issues to track them."
-        else
-          echo "✅ No TODO/FIXME comments found in new code."
-        fi
-
-    - name: Check CHANGELOG.md format
-      run: |
-        # Skip CHANGELOG check if last commit is a release commit
-        LAST_COMMIT_MSG=$(git log -1 --pretty=format:"%s")
-        if echo "$LAST_COMMIT_MSG" | grep -q "chore(release)"; then
-          echo "🔄 Skipping CHANGELOG.md check - release commit detected: $LAST_COMMIT_MSG"
-          exit 0
-        fi
-        
-        if [ -f "CHANGELOG.md" ]; then
-          echo "Checking CHANGELOG.md format..."
-          
-          # Check if there's an "Unreleased" section
-          if ! grep -q "## \[Unreleased\]" CHANGELOG.md; then
-            echo "❌ CHANGELOG.md should have an [Unreleased] section for new changes"
-            exit 1
+      - name: Validate ROADMAP.md format
+        run: |
+          if [ -f "docs/ROADMAP.md" ]; then
+            echo "Validating ROADMAP.md format and structure..."
+            
+            # Run the roadmap validation script
+            make roadmap-validate
+            
+            # Check for items that might need to be moved to "wait for llama.cpp" section
+            echo ""
+            echo "Checking for potential missing llama.cpp dependencies..."
+            make roadmap-scan-missing
+            
+            # Check for items that might need to be moved to "wait for purego struct support" section
+            echo ""
+            echo "Checking for potential purego struct support dependencies..."
+            make roadmap-scan-purego
+            
+            echo "✅ ROADMAP.md validation completed"
+          else
+            echo "⚠️  No ROADMAP.md found"
           fi
-          
-          # Check basic format
-          if ! grep -q "### Added\|### Changed\|### Fixed" CHANGELOG.md; then
-            echo "ℹ️  Consider using standard CHANGELOG format with Added/Changed/Fixed sections"
-          fi
-          
-          echo "✅ CHANGELOG.md format looks good"
-        else
-          echo "⚠️  No CHANGELOG.md found - consider adding one to track changes"
-        fi
-
-    - name: Validate ROADMAP.md format
-      run: |
-        if [ -f "docs/ROADMAP.md" ]; then
-          echo "Validating ROADMAP.md format and structure..."
-          
-          # Run the roadmap validation script
-          make roadmap-validate
-          
-          # Check for items that might need to be moved to "wait for llama.cpp" section
-          echo ""
-          echo "Checking for potential missing llama.cpp dependencies..."
-          make roadmap-scan-missing
-          
-          # Check for items that might need to be moved to "wait for purego struct support" section
-          echo ""
-          echo "Checking for potential purego struct support dependencies..."
-          make roadmap-scan-purego
-          
-          echo "✅ ROADMAP.md validation completed"
-        else
-          echo "⚠️  No ROADMAP.md found"
-        fi

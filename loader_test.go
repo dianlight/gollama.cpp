@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type LoaderSuite struct{ suite.Suite }
+type LoaderSuite struct{ BaseSuite }
 
 func (s *LoaderSuite) TestGetLibraryName() {
 	loader := &LibraryLoader{}

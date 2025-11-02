@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type GgmlSuite struct{ suite.Suite }
+type GgmlSuite struct{ BaseSuite }
 
 // Tests the GGML type size function
 func (s *GgmlSuite) TestGgmlTypeSize() {

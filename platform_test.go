@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type PlatformSuite struct{ suite.Suite }
+type PlatformSuite struct{ BaseSuite }
 
 func (s *PlatformSuite) TestPlatformSupportDetection() {
 	supported := isPlatformSupported()

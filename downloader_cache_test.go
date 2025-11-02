@@ -9,9 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type CacheDirSuite struct {
-	suite.Suite
-}
+type CacheDirSuite struct{ BaseSuite }
 
 func (s *CacheDirSuite) TestDefaultCacheDirectory() {
 	downloader, err := NewLibraryDownloader()

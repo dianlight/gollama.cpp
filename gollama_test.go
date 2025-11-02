@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type GollamaSuite struct{ suite.Suite }
+type GollamaSuite struct{ BaseSuite }
 
 func (s *GollamaSuite) TestVersion() {
 	assert.NotEmpty(s.T(), Version)

@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type FFISuite struct{ suite.Suite }
+type FFISuite struct{ BaseSuite }
 
 // Verifies that FFI type definitions are properly structured
 func (s *FFISuite) TestFFITypeDefinitions() {

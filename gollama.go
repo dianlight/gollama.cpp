@@ -722,6 +722,11 @@ func registerFunctions() error {
 	// registerLibFunc(&llamaPrintTimings, libHandle, "llama_print_timings")
 	// registerLibFunc(&llamaResetTimings, libHandle, "llama_reset_timings")
 
+	// Register GGML functions
+	if err := registerGgmlFunctions(); err != nil {
+		return fmt.Errorf("failed to register GGML functions: %w", err)
+	}
+
 	return nil
 }
 
@@ -851,23 +856,28 @@ func Model_load_from_file(pathModel string, params LlamaModelParams) (LlamaModel
 		return 0, err
 	}
 
-	pathBytes := append([]byte(pathModel), 0) // null-terminate
-
-	// Try FFI first (works on all platforms)
-	if model, err := ffiModelLoadFromFile((*byte)(unsafe.Pointer(&pathBytes[0])), params); err == nil {
-		return model, nil
+	// Check GGML backend initialized
+	if !isLoaded {
+		return 0, errors.New("llama.cpp library not loaded")
 	}
 
+	pathBytes := append([]byte(pathModel), 0) // null-terminate
+
 	// Fallback to purego on Darwin
-	if runtime.GOOS == "darwin" && llamaModelLoadFromFile != nil {
+	if runtime.GOOS == "darwin" {
 		model := llamaModelLoadFromFile((*byte)(unsafe.Pointer(&pathBytes[0])), params)
 		if model == 0 {
 			return 0, errors.New("failed to load model")
 		}
 		return model, nil
+	} else {
+		// Try FFI first (works on all platforms)
+		if model, err := ffiModelLoadFromFile((*byte)(unsafe.Pointer(&pathBytes[0])), params); err == nil {
+			return model, nil
+		} else {
+			return 0, err
+		}
 	}
-
-	return 0, errors.New("Model_load_from_file not available on this platform")
 }
 
 // Model_free frees a model

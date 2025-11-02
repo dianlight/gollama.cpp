@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **GGML Low-Level Bindings** (`goggml.go`): Direct access to GGML tensor library functions
+  - 31 GGML type definitions (F32, F16, Q4_0, Q8_0, BF16, IQ2_XXS, IQ4_XS, etc.)
+  - Backend device enumeration and management functions
+  - Buffer allocation and memory management
+  - Type utility functions (size, quantization checks, name lookups)
+  - Quantization helper functions
+  - Graceful handling of optional GGML functions (may not be exported in all builds)
+  - Helper function `tryRegisterLibFunc()` for optional function registration
+  - Comprehensive test suite (`goggml_test.go`) with type tests, backend tests, and benchmarks
+
 ### Changed
 
 ### Fixed

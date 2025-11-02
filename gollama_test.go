@@ -26,7 +26,7 @@ func TestVersion(t *testing.T) {
 func TestLibraryPath(t *testing.T) {
 	path, err := getLibraryPath()
 	if err != nil {
-		t.Skipf("Skipping library path test on unsupported platform: %v", err)
+		t.Fatalf("Skipping library path test on unsupported platform: %v", err)
 	}
 	if path == "" {
 		t.Error("Library path should not be empty")
@@ -49,7 +49,7 @@ func TestUtilityFunctions(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Skipf("Skipping utility function tests: library not available: %v", err)
+			t.Fatalf("Skipping utility function tests: library not available: %v", err)
 		}
 	}
 
@@ -67,7 +67,7 @@ func TestBackendInitialization(t *testing.T) {
 	// Test backend initialization
 	err := Backend_init()
 	if err != nil {
-		t.Skipf("Skipping backend test: %v", err)
+		t.Fatalf("Skipping backend test: %v", err)
 	}
 
 	// Clean up
@@ -79,7 +79,7 @@ func TestModelParams(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Skipf("Skipping model params test: library not available: %v", err)
+			t.Fatalf("Skipping model params test: library not available: %v", err)
 		}
 	}
 
@@ -98,7 +98,7 @@ func TestContextParams(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Skipf("Skipping context params test: library not available: %v", err)
+			t.Fatalf("Skipping context params test: library not available: %v", err)
 		}
 	}
 
@@ -153,7 +153,7 @@ func TestContextDefaultParams(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Skipf("Skipping context default params test: library not available: %v", err)
+			t.Fatalf("Skipping context default params test: library not available: %v", err)
 		}
 	}
 
@@ -184,7 +184,7 @@ func TestTokenDataArrayFromLogits(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Skipf("Skipping token data array test: library not available: %v", err)
+			t.Fatalf("Skipping token data array test: library not available: %v", err)
 		}
 	}
 
@@ -254,12 +254,18 @@ func TestTokenization(t *testing.T) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			t.Skipf("Skipping tokenization test: library not available: %v", err)
+			t.Fatalf("Skipping tokenization test: library not available: %v", err)
 		}
 	}
 
+	err := Backend_init()
+	if err != nil {
+		t.Fatalf("Failed to initialize backend: %v", err)
+	}
+	defer Backend_free()
+
 	// Look for a test model in the models directory
-	modelPath := "models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf"
+	modelPath := "./models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf"
 
 	// Load the model
 	params := Model_default_params()
@@ -267,7 +273,7 @@ func TestTokenization(t *testing.T) {
 
 	model, err := Model_load_from_file(modelPath, params)
 	if err != nil {
-		t.Skipf("Skipping tokenization test: model not available at %s: %v", modelPath, err)
+		t.Fatalf("Tokenization test: model not available at %s: %v", modelPath, err)
 	}
 	defer Model_free(model)
 

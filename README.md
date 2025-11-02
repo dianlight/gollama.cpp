@@ -16,6 +16,7 @@ A high-performance Go binding for [llama.cpp](https://github.com/ggml-org/llama.
 - **Easy Integration**: Simple Go API for LLM inference
 - **GPU Acceleration**: Supports Metal, CUDA, HIP, Vulkan, OpenCL, SYCL, and other backends
 - **Embedded Runtime Libraries**: Optional go:embed bundle for all supported platforms
+- **GGML Bindings**: Low-level GGML tensor library bindings for advanced use cases
 
 ## Supported Platforms
 
@@ -183,6 +184,45 @@ func main() {
 ```
 
 ## Advanced Usage
+
+### GGML Low-Level API
+
+For advanced use cases, gollama.cpp provides direct access to GGML (the tensor library powering llama.cpp):
+
+```go
+// Check GGML type information
+typeSize, err := gollama.Ggml_type_size(gollama.GGML_TYPE_F32)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("F32 type size: %d bytes\n", typeSize)
+
+// Check if a type is quantized
+isQuantized, err := gollama.Ggml_type_is_quantized(gollama.GGML_TYPE_Q4_0)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Q4_0 is quantized: %v\n", isQuantized)
+
+// Enumerate backend devices
+devCount, err := gollama.Ggml_backend_dev_count()
+if err == nil && devCount > 0 {
+    for i := uint64(0); i < devCount; i++ {
+        dev, _ := gollama.Ggml_backend_dev_get(i)
+        name, _ := gollama.Ggml_backend_dev_name(dev)
+        fmt.Printf("Device %d: %s\n", i, name)
+    }
+}
+```
+
+**Supported GGML Features:**
+- 31 tensor type definitions (F32, F16, Q4_0, Q8_0, BF16, etc.)
+- Type size and quantization utilities
+- Backend device enumeration and management
+- Buffer allocation and management
+- Type information queries
+
+**Note:** GGML functions may not be exported in all llama.cpp builds. The library gracefully handles missing functions without errors.
 
 ### GPU Configuration
 
@@ -374,10 +414,12 @@ For example: `v0.2.0-llamacpp.b6862` uses llama.cpp build b6862.
 ## Documentation
 
 - [API Reference](https://pkg.go.dev/github.com/dianlight/gollama.cpp)
+  - **High-Level API**: `gollama.go` - Complete llama.cpp bindings
+  - **Low-Level API**: `goggml.go` - GGML tensor library bindings
+- [GGML Low-Level API Guide](./docs/GGML_API.md) - Detailed GGML bindings documentation
 - [Examples](./examples/)
 - [Build Guide](./docs/BUILD.md)
 - [GPU Setup](./docs/GPU.md)
-- [Performance Tuning](./docs/PERFORMANCE.md)
 
 ## Examples
 

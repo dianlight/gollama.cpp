@@ -137,6 +137,21 @@ func registerLibFunc(fptr interface{}, handle uintptr, fname string) {
 	}
 }
 
+// tryRegisterLibFunc attempts to register a library function, returning an error if it fails
+// This is useful for optional functions that may not exist in all library builds
+func tryRegisterLibFunc(fptr interface{}, handle uintptr, fname string) error {
+	procAddr, err := getProcAddressPlatform(handle, fname)
+	if err != nil {
+		return err
+	}
+
+	// Cast the function pointer interface to a *uintptr and store the resolved address
+	if ptr, ok := fptr.(*uintptr); ok {
+		*ptr = procAddr
+	}
+	return nil
+}
+
 // getProcAddressPlatform gets the address of a symbol in a loaded library
 func getProcAddressPlatform(handle uintptr, name string) (uintptr, error) {
 	namePtr, err := syscall.BytePtrFromString(name)

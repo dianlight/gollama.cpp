@@ -296,16 +296,19 @@ update-hf-script: clone-llamacpp
 tag-release:
 	@echo "Starting automated tag and release process..."
 	
+	# Save starting commit for potential rollback
+	@starting_commit=$$(git rev-parse HEAD); \
+	\
 	# Check if we're on the main branch
-	@current_branch=$$(git rev-parse --abbrev-ref HEAD); \
+	current_branch=$$(git rev-parse --abbrev-ref HEAD); \
 	if [ "$$current_branch" != "main" ]; then \
 		echo "Error: tag-release can only be run from the main branch. Current branch: $$current_branch"; \
 		exit 1; \
-	fi
-	
+	fi; \
+	\
 	# Check if current branch is up to date with origin
-	@echo "Checking if main branch is up to date with origin..."
-	@git fetch origin main >/dev/null 2>&1; \
+	echo "Checking if main branch is up to date with origin..."; \
+	git fetch origin main >/dev/null 2>&1; \
 	local_commit=$$(git rev-parse HEAD); \
 	remote_commit=$$(git rev-parse origin/main); \
 	if [ "$$local_commit" != "$$remote_commit" ]; then \
@@ -314,77 +317,128 @@ tag-release:
 		echo "Remote: $$remote_commit"; \
 		echo "Please pull latest changes: git pull origin main"; \
 		exit 1; \
-	fi
-	
+	fi; \
+	\
 	# Update CHANGELOG.md for release
-	@echo "Updating CHANGELOG.md for release $(FULL_VERSION)..."
-	@bash scripts/update-changelog.sh "$(FULL_VERSION)" "release"
-	@echo "CHANGELOG.md updated successfully"
-	
-	# Commit the changelog update
-	@echo "Committing CHANGELOG.md update..."
-	@git add CHANGELOG.md
-	@git commit -m ":rocket: chore(release): update CHANGELOG.md for $(FULL_VERSION)"
-	@git push origin main
-	@echo "CHANGELOG.md committed successfully"
-	
-	# Check if current version tag exists
-	@tag_name="$(FULL_VERSION)"; \
+	echo "Updating CHANGELOG.md for release $(FULL_VERSION)..."; \
+	if ! bash scripts/update-changelog.sh "$(FULL_VERSION)" "release"; then \
+		echo "Error: Failed to update CHANGELOG.md"; \
+		exit 1; \
+	fi; \
+	echo "CHANGELOG.md updated successfully"; \
+	\
+	# Commit the changelog update (but don't push yet)
+	echo "Committing CHANGELOG.md update..."; \
+	git add CHANGELOG.md; \
+	if ! git commit -m ":rocket: chore(release): update CHANGELOG.md for $(FULL_VERSION)"; then \
+		echo "Error: Failed to commit CHANGELOG.md"; \
+		git reset --hard $$starting_commit; \
+		exit 1; \
+	fi; \
+	echo "CHANGELOG.md committed successfully"; \
+	\
+	# Check if current version tag exists and handle it
+	tag_name="$(FULL_VERSION)"; \
 	echo "Checking if tag $$tag_name exists..."; \
+	tag_existed=false; \
 	if git tag -l | grep -q "^$$tag_name$$"; then \
 		echo "Tag $$tag_name already exists"; \
+		tag_existed=true; \
 		\
-		# Check if GitHub release exists for this tag \
+		# Check if GitHub release exists for this tag
 		echo "Checking if GitHub release exists for tag $$tag_name..."; \
 		if command -v gh >/dev/null 2>&1; then \
 			if gh release view $$tag_name >/dev/null 2>&1; then \
 				echo "GitHub release already exists for tag $$tag_name"; \
-				echo "Moving tag to current HEAD and updating release..."; \
-				git tag -d $$tag_name; \
-				git push origin :refs/tags/$$tag_name; \
-				git tag $$tag_name HEAD; \
-				git push origin $$tag_name; \
-				echo "Tag $$tag_name moved to current HEAD and pushed"; \
+				echo "Will move tag to current HEAD after all steps complete"; \
 			else \
-				echo "Tag exists but no GitHub release found. Creating release..."; \
-				git push origin $$tag_name; \
-				echo "Tag $$tag_name pushed to origin"; \
+				echo "Tag exists but no GitHub release found"; \
 			fi; \
 		else \
 			echo "Warning: GitHub CLI (gh) not found. Cannot check for existing releases."; \
-			echo "Moving tag to current HEAD..."; \
-			git tag -d $$tag_name; \
-			git push origin :refs/tags/$$tag_name; \
-			git tag $$tag_name HEAD; \
-			git push origin $$tag_name; \
-			echo "Tag $$tag_name moved to current HEAD and pushed"; \
 		fi; \
-	else \
-		echo "Tag $$tag_name does not exist. Creating and pushing..."; \
-		git tag $$tag_name HEAD; \
-		git push origin $$tag_name; \
-		echo "Tag $$tag_name created and pushed"; \
-	fi
-	
-	# Wait for GitHub Actions to process the tag and create the release
-	@echo "Waiting for GitHub Actions to process the tag and create release artifacts..."
-	@echo "You can monitor the progress at: https://github.com/$$(git config --get remote.origin.url | sed 's/.*github.com[:/]\([^/]*\/[^/]*\)\.git/\1/')/actions"
-	
+		\
+		# Delete local tag (will be recreated later)
+		git tag -d $$tag_name; \
+	fi; \
+	\
+	# Create the tag locally (but don't push yet)
+	echo "Creating tag $$tag_name..."; \
+	if ! git tag $$tag_name HEAD; then \
+		echo "Error: Failed to create tag $$tag_name"; \
+		git reset --hard $$starting_commit; \
+		exit 1; \
+	fi; \
+	echo "Tag $$tag_name created locally"; \
+	\
 	# Increment patch version for next development cycle
-	@echo "Incrementing patch version for next development cycle..."
-	@bash scripts/increment-version.sh patch
-	@echo "Version incremented successfully (no git commit performed)"
-	
+	echo "Incrementing patch version for next development cycle..."; \
+	if ! bash scripts/increment-version.sh patch; then \
+		echo "Error: Failed to increment version"; \
+		git tag -d $$tag_name; \
+		if [ "$$tag_existed" = "true" ]; then \
+			git push origin :refs/tags/$$tag_name 2>/dev/null || true; \
+		fi; \
+		git reset --hard $$starting_commit; \
+		exit 1; \
+	fi; \
+	echo "Version incremented successfully"; \
+	\
 	# Add new [Unreleased] section to CHANGELOG.md
-	@echo "Adding new [Unreleased] section to CHANGELOG.md..."
-	@new_version=$$(echo $(VERSION) | awk -F. '{print $$1"."$$2"."$$3+1}'); \
+	echo "Adding new [Unreleased] section to CHANGELOG.md..."; \
+	new_version=$$(echo $(VERSION) | awk -F. '{print $$1"."$$2"."$$3+1}'); \
 	new_full_version="v$$new_version-llamacpp.$(LLAMA_CPP_BUILD)"; \
-	bash scripts/update-changelog.sh "$$new_full_version" "unreleased"
-	@echo "[Unreleased] section added successfully"
-	
-	@echo "Tag and release process completed successfully!"
-	@echo "Released version: $(FULL_VERSION)"
-	@echo "Next development version: v$$(echo $(VERSION) | awk -F. '{print $$1"."$$2"."$$3+1}')-llamacpp.$(LLAMA_CPP_BUILD)"
+	if ! bash scripts/update-changelog.sh "$$new_full_version" "unreleased"; then \
+		echo "Error: Failed to add [Unreleased] section to CHANGELOG.md"; \
+		git tag -d $$tag_name; \
+		if [ "$$tag_existed" = "true" ]; then \
+			git push origin :refs/tags/$$tag_name 2>/dev/null || true; \
+		fi; \
+		git reset --hard $$starting_commit; \
+		exit 1; \
+	fi; \
+	echo "[Unreleased] section added successfully"; \
+	\
+	# All steps succeeded - now push everything
+	echo "All steps completed successfully. Pushing changes to origin..."; \
+	\
+	# Push the CHANGELOG commit
+	if ! git push origin main; then \
+		echo "Error: Failed to push CHANGELOG commit to origin"; \
+		git tag -d $$tag_name; \
+		if [ "$$tag_existed" = "true" ]; then \
+			git push origin :refs/tags/$$tag_name 2>/dev/null || true; \
+		fi; \
+		git reset --hard $$starting_commit; \
+		exit 1; \
+	fi; \
+	echo "CHANGELOG commit pushed successfully"; \
+	\
+	# Delete remote tag if it existed
+	if [ "$$tag_existed" = "true" ]; then \
+		echo "Deleting remote tag $$tag_name..."; \
+		if ! git push origin :refs/tags/$$tag_name; then \
+			echo "Warning: Failed to delete remote tag $$tag_name"; \
+		fi; \
+	fi; \
+	\
+	# Push the tag
+	if ! git push origin $$tag_name; then \
+		echo "Error: Failed to push tag $$tag_name to origin"; \
+		echo "CHANGELOG commit was pushed, but tag push failed"; \
+		echo "Manual intervention may be required"; \
+		exit 1; \
+	fi; \
+	echo "Tag $$tag_name pushed successfully"; \
+	\
+	# Wait for GitHub Actions to process the tag and create the release
+	echo "Waiting for GitHub Actions to process the tag and create release artifacts..."; \
+	echo "You can monitor the progress at: https://github.com/$$(git config --get remote.origin.url | sed 's/.*github.com[:/]\([^/]*\/[^/]*\)\.git/\1/')/actions"; \
+	\
+	echo ""; \
+	echo "Tag and release process completed successfully!"; \
+	echo "Released version: $(FULL_VERSION)"; \
+	echo "Next development version: $$new_full_version"
 
 # Package releases
 .PHONY: release

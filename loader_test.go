@@ -8,386 +8,268 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestLibraryLoader_GetLibraryName(t *testing.T) {
-	loader := &LibraryLoader{}
+type LoaderSuite struct{ suite.Suite }
 
-	// Test current platform
+func (s *LoaderSuite) TestGetLibraryName() {
+	loader := &LibraryLoader{}
 	result, err := loader.getLibraryName()
 	if err != nil {
-		// If current platform is unsupported, that's fine
 		if runtime.GOOS != "darwin" && runtime.GOOS != "linux" && runtime.GOOS != "windows" {
-			t.Logf("Current platform %s is unsupported, which is expected", runtime.GOOS)
+			s.T().Logf("Current platform %s is unsupported, which is expected", runtime.GOOS)
 			return
 		}
-		t.Errorf("Unexpected error for supported OS %s: %v", runtime.GOOS, err)
-		return
+		s.T().Fatalf("Unexpected error for supported OS %s: %v", runtime.GOOS, err)
 	}
-
-	// Verify the result matches expected pattern for current OS
 	switch runtime.GOOS {
 	case "darwin":
-		if result != "libllama.dylib" {
-			t.Errorf("Expected libllama.dylib for darwin, got %s", result)
-		}
+		assert.Equal(s.T(), "libllama.dylib", result)
 	case "linux":
-		if result != "libllama.so" {
-			t.Errorf("Expected libllama.so for linux, got %s", result)
-		}
+		assert.Equal(s.T(), "libllama.so", result)
 	case "windows":
-		if result != "llama.dll" {
-			t.Errorf("Expected llama.dll for windows, got %s", result)
-		}
+		assert.Equal(s.T(), "llama.dll", result)
 	default:
-		t.Logf("Platform %s returned %s", runtime.GOOS, result)
+		s.T().Logf("Platform %s returned %s", runtime.GOOS, result)
 	}
 }
 
-func TestLibraryLoader_LoadSharedLibrary(t *testing.T) {
+func (s *LoaderSuite) TestLoadSharedLibrary_WindowsBehavior() {
+	if runtime.GOOS != "windows" {
+		s.T().Skip("Skipping Windows test on non-Windows platform")
+	}
 	loader := &LibraryLoader{}
-
-	t.Run("Windows behavior", func(t *testing.T) {
-		if runtime.GOOS != "windows" {
-			t.Skip("Skipping Windows test on non-Windows platform")
-		}
-
-		// Test with invalid path (should fail since test.dll doesn't exist)
-		_, err := loader.loadSharedLibrary("test.dll")
-		if err == nil {
-			t.Error("Expected error for non-existent DLL, but got none")
-		}
-	})
-
-	t.Run("Unix-like systems", func(t *testing.T) {
-		if runtime.GOOS == "windows" {
-			t.Skip("Skipping Unix test on Windows")
-		}
-
-		// Test with invalid path (should fail)
-		_, err := loader.loadSharedLibrary("/invalid/path/libtest.so")
-		if err == nil {
-			t.Error("Expected error for invalid path, but got none")
-		}
-	})
+	_, err := loader.loadSharedLibrary("test.dll")
+	assert.Error(s.T(), err, "Expected error for non-existent DLL")
 }
 
-func TestLibraryLoader_ExtractEmbeddedLibraries(t *testing.T) {
+func (s *LoaderSuite) TestLoadSharedLibrary_Unix() {
+	if runtime.GOOS == "windows" {
+		s.T().Skip("Skipping Unix test on Windows")
+	}
 	loader := &LibraryLoader{}
+	_, err := loader.loadSharedLibrary("/invalid/path/libtest.so")
+	assert.Error(s.T(), err, "Expected error for invalid path")
+}
 
-	t.Run("Non-existent embedded libraries", func(t *testing.T) {
-		_, err := loader.extractEmbeddedLibraries()
-		// The test may succeed if libraries are actually present in the embedded filesystem
+func (s *LoaderSuite) TestExtractEmbeddedLibraries_NonExistent() {
+	loader := &LibraryLoader{}
+	_, err := loader.extractEmbeddedLibraries()
+	if err == nil {
+		s.T().Log("extractEmbeddedLibraries succeeded - embedded libraries are present")
+		if loader.tempDir != "" {
+			_ = os.RemoveAll(loader.tempDir)
+			loader.tempDir = ""
+		}
+	} else {
+		s.T().Logf("extractEmbeddedLibraries failed as expected when no libraries present: %v", err)
+	}
+}
+
+func (s *LoaderSuite) TestExtractEmbeddedLibraries_PlatformSpecificSets() {
+	loader := &LibraryLoader{}
+	goos := runtime.GOOS
+	goarch := runtime.GOARCH
+	expectedExtensions := map[string]string{
+		"darwin":  ".dylib",
+		"linux":   ".so",
+		"windows": ".dll",
+	}
+	if expectedExt, exists := expectedExtensions[goos]; exists {
+		mainLibPath, err := loader.extractEmbeddedLibraries()
 		if err == nil {
-			t.Log("extractEmbeddedLibraries succeeded - embedded libraries are present")
-			// Clean up if extraction succeeded
+			s.T().Log("extractEmbeddedLibraries succeeded - libraries may be present")
+			expectedMainLib, _ := loader.getLibraryName()
+			assert.Equal(s.T(), expectedMainLib, filepath.Base(mainLibPath))
 			if loader.tempDir != "" {
-				_ = os.RemoveAll(loader.tempDir) // Ignore error in test cleanup
+				files, err := os.ReadDir(loader.tempDir)
+				if err == nil {
+					s.T().Logf("Extracted %d files to %s", len(files), loader.tempDir)
+					for _, file := range files {
+						fileName := file.Name()
+						assert.Equalf(s.T(), expectedExt, filepath.Ext(fileName), "Unexpected file extension for %s", fileName)
+					}
+				}
+				_ = os.RemoveAll(loader.tempDir)
 				loader.tempDir = ""
 			}
 		} else {
-			t.Logf("extractEmbeddedLibraries failed as expected when no libraries present: %v", err)
-		}
-	})
-
-	t.Run("Platform-specific library sets", func(t *testing.T) {
-		// Test that the function dynamically finds all libraries for current platform
-		goos := runtime.GOOS
-		goarch := runtime.GOARCH
-
-		// Define expected file extensions for each platform
-		expectedExtensions := map[string]string{
-			"darwin":  ".dylib",
-			"linux":   ".so",
-			"windows": ".dll",
-		}
-
-		if expectedExt, exists := expectedExtensions[goos]; exists {
-			// The function should dynamically extract all files with the correct extension
-			mainLibPath, err := loader.extractEmbeddedLibraries()
-			if err == nil {
-				t.Log("extractEmbeddedLibraries succeeded - libraries may be present")
-
-				// Verify that main library path is correct
-				expectedMainLib, _ := loader.getLibraryName()
-				if filepath.Base(mainLibPath) != expectedMainLib {
-					t.Errorf("Main library path mismatch: got %s, expected to end with %s", mainLibPath, expectedMainLib)
-				}
-
-				// Verify temporary directory contains files with correct extension
-				if loader.tempDir != "" {
-					files, err := os.ReadDir(loader.tempDir)
-					if err == nil {
-						t.Logf("Extracted %d files to %s", len(files), loader.tempDir)
-						for _, file := range files {
-							fileName := file.Name()
-							if filepath.Ext(fileName) != expectedExt {
-								t.Errorf("Unexpected file extension for %s, expected %s", fileName, expectedExt)
-							}
-							t.Logf("  - %s", fileName)
-						}
-					}
-
-					// Clean up
-					_ = os.RemoveAll(loader.tempDir) // Ignore error in test cleanup
-					loader.tempDir = ""
-				}
+			if err.Error() == fmt.Sprintf("unsupported OS: %s", goos) {
+				s.T().Fatalf("Platform should be supported: %s", goos)
 			} else {
-				// Verify the error message indicates missing libraries, not unsupported platform
-				if err.Error() == fmt.Sprintf("unsupported OS: %s", goos) {
-					t.Errorf("Platform should be supported: %s", goos)
-				} else {
-					t.Logf("Expected failure for missing libraries: %v", err)
-				}
+				s.T().Logf("Expected failure for missing libraries: %v", err)
 			}
-
-			t.Logf("Platform %s_%s expects files with extension: %s", goos, goarch, expectedExt)
-		} else {
-			t.Logf("Platform %s not in expected patterns", goos)
 		}
-	})
+		s.T().Logf("Platform %s_%s expects files with extension: %s", goos, goarch, expectedExt)
+	} else {
+		s.T().Logf("Platform %s not in expected patterns", goos)
+	}
 }
 
-func TestLibraryLoader_GetHandle(t *testing.T) {
+func (s *LoaderSuite) TestGetHandle_InitiallyZero() {
 	loader := &LibraryLoader{}
-
-	t.Run("Initially zero", func(t *testing.T) {
-		handle := loader.GetHandle()
-		if handle != 0 {
-			t.Errorf("Expected handle to be 0, got %d", handle)
-		}
-	})
-
-	t.Run("After setting handle", func(t *testing.T) {
-		expectedHandle := uintptr(12345)
-		loader.handle = expectedHandle
-		loader.loaded = true
-
-		handle := loader.GetHandle()
-		if handle != expectedHandle {
-			t.Errorf("Expected handle to be %d, got %d", expectedHandle, handle)
-		}
-
-		// Reset for other tests
-		loader.handle = 0
-		loader.loaded = false
-	})
+	handle := loader.GetHandle()
+	assert.Equal(s.T(), uintptr(0), handle)
 }
 
-func TestLibraryLoader_IsLoaded(t *testing.T) {
+func (s *LoaderSuite) TestGetHandle_AfterSettingHandle() {
 	loader := &LibraryLoader{}
-
-	t.Run("Initially false", func(t *testing.T) {
-		if loader.IsLoaded() {
-			t.Error("Expected IsLoaded to be false initially")
-		}
-	})
-
-	t.Run("After setting loaded", func(t *testing.T) {
-		loader.loaded = true
-
-		if !loader.IsLoaded() {
-			t.Error("Expected IsLoaded to be true after setting loaded")
-		}
-
-		// Reset for other tests
-		loader.loaded = false
-	})
+	expectedHandle := uintptr(12345)
+	loader.handle = expectedHandle
+	loader.loaded = true
+	handle := loader.GetHandle()
+	assert.Equal(s.T(), expectedHandle, handle)
+	loader.handle = 0
+	loader.loaded = false
 }
 
-func TestLibraryLoader_UnloadLibrary(t *testing.T) {
+func (s *LoaderSuite) TestIsLoaded_InitiallyFalse() {
 	loader := &LibraryLoader{}
-
-	t.Run("Unload when not loaded", func(t *testing.T) {
-		err := loader.UnloadLibrary()
-		if err != nil {
-			t.Errorf("Unexpected error when unloading unloaded library: %v", err)
-		}
-	})
-
-	t.Run("Unload with temporary directory", func(t *testing.T) {
-		// Create a temporary directory
-		tempDir, err := os.MkdirTemp("", "gollama-test-*")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
-		}
-
-		loader.loaded = true
-		loader.handle = uintptr(12345)
-		loader.tempDir = tempDir
-		loader.llamaLibPath = filepath.Join(tempDir, "test.so")
-
-		err = loader.UnloadLibrary()
-		if err != nil {
-			t.Errorf("Unexpected error when unloading library: %v", err)
-		}
-
-		// Check that everything is reset
-		if loader.loaded {
-			t.Error("Expected loaded to be false after unload")
-		}
-		if loader.handle != 0 {
-			t.Error("Expected handle to be 0 after unload")
-		}
-		if loader.tempDir != "" {
-			t.Error("Expected tempDir to be empty after unload")
-		}
-		if loader.llamaLibPath != "" {
-			t.Error("Expected libPath to be empty after unload")
-		}
-
-		// Check that temp directory was removed
-		if _, err := os.Stat(tempDir); !os.IsNotExist(err) {
-			t.Error("Expected temp directory to be removed")
-		}
-	})
+	assert.False(s.T(), loader.IsLoaded())
 }
 
-func TestLibraryLoader_LoadLibrary(t *testing.T) {
+func (s *LoaderSuite) TestIsLoaded_AfterSettingLoaded() {
 	loader := &LibraryLoader{}
-
-	t.Run("Load when already loaded", func(t *testing.T) {
-		loader.loaded = true
-		defer func() { loader.loaded = false }()
-
-		err := loader.LoadLibrary()
-		if err != nil {
-			t.Errorf("Unexpected error when loading already loaded library: %v", err)
-		}
-	})
-
-	t.Run("Load library - downloads when embedded libs disabled", func(t *testing.T) {
-		// When embedded libraries are disabled (via build tags), the loader
-		// should fall back to downloading libraries, which should succeed
-		err := loader.LoadLibrary()
-		if err != nil {
-			t.Errorf("Expected LoadLibrary to succeed by downloading libraries, but got error: %v", err)
-		} else {
-			t.Log("LoadLibrary succeeded by downloading libraries as expected")
-		}
-
-		// Clean up
-		if loader.loaded {
-			_ = loader.UnloadLibrary() // Ignore error in test cleanup
-		}
-	})
+	loader.loaded = true
+	assert.True(s.T(), loader.IsLoaded())
+	loader.loaded = false
 }
 
-func TestLibraryLoader_ThreadSafety(t *testing.T) {
+func (s *LoaderSuite) TestUnloadLibrary_WhenNotLoaded() {
 	loader := &LibraryLoader{}
-
-	t.Run("Concurrent access to GetHandle", func(t *testing.T) {
-		const numGoroutines = 100
-		var wg sync.WaitGroup
-
-		wg.Add(numGoroutines)
-		for i := 0; i < numGoroutines; i++ {
-			go func() {
-				defer wg.Done()
-				_ = loader.GetHandle()
-			}()
-		}
-
-		wg.Wait()
-	})
-
-	t.Run("Concurrent access to IsLoaded", func(t *testing.T) {
-		const numGoroutines = 100
-		var wg sync.WaitGroup
-
-		wg.Add(numGoroutines)
-		for i := 0; i < numGoroutines; i++ {
-			go func() {
-				defer wg.Done()
-				_ = loader.IsLoaded()
-			}()
-		}
-
-		wg.Wait()
-	})
-
-	t.Run("Concurrent LoadLibrary calls", func(t *testing.T) {
-		const numGoroutines = 10
-		var wg sync.WaitGroup
-
-		wg.Add(numGoroutines)
-		for i := 0; i < numGoroutines; i++ {
-			go func() {
-				defer wg.Done()
-				_ = loader.LoadLibrary()
-			}()
-		}
-
-		wg.Wait()
-
-		// Clean up if any succeeded
-		if loader.loaded {
-			_ = loader.UnloadLibrary() // Ignore error in test cleanup
-		}
-	})
+	err := loader.UnloadLibrary()
+	assert.NoError(s.T(), err)
 }
 
-func TestGlobalFunctions(t *testing.T) {
-	t.Run("getLibHandle", func(t *testing.T) {
-		handle := getLibHandle()
-		expectedHandle := globalLoader.GetHandle()
-		if handle != expectedHandle {
-			t.Errorf("Expected handle %d, got %d", expectedHandle, handle)
-		}
-	})
-
-	t.Run("isLibraryLoaded", func(t *testing.T) {
-		loaded := isLibraryLoaded()
-		expectedLoaded := globalLoader.IsLoaded()
-		if loaded != expectedLoaded {
-			t.Errorf("Expected loaded %t, got %t", expectedLoaded, loaded)
-		}
-	})
-
-	t.Run("RegisterFunction with no library", func(t *testing.T) {
-		var testFunc func()
-		err := RegisterFunction(&testFunc, "test_function")
-		if err == nil {
-			t.Error("Expected error when registering function with no library loaded")
-		}
-		if err.Error() != "library not loaded" {
-			t.Errorf("Unexpected error message: %v", err)
-		}
-	})
-
-	t.Run("Cleanup", func(t *testing.T) {
-		// This should not panic
-		Cleanup()
-	})
-}
-
-func TestLibraryLoader_ExtractEmbeddedLibrariesWriteFailure(t *testing.T) {
+func (s *LoaderSuite) TestUnloadLibrary_WithTemporaryDirectory() {
 	loader := &LibraryLoader{}
+	tempDir, err := os.MkdirTemp("", "gollama-test-*")
+	if err != nil {
+		s.T().Fatalf("Failed to create temp dir: %v", err)
+	}
+	loader.loaded = true
+	loader.handle = uintptr(12345)
+	loader.tempDir = tempDir
+	loader.llamaLibPath = filepath.Join(tempDir, "test.so")
+	err = loader.UnloadLibrary()
+	assert.NoError(s.T(), err)
+	assert.False(s.T(), loader.loaded)
+	assert.Equal(s.T(), uintptr(0), loader.handle)
+	assert.Empty(s.T(), loader.tempDir)
+	assert.Empty(s.T(), loader.llamaLibPath)
+	_, statErr := os.Stat(tempDir)
+	assert.True(s.T(), os.IsNotExist(statErr), "Expected temp directory to be removed")
+}
 
-	t.Run("Write to read-only directory", func(t *testing.T) {
-		// Create a temporary directory and make it read-only
-		tempDir, err := os.MkdirTemp("", "gollama-readonly-test-*")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
-		}
-		defer func() { _ = os.RemoveAll(tempDir) }() // Ignore error in cleanup
+func (s *LoaderSuite) TestLoadLibrary_WhenAlreadyLoaded() {
+	loader := &LibraryLoader{}
+	loader.loaded = true
+	defer func() { loader.loaded = false }()
+	err := loader.LoadLibrary()
+	assert.NoError(s.T(), err)
+}
 
-		// Make directory read-only
-		err = os.Chmod(tempDir, 0444)
-		if err != nil {
-			t.Skipf("Cannot change directory permissions: %v", err)
-		}
-		defer func() { _ = os.Chmod(tempDir, 0755) }() // Restore permissions for cleanup, ignore error
+func (s *LoaderSuite) TestLoadLibrary_DownloadsWhenEmbeddedDisabled() {
+	loader := &LibraryLoader{}
+	err := loader.LoadLibrary()
+	if err != nil {
+		s.T().Errorf("Expected LoadLibrary to succeed by downloading libraries, but got error: %v", err)
+	} else {
+		s.T().Log("LoadLibrary succeeded by downloading libraries as expected")
+	}
+	if loader.loaded {
+		_ = loader.UnloadLibrary()
+	}
+}
 
-		// This test is OS-dependent and may not work reliably
-		// We'll just verify the function doesn't panic
-		_, err = loader.extractEmbeddedLibraries()
-		if err == nil {
-			t.Log("extractEmbeddedLibraries succeeded unexpectedly")
-		} else {
-			t.Logf("extractEmbeddedLibraries failed as expected: %v", err)
-		}
-	})
+func (s *LoaderSuite) TestThreadSafety_GetHandle() {
+	loader := &LibraryLoader{}
+	const numGoroutines = 100
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer wg.Done()
+			_ = loader.GetHandle()
+		}()
+	}
+	wg.Wait()
+}
+
+func (s *LoaderSuite) TestThreadSafety_IsLoaded() {
+	loader := &LibraryLoader{}
+	const numGoroutines = 100
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer wg.Done()
+			_ = loader.IsLoaded()
+		}()
+	}
+	wg.Wait()
+}
+
+func (s *LoaderSuite) TestThreadSafety_ConcurrentLoadLibraryCalls() {
+	loader := &LibraryLoader{}
+	const numGoroutines = 10
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer wg.Done()
+			_ = loader.LoadLibrary()
+		}()
+	}
+	wg.Wait()
+	if loader.loaded {
+		_ = loader.UnloadLibrary()
+	}
+}
+
+func (s *LoaderSuite) TestGlobalFunctions_GetLibHandle() {
+	handle := getLibHandle()
+	expectedHandle := globalLoader.GetHandle()
+	assert.Equal(s.T(), expectedHandle, handle)
+}
+
+func (s *LoaderSuite) TestGlobalFunctions_IsLibraryLoaded() {
+	loaded := isLibraryLoaded()
+	expectedLoaded := globalLoader.IsLoaded()
+	assert.Equal(s.T(), expectedLoaded, loaded)
+}
+
+func (s *LoaderSuite) TestGlobalFunctions_RegisterFunctionNoLibrary() {
+	var testFunc func()
+	err := RegisterFunction(&testFunc, "test_function")
+	assert.Error(s.T(), err, "Expected error when registering function with no library loaded")
+	if err != nil {
+		assert.Equal(s.T(), "library not loaded", err.Error())
+	}
+}
+
+func (s *LoaderSuite) TestGlobalFunctions_Cleanup() { Cleanup() }
+
+func (s *LoaderSuite) TestExtractEmbeddedLibrariesWriteFailure_WriteToReadOnlyDirectory() {
+	loader := &LibraryLoader{}
+	tempDir, err := os.MkdirTemp("", "gollama-readonly-test-*")
+	if err != nil {
+		s.T().Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tempDir) }()
+	if err = os.Chmod(tempDir, 0444); err != nil {
+		s.T().Skipf("Cannot change directory permissions: %v", err)
+	}
+	defer func() { _ = os.Chmod(tempDir, 0755) }()
+	_, err = loader.extractEmbeddedLibraries()
+	if err == nil {
+		s.T().Log("extractEmbeddedLibraries succeeded unexpectedly")
+	} else {
+		s.T().Logf("extractEmbeddedLibraries failed as expected: %v", err)
+	}
 }
 
 // Benchmark tests
@@ -436,74 +318,47 @@ func BenchmarkGlobalFunctions(b *testing.B) {
 }
 
 // Test race conditions
-func TestLibraryLoader_RaceConditions(t *testing.T) {
+func (s *LoaderSuite) TestRaceConditions_LoadAndUnloadRace() {
 	loader := &LibraryLoader{}
-
-	t.Run("Load and Unload race", func(t *testing.T) {
-		const iterations = 50
-		var wg sync.WaitGroup
-
-		wg.Add(2)
-
-		// Goroutine 1: Try to load
-		go func() {
-			defer wg.Done()
-			for i := 0; i < iterations; i++ {
-				_ = loader.LoadLibrary()
-				time.Sleep(time.Microsecond)
-			}
-		}()
-
-		// Goroutine 2: Try to unload
-		go func() {
-			defer wg.Done()
-			for i := 0; i < iterations; i++ {
-				_ = loader.UnloadLibrary()
-				time.Sleep(time.Microsecond)
-			}
-		}()
-
-		wg.Wait()
-
-		// Final cleanup
-		if loader.loaded {
-			_ = loader.UnloadLibrary() // Ignore error in test cleanup
+	const iterations = 50
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = loader.LoadLibrary()
+			time.Sleep(time.Microsecond)
 		}
-	})
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = loader.UnloadLibrary()
+			time.Sleep(time.Microsecond)
+		}
+	}()
+	wg.Wait()
+	if loader.loaded {
+		_ = loader.UnloadLibrary()
+	}
 }
 
 // Test initialization and state
-func TestLibraryLoader_InitialState(t *testing.T) {
+func (s *LoaderSuite) TestInitialState() {
 	loader := &LibraryLoader{}
-
-	if loader.handle != 0 {
-		t.Error("Expected initial handle to be 0")
-	}
-	if loader.loaded {
-		t.Error("Expected initial loaded to be false")
-	}
-	if loader.tempDir != "" {
-		t.Error("Expected initial tempDir to be empty")
-	}
-	if loader.llamaLibPath != "" {
-		t.Error("Expected initial libPath to be empty")
-	}
+	assert.Equal(s.T(), uintptr(0), loader.handle)
+	assert.False(s.T(), loader.loaded)
+	assert.Empty(s.T(), loader.tempDir)
+	assert.Empty(s.T(), loader.llamaLibPath)
 }
 
 // Test global loader initialization
-func TestGlobalLoader(t *testing.T) {
-	if globalLoader == nil {
-		t.Error("Expected globalLoader to be initialized")
-	}
-
-	// Test that global functions work with uninitialized state
+func (s *LoaderSuite) TestGlobalLoader() {
+	assert.NotNil(s.T(), globalLoader, "Expected globalLoader to be initialized")
 	handle := getLibHandle()
-	if handle != 0 {
-		t.Errorf("Expected global handle to be 0 initially, got %d", handle)
-	}
-
+	assert.Equal(s.T(), uintptr(0), handle, "Expected global handle to be 0 initially")
 	loaded := isLibraryLoaded()
-	if loaded {
-		t.Error("Expected global library to not be loaded initially")
-	}
+	assert.False(s.T(), loaded, "Expected global library to not be loaded initially")
 }
+
+func TestLoaderSuite(t *testing.T) { suite.Run(t, new(LoaderSuite)) }

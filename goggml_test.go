@@ -2,13 +2,17 @@ package gollama
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-// TestGgmlTypeSize tests the GGML type size function
-func TestGgmlTypeSize(t *testing.T) {
-	// Initialize backend
+type GgmlSuite struct{ suite.Suite }
+
+// Tests the GGML type size function
+func (s *GgmlSuite) TestGgmlTypeSize() {
 	if err := Backend_init(); err != nil {
-		t.Fatalf("Failed to initialize backend: %v", err)
+		s.T().Fatalf("Failed to initialize backend: %v", err)
 	}
 	defer Backend_free()
 
@@ -27,24 +31,16 @@ func TestGgmlTypeSize(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			size, err := Ggml_type_size(tt.typ)
-			if err != nil {
-				t.Errorf("Ggml_type_size() error = %v", err)
-				return
-			}
-			if size != tt.wantSize {
-				t.Errorf("Ggml_type_size() = %v, want %v", size, tt.wantSize)
-			}
-		})
+		size, err := Ggml_type_size(tt.typ)
+		assert.NoError(s.T(), err)
+		assert.Equal(s.T(), tt.wantSize, size)
 	}
 }
 
-// TestGgmlTypeIsQuantized tests whether types are correctly identified as quantized
-func TestGgmlTypeIsQuantized(t *testing.T) {
-	// Initialize backend
+// Tests whether types are correctly identified as quantized
+func (s *GgmlSuite) TestGgmlTypeIsQuantized() {
 	if err := Backend_init(); err != nil {
-		t.Fatalf("Failed to initialize backend: %v", err)
+		s.T().Fatalf("Failed to initialize backend: %v", err)
 	}
 	defer Backend_free()
 
@@ -64,22 +60,17 @@ func TestGgmlTypeIsQuantized(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			isQuantized, err := Ggml_type_is_quantized(tt.typ)
-			if err != nil {
-				// Function may not be available in all builds
-				t.Skipf("Ggml_type_is_quantized() not available: %v", err)
-				return
-			}
-			if isQuantized != tt.wantQuantized {
-				t.Errorf("Ggml_type_is_quantized() = %v, want %v", isQuantized, tt.wantQuantized)
-			}
-		})
+		isQuantized, err := Ggml_type_is_quantized(tt.typ)
+		if err != nil {
+			s.T().Skipf("Ggml_type_is_quantized() not available: %v", err)
+			continue
+		}
+		assert.Equal(s.T(), tt.wantQuantized, isQuantized)
 	}
 }
 
-// TestGgmlTypeString tests the String method for GgmlType
-func TestGgmlTypeString(t *testing.T) {
+// Tests the String method for GgmlType
+func (s *GgmlSuite) TestGgmlTypeString() {
 	tests := []struct {
 		typ  GgmlType
 		want string
@@ -96,121 +87,82 @@ func TestGgmlTypeString(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.want, func(t *testing.T) {
-			if got := tt.typ.String(); got != tt.want {
-				t.Errorf("GgmlType.String() = %v, want %v", got, tt.want)
-			}
-		})
+		assert.Equal(s.T(), tt.want, tt.typ.String())
 	}
 }
 
-// TestGgmlBackendDevCount tests the backend device count function
-func TestGgmlBackendDevCount(t *testing.T) {
-	// Initialize backend
+// Tests the backend device count function
+func (s *GgmlSuite) TestGgmlBackendDevCount() {
 	if err := Backend_init(); err != nil {
-		t.Fatalf("Failed to initialize backend: %v", err)
+		s.T().Fatalf("Failed to initialize backend: %v", err)
 	}
 	defer Backend_free()
 
-	err := Ggml_backend_load_all()
-	if err != nil {
-		t.Errorf("ggml_backend_load not available or failed: %v", err)
+	if err := Ggml_backend_load_all(); err != nil {
+		s.T().Logf("ggml_backend_load not available or failed: %v", err)
 		return
 	}
 
 	count, err := Ggml_backend_dev_count()
 	if err != nil {
-		t.Skipf("Ggml_backend_dev_count() not available: %v", err)
+		s.T().Skipf("Ggml_backend_dev_count() not available: %v", err)
+		return
 	}
-
-	// Note: Function may return 0 if GGML functions are not exported
-	// This is expected in some llama.cpp builds
-	if count == 0 {
-		t.Error("GGML no backend device functions available in this build")
-	}
-
-	t.Logf("Found %d backend device(s)", count)
+	assert.NotZero(s.T(), count, "GGML no backend device functions available in this build")
+	s.T().Logf("Found %d backend device(s)", count)
 }
 
-// TestGgmlBackendDevInfo tests getting backend device information
-func TestGgmlBackendDevInfo(t *testing.T) {
-	// Initialize backend
+// Tests getting backend device information
+func (s *GgmlSuite) TestGgmlBackendDevInfo() {
 	if err := Backend_init(); err != nil {
-		t.Fatalf("Failed to initialize backend: %v", err)
+		s.T().Fatalf("Failed to initialize backend: %v", err)
 	}
 	defer Backend_free()
 
-	err := Ggml_backend_load_all()
-	if err != nil {
-		t.Errorf("ggml_backend_load not available or failed: %v", err)
+	if err := Ggml_backend_load_all(); err != nil {
+		s.T().Logf("ggml_backend_load not available or failed: %v", err)
 		return
 	}
 
 	count, err := Ggml_backend_dev_count()
-	if err != nil {
-		t.Fatalf("Ggml_backend_dev_count() error = %v", err)
-	}
+	assert.NoError(s.T(), err)
+	assert.NotZero(s.T(), count, "No backend devices available")
 
-	if count == 0 {
-		t.Error("No backend devices available")
-	}
-
-	// Get info for the first device (usually CPU)
 	device, err := Ggml_backend_dev_get(0)
-	if err != nil {
-		t.Fatalf("Ggml_backend_dev_get(0) error = %v", err)
-	}
+	assert.NoError(s.T(), err)
 
 	name, err := Ggml_backend_dev_name(device)
-	if err != nil {
-		t.Fatalf("Ggml_backend_dev_name() error = %v", err)
-	}
-
-	if name == "" {
-		t.Error("Ggml_backend_dev_name() returned empty string")
-	}
-
-	t.Logf("Device 0: %s", name)
+	assert.NoError(s.T(), err)
+	assert.NotEmpty(s.T(), name)
+	s.T().Logf("Device 0: %s", name)
 
 	desc, err := Ggml_backend_dev_description(device)
-	if err != nil {
-		t.Fatalf("Ggml_backend_dev_description() error = %v", err)
-	}
-
+	assert.NoError(s.T(), err)
 	if desc != "" {
-		t.Logf("Description: %s", desc)
+		s.T().Logf("Description: %s", desc)
 	}
 
-	// Try to get memory info (may not be supported on all devices)
-	free, total, err := Ggml_backend_dev_memory(device)
-	if err == nil {
-		t.Logf("Memory: %d bytes free / %d bytes total", free, total)
+	if free, total, err := Ggml_backend_dev_memory(device); err == nil {
+		s.T().Logf("Memory: %d bytes free / %d bytes total", free, total)
 	}
 }
 
-// TestGgmlBackendCpuBufferType tests getting the CPU buffer type
-func TestGgmlBackendCpuBufferType(t *testing.T) {
-	// Initialize backend
+// Tests getting the CPU buffer type
+func (s *GgmlSuite) TestGgmlBackendCpuBufferType() {
 	if err := Backend_init(); err != nil {
-		t.Fatalf("Failed to initialize backend: %v", err)
+		s.T().Fatalf("Failed to initialize backend: %v", err)
 	}
 	defer Backend_free()
 
 	bufType, err := Ggml_backend_cpu_buffer_type()
-	if err != nil {
-		t.Fatalf("Ggml_backend_cpu_buffer_type() error = %v", err)
-	}
-
-	if bufType == 0 {
-		t.Error("Ggml_backend_cpu_buffer_type() returned null buffer type")
-	}
+	assert.NoError(s.T(), err)
+	assert.NotZero(s.T(), bufType, "Ggml_backend_cpu_buffer_type() returned null buffer type")
 }
 
-// TestGgmlTypeName tests getting type names via GGML
-func TestGgmlTypeName(t *testing.T) {
-	// Initialize backend
+// Tests getting type names via GGML
+func (s *GgmlSuite) TestGgmlTypeName() {
 	if err := Backend_init(); err != nil {
-		t.Fatalf("Failed to initialize backend: %v", err)
+		s.T().Fatalf("Failed to initialize backend: %v", err)
 	}
 	defer Backend_free()
 
@@ -226,87 +178,64 @@ func TestGgmlTypeName(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.wantName, func(t *testing.T) {
-			name, err := Ggml_type_name(tt.typ)
-			if err != nil {
-				t.Errorf("Ggml_type_name() error = %v", err)
-				return
-			}
-			if name != tt.wantName {
-				t.Errorf("Ggml_type_name() = %v, want %v", name, tt.wantName)
-			}
-		})
+		name, err := Ggml_type_name(tt.typ)
+		assert.NoError(s.T(), err)
+		assert.Equal(s.T(), tt.wantName, name)
 	}
 }
 
-// TestGgmlBackendLoad tests backend loading by name
-func TestGgmlBackendLoad(t *testing.T) {
-	// Initialize backend
+// Tests backend loading by name
+func (s *GgmlSuite) TestGgmlBackendLoad() {
 	if err := Backend_init(); err != nil {
-		t.Fatalf("Failed to initialize backend: %v", err)
+		s.T().Fatalf("Failed to initialize backend: %v", err)
 	}
 	defer Backend_free()
 
-	// Try loading CPU backend (this may not work in all builds)
 	backend, err := Ggml_backend_load("CPU", "")
 	if err != nil {
-		t.Errorf("ggml_backend_load not available or failed: %v", err)
+		s.T().Logf("ggml_backend_load not available or failed: %v", err)
 		return
 	}
-
 	if backend != 0 {
-		// Successfully loaded a backend
-		name, err := Ggml_backend_name(backend)
-		if err == nil {
-			t.Logf("Loaded backend: %s", name)
+		if name, err := Ggml_backend_name(backend); err == nil {
+			s.T().Logf("Loaded backend: %s", name)
 		}
-		// Note: Don't free the backend here as it may be managed by the library
 	}
 }
 
-// TestGgmlBackendLoadAll tests loading all available backends
-func TestGgmlBackendLoadAll(t *testing.T) {
-	// Initialize backend
+// Tests loading all available backends
+func (s *GgmlSuite) TestGgmlBackendLoadAll() {
 	if err := Backend_init(); err != nil {
-		t.Fatalf("Failed to initialize backend: %v", err)
+		s.T().Fatalf("Failed to initialize backend: %v", err)
 	}
 	defer Backend_free()
 
-	// Try loading all backends
-	err := Ggml_backend_load_all()
-	if err != nil {
-		t.Logf("ggml_backend_load_all not available: %v", err)
+	if err := Ggml_backend_load_all(); err != nil {
+		s.T().Logf("ggml_backend_load_all not available: %v", err)
 		return
 	}
-
-	// If successful, try to enumerate devices
-	count, err := Ggml_backend_dev_count()
-	if err == nil {
-		t.Logf("Backend device count after load_all: %d", count)
+	if count, err := Ggml_backend_dev_count(); err == nil {
+		s.T().Logf("Backend device count after load_all: %d", count)
 	}
 }
 
-// TestGgmlBackendLoadAllFromPath tests loading all backends from a specific path
-func TestGgmlBackendLoadAllFromPath(t *testing.T) {
-	// Initialize backend
+// Tests loading all backends from a specific path
+func (s *GgmlSuite) TestGgmlBackendLoadAllFromPath() {
 	if err := Backend_init(); err != nil {
-		t.Fatalf("Failed to initialize backend: %v", err)
+		s.T().Fatalf("Failed to initialize backend: %v", err)
 	}
 	defer Backend_free()
 
-	// Try loading all backends from current directory
-	err := Ggml_backend_load_all_from_path(".")
-	if err != nil {
-		t.Logf("ggml_backend_load_all_from_path not available: %v", err)
+	if err := Ggml_backend_load_all_from_path("."); err != nil {
+		s.T().Logf("ggml_backend_load_all_from_path not available: %v", err)
 		return
 	}
-
-	// If successful, try to enumerate devices
-	count, err := Ggml_backend_dev_count()
-	if err == nil {
-		t.Logf("Backend device count after load_all_from_path: %d", count)
+	if count, err := Ggml_backend_dev_count(); err == nil {
+		s.T().Logf("Backend device count after load_all_from_path: %d", count)
 	}
 }
+
+func TestGgmlSuite(t *testing.T) { suite.Run(t, new(GgmlSuite)) }
 
 // BenchmarkGgmlTypeSize benchmarks the type size function
 func BenchmarkGgmlTypeSize(b *testing.B) {

@@ -386,6 +386,14 @@ make test
 make release
 ```
 
+## Running Tests
+
+```bash
+make test
+```
+
+Tests use `github.com/stretchr/testify/suite` along with a shared `BaseSuite` (see `test_base_suite_test.go`) that automatically snapshots/restores configuration and environment variables and unloads the llama library after each test. See the Contributing guide for details.
+
 ### GPU Detection Logic
 
 The Makefile implements intelligent GPU detection:

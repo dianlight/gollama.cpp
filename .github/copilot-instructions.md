@@ -118,6 +118,40 @@ When writing or modifying code:
    - Update version references in documentation
    - Update download URLs and checksums
 
+### Rule: Testing Conventions
+When adding or updating tests, follow these conventions:
+
+1. **Test Framework**:
+   - Use `github.com/stretchr/testify/suite` for new test suites
+   - Prefer `suite.Suite` with `assert`/`require` helpers over bare `testing.T`
+
+2. **Base Suite Usage**:
+   - Embed the shared `BaseSuite` (defined in `test_base_suite_test.go`) in every suite to ensure consistent setup/teardown
+   - `BaseSuite` responsibilities:
+     - Snapshot and restore global configuration via `GetGlobalConfig`/`SetGlobalConfig`
+     - Snapshot and restore key environment variables used by tests
+     - Call `Cleanup()` after each test to unload the llama library and avoid cross-test state
+
+   Example skeleton:
+   
+   - Define the suite:
+     - `type MyFeatureSuite struct { BaseSuite }`
+   - Register the suite:
+     - `func TestMyFeatureSuite(t *testing.T) { suite.Run(t, new(MyFeatureSuite)) }`
+   - Write tests as methods:
+     - `func (s *MyFeatureSuite) TestSomething() { s.Require().NoError(err) }`
+
+3. **Global State and Env Vars**:
+   - Do not mutate global state without the `BaseSuite` safeguards
+   - If a new environment variable is introduced for tests, add it to the `envKeys` list in `test_base_suite_test.go` so it is preserved and restored automatically
+
+4. **Table-Driven Tests**:
+   - Continue to use table-driven patterns within suite methods for multi-case validation
+
+5. **Integration vs Unit**:
+   - Keep unit tests fast and hermetic; avoid external downloads when possible
+   - Mark slow/integration tests with clear names and guard them behind environment checks when appropriate
+
 ## File-Specific Rules
 
 ### For `gollama.go` changes:

@@ -282,6 +282,41 @@ func TestTokenize(t *testing.T) {
 }
 ```
 
+#### Test Framework: Testify + Suite
+
+We use `github.com/stretchr/testify/suite` for new and updated tests to provide consistent setup/teardown and rich assertions.
+
+- Shared base: `test_base_suite_test.go` defines `BaseSuite`, which:
+  - Snapshots and restores global configuration between tests
+  - Snapshots and restores key environment variables used by tests
+  - Calls `Cleanup()` after each test to unload the llama library and prevent cross-test contamination
+
+Skeleton for a new suite:
+
+```go
+package gollama
+
+import (
+    "testing"
+    "github.com/stretchr/testify/suite"
+)
+
+// Embed BaseSuite for automatic setup/teardown
+type MyFeatureSuite struct{ BaseSuite }
+
+func TestMyFeatureSuite(t *testing.T) { suite.Run(t, new(MyFeatureSuite)) }
+
+func (s *MyFeatureSuite) TestSomething() {
+    // Use s.Assert()/s.Require() as needed
+    s.Require().NoError(nil)
+}
+```
+
+Guidelines:
+- Always embed `BaseSuite` in suites to ensure environment and global config are restored and the library is unloaded after each test
+- If you add new test-specific environment variables, list them in `envKeys` inside `test_base_suite_test.go` so they are preserved/restored automatically
+- Prefer `s.Require()` for fatal assertions and `s.Assert()` for non-fatal checks
+
 #### Benchmarks
 ```go
 func BenchmarkTokenize(b *testing.B) {
@@ -301,6 +336,13 @@ func BenchmarkTokenize(b *testing.B) {
 - Place in `tests/` directory
 - Require actual model files
 - May be skipped in CI if models not available
+
+### Test Requirements
+
+- All new code must include tests
+- Tests must pass on all supported platforms
+- Code coverage should not decrease significantly
+- Benchmarks should not show performance regressions
 
 ### Test Requirements
 

@@ -235,6 +235,8 @@ var (
 	ggmlBackendName     func(backend GgmlBackend) *byte
 	ggmlBackendIsCpu    func(backend GgmlBackend) bool
 	ggmlBackendSupports func(backend GgmlBackend, buft GgmlBackendBufferType) bool
+	ggmlBackendLoad     func(name *byte, search_path *byte) GgmlBackend
+	ggmlBackendLoadAll  func()
 
 	// Tensor utility functions
 	ggmlNbytes       func(tensor GgmlTensor) uint64
@@ -300,6 +302,8 @@ func registerGgmlFunctions() error {
 	_ = tryRegisterLibFunc(&ggmlBackendName, libHandle, "ggml_backend_name")
 	_ = tryRegisterLibFunc(&ggmlBackendIsCpu, libHandle, "ggml_backend_is_cpu")
 	_ = tryRegisterLibFunc(&ggmlBackendSupports, libHandle, "ggml_backend_supports_buft")
+	_ = tryRegisterLibFunc(&ggmlBackendLoad, libHandle, "ggml_backend_load")
+	_ = tryRegisterLibFunc(&ggmlBackendLoadAll, libHandle, "ggml_backend_load_all")
 
 	// Tensor utility functions
 	_ = tryRegisterLibFunc(&ggmlNbytes, libHandle, "ggml_nbytes")
@@ -492,6 +496,44 @@ func Ggml_backend_buffer_is_host(buffer GgmlBackendBuffer) (bool, error) {
 	return ggmlBackendBufferIsHost(buffer), nil
 }
 
+// Ggml_backend_name returns the name of a backend
+func Ggml_backend_name(backend GgmlBackend) (string, error) {
+	if err := ensureLoaded(); err != nil {
+		return "", err
+	}
+	if ggmlBackendName == nil {
+		return "", fmt.Errorf("ggml_backend_name function not available")
+	}
+	namePtr := ggmlBackendName(backend)
+	if namePtr == nil {
+		return "", nil
+	}
+	return bytePointerToString(namePtr), nil
+}
+
+// Ggml_backend_free frees a backend
+func Ggml_backend_free(backend GgmlBackend) error {
+	if err := ensureLoaded(); err != nil {
+		return err
+	}
+	if ggmlBackendFree == nil {
+		return fmt.Errorf("ggml_backend_free function not available")
+	}
+	ggmlBackendFree(backend)
+	return nil
+}
+
+// Ggml_backend_is_cpu checks if a backend is CPU-based
+func Ggml_backend_is_cpu(backend GgmlBackend) (bool, error) {
+	if err := ensureLoaded(); err != nil {
+		return false, err
+	}
+	if ggmlBackendIsCpu == nil {
+		return false, fmt.Errorf("ggml_backend_is_cpu function not available")
+	}
+	return ggmlBackendIsCpu(backend), nil
+}
+
 // Ggml_type_name returns the string name of a GGML type
 func Ggml_type_name(typ GgmlType) (string, error) {
 	if err := ensureLoaded(); err != nil {
@@ -505,6 +547,37 @@ func Ggml_type_name(typ GgmlType) (string, error) {
 		return "", nil
 	}
 	return bytePointerToString(namePtr), nil
+}
+
+// Ggml_backend_load dynamically loads a backend by name from a search path
+func Ggml_backend_load(name string, searchPath string) (GgmlBackend, error) {
+	if err := ensureLoaded(); err != nil {
+		return 0, err
+	}
+	if ggmlBackendLoad == nil {
+		return 0, fmt.Errorf("ggml_backend_load function not available")
+	}
+
+	nameBytes := append([]byte(name), 0)
+	var pathPtr *byte
+	if searchPath != "" {
+		pathBytes := append([]byte(searchPath), 0)
+		pathPtr = &pathBytes[0]
+	}
+
+	return ggmlBackendLoad(&nameBytes[0], pathPtr), nil
+}
+
+// Ggml_backend_load_all loads all available backends
+func Ggml_backend_load_all() error {
+	if err := ensureLoaded(); err != nil {
+		return err
+	}
+	if ggmlBackendLoadAll == nil {
+		return fmt.Errorf("ggml_backend_load_all function not available")
+	}
+	ggmlBackendLoadAll()
+	return nil
 }
 
 // Helper function to convert byte pointer to Go string

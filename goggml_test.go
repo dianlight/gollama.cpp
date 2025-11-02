@@ -226,6 +226,53 @@ func TestGgmlTypeName(t *testing.T) {
 	}
 }
 
+// TestGgmlBackendLoad tests backend loading by name
+func TestGgmlBackendLoad(t *testing.T) {
+	// Initialize backend
+	if err := Backend_init(); err != nil {
+		t.Fatalf("Failed to initialize backend: %v", err)
+	}
+	defer Backend_free()
+
+	// Try loading CPU backend (this may not work in all builds)
+	backend, err := Ggml_backend_load("CPU", "")
+	if err != nil {
+		t.Logf("ggml_backend_load not available or failed: %v", err)
+		return
+	}
+
+	if backend != 0 {
+		// Successfully loaded a backend
+		name, err := Ggml_backend_name(backend)
+		if err == nil {
+			t.Logf("Loaded backend: %s", name)
+		}
+		// Note: Don't free the backend here as it may be managed by the library
+	}
+}
+
+// TestGgmlBackendLoadAll tests loading all available backends
+func TestGgmlBackendLoadAll(t *testing.T) {
+	// Initialize backend
+	if err := Backend_init(); err != nil {
+		t.Fatalf("Failed to initialize backend: %v", err)
+	}
+	defer Backend_free()
+
+	// Try loading all backends
+	err := Ggml_backend_load_all()
+	if err != nil {
+		t.Logf("ggml_backend_load_all not available: %v", err)
+		return
+	}
+
+	// If successful, try to enumerate devices
+	count, err := Ggml_backend_dev_count()
+	if err == nil {
+		t.Logf("Backend device count after load_all: %d", count)
+	}
+}
+
 // BenchmarkGgmlTypeSize benchmarks the type size function
 func BenchmarkGgmlTypeSize(b *testing.B) {
 	// Initialize backend

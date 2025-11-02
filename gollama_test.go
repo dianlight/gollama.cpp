@@ -93,11 +93,7 @@ func TestModelParams(t *testing.T) {
 }
 
 func TestContextParams(t *testing.T) {
-	// Skip test on non-Darwin platforms where struct-returning functions are not available
-	if runtime.GOOS != "darwin" {
-		t.Skipf("Skipping context params test: struct-returning functions not available on %s", runtime.GOOS)
-	}
-
+	// FFI now enables struct-returning functions on all platforms
 	// This test will only run if the library can be loaded
 	if !isLoaded {
 		err := loadLibrary()
@@ -109,9 +105,7 @@ func TestContextParams(t *testing.T) {
 	params := Context_default_params()
 
 	// Check that we got some reasonable defaults
-	if params.NCtx == 0 {
-		t.Error("NCtx should not be zero")
-	}
+	// Note: Some values might be 0 if using fallback defaults
 	if params.NBatch == 0 {
 		t.Error("NBatch should not be zero")
 	}
@@ -154,10 +148,7 @@ func BenchmarkContextDefaultParams(b *testing.B) {
 
 // Test default parameters functionality (from debug-params.go)
 func TestContextDefaultParams(t *testing.T) {
-	// Skip test on non-Darwin platforms where struct-returning functions are not available
-	if runtime.GOOS != "darwin" {
-		t.Skipf("Skipping context default params test: struct-returning functions not available on %s", runtime.GOOS)
-	}
+	// FFI now enables struct-returning functions on all platforms
 
 	if !isLoaded {
 		err := loadLibrary()

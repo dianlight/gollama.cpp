@@ -3,7 +3,7 @@
 
 # Version information
 VERSION ?= 0.2.1
-LLAMA_CPP_BUILD ?= b6364
+LLAMA_CPP_BUILD ?= b6862
 FULL_VERSION = v$(VERSION)-llamacpp.$(LLAMA_CPP_BUILD)
 
 # Check everything
@@ -77,9 +77,11 @@ build-examples: build
 
 # Test with library download
 .PHONY: test
-test: deps
+test: deps download-libs
 	@echo "Running tests (libraries will be downloaded automatically)"
-	$(GO) test -v ./...
+	$(GO) test -p 1 -failfast -timeout 120s -tags embedallowed_no -coverprofile=coverage.out -cover ./... && \
+	$(GO) tool cover -func=coverage.out | grep total: | awk '{print "Total coverage: " $$3}'
+
 
 # Test with race detection
 .PHONY: test-race
@@ -152,6 +154,12 @@ download-libs-parallel: deps
 download-libs-platforms: deps
 	@echo "Downloading llama.cpp libraries for specific platforms"
 	env GOOS= GOARCH= $(GO) run ./cmd/gollama-download -platforms "linux/amd64,darwin/arm64,windows/amd64" -version $(LLAMA_CPP_BUILD) -checksum
+
+# Populate embedded libs directory with the configured llama.cpp build
+.PHONY: populate-libs
+populate-libs: deps
+	@echo "Synchronizing embedded libraries in ./libs for llama.cpp $(LLAMA_CPP_BUILD)"
+	env GOOS= GOARCH= $(GO) run ./cmd/gollama-download -download-all -version $(LLAMA_CPP_BUILD) -copy-libs -libs-dir libs
 
 # Test compilation for specific platform  
 .PHONY: test-compile-windows
@@ -489,6 +497,7 @@ help:
 	@echo "  download-libs-all  Download llama.cpp libraries for all platforms"
 	@echo "  test-download      Test library download functionality"
 	@echo "  test-download-platforms  Test downloads for all platforms"
+	@echo "  populate-libs      Download all platforms and synchronize embedded libs directory"
 	@echo "  clean-libs         Clean library cache (forces re-download)"
 	@echo ""
 	@echo "Quality assurance:"

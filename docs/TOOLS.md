@@ -147,6 +147,9 @@ make model_download
 
 # Clean model cache
 make clean-libs
+
+# Synchronise embedded llama.cpp libraries for go:embed
+make populate-libs
 ```
 
 ### Script Management

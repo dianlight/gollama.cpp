@@ -2,14 +2,14 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
-    tags: [ 'v*-llamacpp.*' ]
+    branches: [main, develop]
+    tags: ["v*-llamacpp.*"]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 env:
-  GO_VERSION: '1.21'
-  LLAMA_CPP_BUILD: 'b6364'
+  GO_VERSION: "1.25"
+  LLAMA_CPP_BUILD: "b6862"
 
 jobs:
   test:
@@ -18,77 +18,198 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ['1.21', '1.22','1.24','1.25']
-    
+        go-version: ["1.21", "1.22", "1.24", "1.25"]
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-    - name: Set up Go
-      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
-      with:
-        go-version: ${{ matrix.go-version }}
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version: ${{ matrix.go-version }}
 
-    - name: Cache Go modules
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-${{ matrix.go-version }}-
+      - name: Cache Go modules
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ matrix.go-version }}-
 
-    - name: Install dependencies (Ubuntu)
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake build-essential
-        # Install Vulkan tools for GPU detection
-        #sudo apt-get install -y vulkan-tools || echo "Vulkan tools not available"
-        # Install OpenCL tools for GPU detection
-        #sudo apt-get install -y clinfo || echo "OpenCL tools not available"
+      - name: Install dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential
+          # Install Vulkan tools for GPU detection
+          #sudo apt-get install -y vulkan-tools || echo "Vulkan tools not available"
+          # Install OpenCL tools for GPU detection
+          #sudo apt-get install -y clinfo || echo "OpenCL tools not available"
 
-    #- name: Install dependencies (macOS)
-    #  if: matrix.os == 'macos-latest'
-    #  run: |
-    #    brew install cmake
-    #    # Install Vulkan SDK for GPU detection (if available)
-    #    brew install --cask vulkan-sdk || echo "Vulkan SDK not available"
+      #- name: Install dependencies (macOS)
+      #  if: matrix.os == 'macos-latest'
+      #  run: |
+      #    brew install cmake
+      #    # Install Vulkan SDK for GPU detection (if available)
+      #    brew install --cask vulkan-sdk || echo "Vulkan SDK not available"
 
-    - name: Install dependencies (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        choco install cmake
-        # Install Vulkan SDK for GPU detection (if available)
-        #choco install vulkan-sdk || echo "Vulkan SDK not available"
+      - name: Install dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install cmake -y
+          # Ensure Microsoft Visual C++ Redistributable is present (needed by prebuilt DLLs)
+          choco install vcredist140 -y || echo "vcredist already installed"
+          # Install Vulkan SDK for GPU detection (if available)
+          #choco install vulkan-sdk || echo "Vulkan SDK not available"
 
-    - name: Download dependencies
-      run: go mod download
+      - name: Download dependencies
+        run: go mod download
 
-    #- name: GPU Detection Test
-    #  run: |
-    #    echo "Testing GPU detection capabilities..."
-    #    make detect-gpu || echo "GPU detection completed"
+      - name: Cache libllama libraries
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        with:
+          path: |
+            ~/.cache/gollama/libs
+            ~/Library/Caches/gollama/libs
+            ~\AppData\Local\gollama\libs
+          key: ${{ runner.os }}-libllama-${{ env.LLAMA_CPP_BUILD }}
+          restore-keys: |
+            ${{ runner.os }}-libllama-
 
-    - name: Verify platform compatibility
-      run: |
-        echo "Testing platform compatibility..."
-        go build -v ./...
-        echo "Build successful for ${{ runner.os }}"
+      - name: Download libllama libraries
+        run: go run ./cmd/gollama-download -download
 
-    - name: Run tests
-      run: go test -v ./...
+      - name: Verify and setup libraries (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Write-Output "=== Windows Library Setup Debug ==="
+          $CacheDir = "$env:LOCALAPPDATA\gollama\libs"
+          Write-Output "Expected cache directory: $CacheDir"
 
-    - name: Run platform-specific tests
-      run: go test -v -run TestPlatformSpecific ./...
+          # Check if cache directory exists
+          if (Test-Path $CacheDir) {
+            Write-Output "✓ Cache directory exists"
+            
+            # List directory structure
+            Write-Output "Directory structure:"
+            Get-ChildItem -Path $CacheDir -Recurse | Select-Object -First 50 | ForEach-Object {
+              $level = ([System.IO.Path]::GetRelativePath($CacheDir, $_.FullName).Split([System.IO.Path]::DirectorySeparatorChar).Count - 1) * 2
+              $indent = " " * $level
+              Write-Output "$indent$($_.Name)"
+            }
+            
+            # Check for DLL files
+            $DllFiles = @(Get-ChildItem -Path $CacheDir -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue)
+            Write-Output ""
+            Write-Output "DLL files found: $($DllFiles.Count)"
+            foreach ($dll in $DllFiles) {
+              Write-Output "  - $($dll.FullName)"
+            }
+          } else {
+            Write-Output "✗ Cache directory does not exist yet (will be created on first test run)"
+          }
 
-    - name: Run tests with race detection
-      if: matrix.os != 'windows-latest' # Race detector not fully supported on Windows
-      run: go test -race -v ./...
+      - name: Set library path (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          CACHE_DIR="$HOME/.cache/gollama/libs"
+          LIB_DIR=$(find "$CACHE_DIR" -type d -name "build" -o -name "bin" | grep -E "build/bin|bin$" | head -1)
+          if [ -n "$LIB_DIR" ]; then
+            echo "LD_LIBRARY_PATH=$LIB_DIR:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+            echo "Library path set to: $LIB_DIR"
+          fi
 
-    - name: Run benchmarks
-      run: go test -bench=. -benchmem ./...
+      - name: Set library path (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          CACHE_DIR="$HOME/Library/Caches/gollama/libs"
+          LIB_DIR=$(find "$CACHE_DIR" -type d -name "build" -o -name "bin" | grep -E "build/bin|bin$" | head -1)
+          if [ -n "$LIB_DIR" ]; then
+            echo "DYLD_LIBRARY_PATH=$LIB_DIR:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
+            echo "Library path set to: $LIB_DIR"
+          fi
+
+      - name: Set library path (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $CacheDir = "$env:LOCALAPPDATA\gollama\libs"
+          Write-Output "Cache directory: $CacheDir"
+
+          # List the cache directory structure for debugging
+          if (Test-Path $CacheDir) {
+            Write-Output "Contents of cache directory:"
+            Get-ChildItem -Path $CacheDir -Recurse | Select-Object -First 20 | ForEach-Object { Write-Output "  $_" }
+          } else {
+            Write-Output "Cache directory does not exist yet"
+          }
+
+          # Find library directory - look for build/bin or just bin directories
+          $LibDir = $null
+          if (Test-Path $CacheDir) {
+            $LibDir = Get-ChildItem -Path $CacheDir -Recurse -Directory -ErrorAction SilentlyContinue | 
+              Where-Object { ($_.Name -eq "bin") -or ($_.FullName -match "\\build\\bin$") } | 
+              Select-Object -First 1 -ExpandProperty FullName
+          }
+
+          if ($LibDir) {
+            Write-Output "Library directory found: $LibDir"
+            Write-Output "Verifying DLL presence:"
+            Get-ChildItem -Path $LibDir -Filter "*.dll" | ForEach-Object { Write-Output "  Found: $($_.Name)" }
+            echo "PATH=$LibDir;$env:PATH" >> $env:GITHUB_ENV
+            echo "LD_LIBRARY_PATH=$LibDir" >> $env:GITHUB_ENV
+            Write-Output "Library path set to: $LibDir"
+          } else {
+            Write-Output "Library directory not found - tests will attempt to download libraries at runtime"
+          }
+
+      #- name: GPU Detection Test
+      #  run: |
+      #    echo "Testing GPU detection capabilities..."
+      #    make detect-gpu || echo "GPU detection completed"
+
+      - name: Verify platform compatibility
+        run: |
+          echo "Testing platform compatibility..."
+          go build -v ./...
+          echo "Build successful for ${{ runner.os }}"
+
+      - name: Verify library availability (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Write-Output "Checking for library DLLs..."
+          $CacheDir = "$env:LOCALAPPDATA\gollama\libs"
+          $DllCount = (Get-ChildItem -Path $CacheDir -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue | Measure-Object).Count
+          Write-Output "Found $DllCount DLL files"
+
+          # List all DLL files found
+          if ($DllCount -gt 0) {
+            Write-Output "DLL files:"
+            Get-ChildItem -Path $CacheDir -Recurse -Filter "*.dll" | ForEach-Object { Write-Output "  $_" }
+          }
+
+          # Check PATH
+          Write-Output "Current PATH components (Windows relevant):"
+          $tempPath = [System.IO.Path]::GetTempPath()
+          $tempPattern = [regex]::Escape($tempPath)
+          $env:PATH.Split(";") |
+            Where-Object { $_ -match "gollama|llama" -or $_ -match $tempPattern } |
+            ForEach-Object { Write-Output "  $_" }
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Run platform-specific tests
+        run: go test -v -run TestPlatformSpecific ./...
+
+      - name: Run tests with race detection
+        if: matrix.os != 'windows-latest' # Race detector not fully supported on Windows
+        run: go test -race -v ./...
+
+      - name: Run benchmarks
+        run: go test -bench=. -benchmem ./...
 
   # gpu-detection:
   #   name: GPU Detection Testing
@@ -96,7 +217,7 @@ jobs:
   #   strategy:
   #     matrix:
   #       os: [ubuntu-latest, macos-latest, windows-latest]
-    
+
   #   steps:
   #   - name: Checkout code
   #     uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
@@ -146,7 +267,7 @@ jobs:
   #     run: |
   #       echo "Testing GPU-aware library downloading..."
   #       go test -v -run TestPlatformAsset ./...
-        
+
   #   - name: Comprehensive GPU detection
   #     run: |
   #       echo "Running comprehensive GPU detection..."
@@ -155,44 +276,44 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-    - name: Set up Go
-      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
-      with:
-        go-version: ${{ env.GO_VERSION }}
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
 
-    - name: golangci-lint
-      uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
-      with:
-        version: latest
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
+        with:
+          version: latest
 
   security:
     name: Security Scan
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-    - name: Set up Go
-      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
-      with:
-        go-version: ${{ env.GO_VERSION }}
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
 
-    - name: Run Gosec Security Scanner
-      uses: securego/gosec@master
-      with:
-        # Exclude acceptable issues and set severity to medium:
-        # G103: Use of unsafe calls (necessary for C interop)
-        # G104: Errors unhandled (acceptable for non-critical operations)
-        # G115: Integer overflow with validation (all conversions are validated)
-        # G304: File inclusion via variable (expected in CLI tools)
-        # This reduces noise while focusing on actionable security issues
-        args: '-exclude=G103,G104,G115,G304 -severity=medium ./...'
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          # Exclude acceptable issues and set severity to medium:
+          # G103: Use of unsafe calls (necessary for C interop)
+          # G104: Errors unhandled (acceptable for non-critical operations)
+          # G115: Integer overflow with validation (all conversions are validated)
+          # G304: File inclusion via variable (expected in CLI tools)
+          # This reduces noise while focusing on actionable security issues
+          args: "-exclude=G103,G104,G115,G304 -severity=medium ./..."
 
   release:
     name: Create Release
@@ -208,140 +329,165 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-    - name: Set up Go
-      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
-      with:
-        go-version: ${{ env.GO_VERSION }}
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
 
-    - name: Cache Go modules
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-${{ env.GO_VERSION }}-
+      - name: Populate embedded libraries and publish sync branch
+        env:
+          LLAMA_CPP_BUILD: ${{ env.LLAMA_CPP_BUILD }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-    - name: Validate release version in CHANGELOG.md
-      env:
-        VERSION: ${{ github.ref_name }}
-      run: |
-        # Extract full version from tag (e.g., v0.2.0-llamacpp.b6099)
-        export FULL_VERSION=${VERSION}
-        echo "Validating release version: $FULL_VERSION"
-        
-        # Check if the full version exists in CHANGELOG.md
-        if ! grep -q "## \[$FULL_VERSION\]" CHANGELOG.md; then
-          echo "❌ Error: Version $FULL_VERSION not found in CHANGELOG.md"
-          echo "Please add a changelog entry for version $FULL_VERSION before creating a release."
-          echo "Expected format: ## [$FULL_VERSION] - YYYY-MM-DD"
-          exit 1
-        fi
-        
-        echo "✅ Version $FULL_VERSION found in CHANGELOG.md"
+          git fetch origin automation/embedded-libs || true
+          git checkout -B automation/embedded-libs
 
-    - name: Create release packages using Makefile
-      env:
-        FULL_VERSION: ${{ github.ref_name }}
-        LLAMA_CPP_BUILD: ${{ env.LLAMA_CPP_BUILD }}
-      run: |
-        # Extract base version from full version tag (e.g., v0.2.0-llamacpp.b6099 -> 0.2.0)
-        export VERSION=$(echo "${FULL_VERSION}" | sed 's/^v//' | sed 's/-llamacpp\..*//')
-        echo "Creating release for full version: $FULL_VERSION"
-        echo "Base version: $VERSION"
-        echo "Using llama.cpp build: $LLAMA_CPP_BUILD"
-        make release
+          make populate-libs
 
-    - name: Extract release notes
-      id: extract_notes
-      run: |
-        # Extract release notes from CHANGELOG.md
-        FULL_VERSION=${{ github.ref_name }}
-        echo "Extracting release notes for version: $FULL_VERSION"
-        
-        # Extract the section for this version
-        if sed -n "/## \[$FULL_VERSION\]/,/## \[/p" CHANGELOG.md | sed '$d' > release_notes.md; then
-          # Check if we actually extracted content (more than just the header)
-          if [ $(wc -l < release_notes.md) -le 1 ]; then
-            echo "⚠️  Warning: No detailed release notes found for version $FULL_VERSION"
+          if ! git diff --quiet -- libs; then
+            git add libs
+            git commit -m "chore: sync embedded libs for ${LLAMA_CPP_BUILD}"
+            git push origin HEAD:automation/embedded-libs
+          else
+            echo "Embedded libraries already up to date"
+          fi
+
+          git checkout "${GITHUB_SHA}"
+          make populate-libs
+
+      - name: Cache Go modules
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ env.GO_VERSION }}-
+
+      - name: Validate release version in CHANGELOG.md
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          # Extract full version from tag (e.g., v0.2.0-llamacpp.b6099)
+          export FULL_VERSION=${VERSION}
+          echo "Validating release version: $FULL_VERSION"
+
+          # Check if the full version exists in CHANGELOG.md
+          if ! grep -q "## \[$FULL_VERSION\]" CHANGELOG.md; then
+            echo "❌ Error: Version $FULL_VERSION not found in CHANGELOG.md"
+            echo "Please add a changelog entry for version $FULL_VERSION before creating a release."
+            echo "Expected format: ## [$FULL_VERSION] - YYYY-MM-DD"
+            exit 1
+          fi
+
+          echo "✅ Version $FULL_VERSION found in CHANGELOG.md"
+
+      - name: Create release packages using Makefile
+        env:
+          FULL_VERSION: ${{ github.ref_name }}
+          LLAMA_CPP_BUILD: ${{ env.LLAMA_CPP_BUILD }}
+        run: |
+          # Extract base version from full version tag (e.g., v0.2.0-llamacpp.b6099 -> 0.2.0)
+          export VERSION=$(echo "${FULL_VERSION}" | sed 's/^v//' | sed 's/-llamacpp\..*//')
+          echo "Creating release for full version: $FULL_VERSION"
+          echo "Base version: $VERSION"
+          echo "Using llama.cpp build: $LLAMA_CPP_BUILD"
+          make release
+
+      - name: Extract release notes
+        id: extract_notes
+        run: |
+          # Extract release notes from CHANGELOG.md
+          FULL_VERSION=${{ github.ref_name }}
+          echo "Extracting release notes for version: $FULL_VERSION"
+
+          # Extract the section for this version
+          if sed -n "/## \[$FULL_VERSION\]/,/## \[/p" CHANGELOG.md | sed '$d' > release_notes.md; then
+            # Check if we actually extracted content (more than just the header)
+            if [ $(wc -l < release_notes.md) -le 1 ]; then
+              echo "⚠️  Warning: No detailed release notes found for version $FULL_VERSION"
+              echo "Release $FULL_VERSION" > release_notes.md
+              echo "" >> release_notes.md
+              echo "See CHANGELOG.md for details." >> release_notes.md
+            else
+              echo "✅ Release notes extracted successfully"
+            fi
+          else
+            echo "❌ Failed to extract release notes"
             echo "Release $FULL_VERSION" > release_notes.md
             echo "" >> release_notes.md
             echo "See CHANGELOG.md for details." >> release_notes.md
-          else
-            echo "✅ Release notes extracted successfully"
           fi
-        else
-          echo "❌ Failed to extract release notes"
-          echo "Release $FULL_VERSION" > release_notes.md
-          echo "" >> release_notes.md
-          echo "See CHANGELOG.md for details." >> release_notes.md
-        fi
 
-    - name: Create GitHub Release
-      uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1
-      id: create_release
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        body_path: release_notes.md
-        draft: false
-        prerelease: false
+      - name: Create GitHub Release
+        uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
 
-    - name: Upload Release Assets
-      run: |
-        for file in dist/*; do
-          if [ -f "$file" ]; then
-            echo "Uploading $file"
-            curl \
-              -X POST \
-              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              -H "Content-Type: application/octet-stream" \
-              --data-binary @"$file" \
-              "${{ steps.create_release.outputs.upload_url }}?name=$(basename $file)"
-          fi
-        done
+      - name: Upload Release Assets
+        run: |
+          for file in dist/*; do
+            if [ -f "$file" ]; then
+              echo "Uploading $file"
+              curl \
+                -X POST \
+                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Content-Type: application/octet-stream" \
+                --data-binary @"$file" \
+                "${{ steps.create_release.outputs.upload_url }}?name=$(basename $file)"
+            fi
+          done
 
-    - name: Publish to Go Module Proxy
-      run: |
-        echo "Publishing module to Go module proxy..."
-        # Get the module name from go.mod
-        MODULE_NAME=$(go mod edit -json | jq -r '.Module.Path')
-        TAG_VERSION=${{ github.ref_name }}
-        
-        echo "Module: $MODULE_NAME"
-        echo "Version: $TAG_VERSION"
-        
-        # Request the module from the proxy to trigger indexing
-        echo "Requesting module from proxy.golang.org..."
-        GOPROXY=proxy.golang.org go list -m "$MODULE_NAME@$TAG_VERSION" || echo "Module may take a few minutes to be available"
-        
-        # Also try to fetch module info to ensure it's properly indexed
-        echo "Verifying module availability..."
-        curl -f "https://proxy.golang.org/$MODULE_NAME/@v/$TAG_VERSION.info" || echo "Module indexing in progress"
-        
-        echo "Go module publication requested. The module should be available at:"
-        echo "  go get $MODULE_NAME@$TAG_VERSION"
+      - name: Publish to Go Module Proxy
+        run: |
+          echo "Publishing module to Go module proxy..."
+          # Get the module name from go.mod
+          MODULE_NAME=$(go mod edit -json | jq -r '.Module.Path')
+          TAG_VERSION=${{ github.ref_name }}
 
-    - name: Install doc2go for release documentation
-      run: go install go.abhg.dev/doc2go@latest
-    
-    - name: Generate API reference for release
-      run: doc2go ./...
-    
-    - name: Upload pages artifact for release
-      uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+          echo "Module: $MODULE_NAME"
+          echo "Version: $TAG_VERSION"
 
-    - name: Deploy documentation to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+          # Request the module from the proxy to trigger indexing
+          echo "Requesting module from proxy.golang.org..."
+          GOPROXY=proxy.golang.org go list -m "$MODULE_NAME@$TAG_VERSION" || echo "Module may take a few minutes to be available"
+
+          # Also try to fetch module info to ensure it's properly indexed
+          echo "Verifying module availability..."
+          curl -f "https://proxy.golang.org/$MODULE_NAME/@v/$TAG_VERSION.info" || echo "Module indexing in progress"
+
+          echo "Go module publication requested. The module should be available at:"
+          echo "  go get $MODULE_NAME@$TAG_VERSION"
+
+      - name: Install doc2go for release documentation
+        run: go install go.abhg.dev/doc2go@latest
+
+      - name: Generate API reference for release
+        run: doc2go ./...
+
+      - name: Upload pages artifact for release
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+
+      - name: Deploy documentation to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
 
   examples:
     name: Build Examples
@@ -350,39 +496,57 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-    - name: Set up Go
-      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
-      with:
-        go-version: ${{ env.GO_VERSION }}
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
 
-    - name: Build examples
-      run: make build-examples
+      - name: Cache Go modules
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-examples-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-examples-${{ env.GO_VERSION }}-
+
+      - name: Cache libllama libraries
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        with:
+          path: |
+            ~/.cache/gollama/libs
+            ~/Library/Caches/gollama/libs
+            ~\AppData\Local\gollama\libs
+          key: ${{ runner.os }}-libllama-${{ env.LLAMA_CPP_BUILD }}
+          restore-keys: |
+            ${{ runner.os }}-libllama-
+
+      - name: Build examples
+        run: make build-examples
 
   documentation:
     name: Generate Documentation
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-    - name: Set up Go
-      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
-      with:
-        go-version: ${{ env.GO_VERSION }}
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
 
-    - name: Install doc2go
-      run: go install go.abhg.dev/doc2go@latest
-    
-    - name: Generate API reference
-      run: doc2go ./...
+      - name: Install doc2go
+        run: go install go.abhg.dev/doc2go@latest
 
-
-        
+      - name: Generate API reference
+        run: doc2go ./...

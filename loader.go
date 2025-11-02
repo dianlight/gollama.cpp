@@ -3,7 +3,9 @@ package gollama
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 )
 
@@ -34,29 +36,52 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 		return nil
 	}
 
+	resolvedVersion := version
+	if resolvedVersion == "" {
+		resolvedVersion = LlamaCppBuild
+	}
+
 	// Initialize downloader if not already done
 	if l.downloader == nil {
-		downloader, err := NewLibraryDownloader()
+		// Check if global config has a custom cache directory
+		cacheDir := ""
+		if globalConfig != nil && globalConfig.CacheDir != "" {
+			cacheDir = globalConfig.CacheDir
+		}
+
+		downloader, err := NewLibraryDownloaderWithCacheDir(cacheDir)
 		if err != nil {
 			return fmt.Errorf("failed to create library downloader: %w", err)
 		}
 		l.downloader = downloader
 	}
 
-	// Get the appropriate release
-	var release *ReleaseInfo
-	var err error
+	// Prefer embedded libraries if available for the requested version
+	if resolvedVersion == LlamaCppBuild && hasEmbeddedLibraryForPlatform(runtime.GOOS, runtime.GOARCH) {
+		targetDir := filepath.Join(l.downloader.cacheDir, "embedded", embeddedPlatformDirName(runtime.GOOS, runtime.GOARCH))
+		if !l.downloader.isLibraryReady(targetDir) {
+			if err := extractEmbeddedLibrariesTo(targetDir, runtime.GOOS, runtime.GOARCH); err != nil {
+				return fmt.Errorf("failed to extract embedded libraries: %w", err)
+			}
+		}
 
-	if version == "" {
-		release, err = l.downloader.GetLatestRelease()
-		if err != nil {
-			return fmt.Errorf("failed to get latest release: %w", err)
+		libPath, err := l.downloader.FindLibraryPathForPlatform(targetDir, runtime.GOOS)
+		if err == nil {
+			handle, err := l.loadSharedLibrary(libPath)
+			if err != nil {
+				return fmt.Errorf("failed to load embedded library %s: %w", libPath, err)
+			}
+			l.handle = handle
+			l.libPath = libPath
+			l.loaded = true
+			return nil
 		}
-	} else {
-		release, err = l.downloader.GetReleaseByTag(version)
-		if err != nil {
-			return fmt.Errorf("failed to get release %s: %w", version, err)
-		}
+	}
+
+	// Get the appropriate release when embedded libs are unavailable
+	release, err := l.getReleaseForVersion(version)
+	if err != nil {
+		return err
 	}
 
 	// Get platform-specific asset pattern
@@ -71,14 +96,30 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 		return fmt.Errorf("failed to find platform asset: %w", err)
 	}
 
+	// Check if library is already cached and ready
+	extractedDir := filepath.Join(l.downloader.cacheDir, strings.TrimSuffix(assetName, ".zip"))
+	libPath, err := l.downloader.FindLibraryPath(extractedDir)
+	if err == nil {
+		handle, err := l.loadSharedLibrary(libPath)
+		if err != nil {
+			return fmt.Errorf("failed to load library %s: %w", libPath, err)
+		}
+
+		l.handle = handle
+		l.libPath = libPath
+		l.loaded = true
+
+		return nil
+	}
+
 	// Download and extract the library
-	extractedDir, err := l.downloader.DownloadAndExtract(downloadURL, assetName)
+	extractedDir, err = l.downloader.DownloadAndExtract(downloadURL, assetName)
 	if err != nil {
 		return fmt.Errorf("failed to download library: %w", err)
 	}
 
 	// Find the main library file
-	libPath, err := l.downloader.FindLibraryPath(extractedDir)
+	libPath, err = l.downloader.FindLibraryPath(extractedDir)
 	if err != nil {
 		return fmt.Errorf("failed to find library file: %w", err)
 	}
@@ -94,6 +135,22 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 	l.loaded = true
 
 	return nil
+}
+
+func (l *LibraryLoader) getReleaseForVersion(version string) (*ReleaseInfo, error) {
+	if version == "" {
+		release, err := l.downloader.GetLatestRelease()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get latest release: %w", err)
+		}
+		return release, nil
+	}
+
+	release, err := l.downloader.GetReleaseByTag(version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get release %s: %w", version, err)
+	}
+	return release, nil
 }
 
 // UnloadLibrary unloads the library and cleans up resources
@@ -170,15 +227,7 @@ func (l *LibraryLoader) IsLoaded() bool {
 
 // loadSharedLibrary loads a shared library using the appropriate method for the platform
 func (l *LibraryLoader) loadSharedLibrary(path string) (uintptr, error) {
-	switch runtime.GOOS {
-	case "windows":
-		// On Windows, we would use LoadLibrary
-		// For now, return an error as Windows support is not fully implemented
-		return 0, fmt.Errorf("support for windows platform not yet implemented")
-	default:
-		// On Unix-like systems, use platform-specific loading
-		return loadLibraryPlatform(path)
-	}
+	return loadLibraryPlatform(path)
 }
 
 // Global functions for backward compatibility
@@ -224,10 +273,16 @@ func CleanLibraryCache() error {
 
 // DownloadLibrariesForPlatforms downloads libraries for multiple platforms in parallel
 // platforms should be in the format []string{"linux/amd64", "darwin/arm64", "windows/amd64"}
-// version can be empty for latest version or specify a specific version like "b6099"
+// version can be empty for latest version or specify a specific version like "b6862"
 func DownloadLibrariesForPlatforms(platforms []string, version string) ([]DownloadResult, error) {
 	if globalLoader.downloader == nil {
-		downloader, err := NewLibraryDownloader()
+		// Check if global config has a custom cache directory
+		cacheDir := ""
+		if globalConfig != nil && globalConfig.CacheDir != "" {
+			cacheDir = globalConfig.CacheDir
+		}
+
+		downloader, err := NewLibraryDownloaderWithCacheDir(cacheDir)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create library downloader: %w", err)
 		}
@@ -240,7 +295,13 @@ func DownloadLibrariesForPlatforms(platforms []string, version string) ([]Downlo
 // GetSHA256ForFile calculates the SHA256 checksum for a given file
 func GetSHA256ForFile(filepath string) (string, error) {
 	if globalLoader.downloader == nil {
-		downloader, err := NewLibraryDownloader()
+		// Check if global config has a custom cache directory
+		cacheDir := ""
+		if globalConfig != nil && globalConfig.CacheDir != "" {
+			cacheDir = globalConfig.CacheDir
+		}
+
+		downloader, err := NewLibraryDownloaderWithCacheDir(cacheDir)
 		if err != nil {
 			return "", fmt.Errorf("failed to create library downloader: %w", err)
 		}
@@ -248,4 +309,23 @@ func GetSHA256ForFile(filepath string) (string, error) {
 	}
 
 	return globalLoader.downloader.calculateSHA256(filepath)
+}
+
+// GetLibraryCacheDir returns the directory where downloaded libraries are cached
+func GetLibraryCacheDir() (string, error) {
+	if globalLoader.downloader == nil {
+		// Check if global config has a custom cache directory
+		cacheDir := ""
+		if globalConfig != nil && globalConfig.CacheDir != "" {
+			cacheDir = globalConfig.CacheDir
+		}
+
+		downloader, err := NewLibraryDownloaderWithCacheDir(cacheDir)
+		if err != nil {
+			return "", fmt.Errorf("failed to create library downloader: %w", err)
+		}
+		globalLoader.downloader = downloader
+	}
+
+	return globalLoader.downloader.GetCacheDir(), nil
 }

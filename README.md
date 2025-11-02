@@ -4,16 +4,18 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Release](https://img.shields.io/github/v/release/dianlight/gollama.cpp.svg)](https://github.com/dianlight/gollama.cpp/releases)
 
-A high-performance Go binding for [llama.cpp](https://github.com/ggml-org/llama.cpp) using [purego](https://github.com/ebitengine/purego) for cross-platform compatibility without CGO.
+A high-performance Go binding for [llama.cpp](https://github.com/ggml-org/llama.cpp) using [purego](https://github.com/ebitengine/purego) and [libffi](https://github.com/jupiterrider/ffi) for cross-platform compatibility without CGO.
 
 ## Features
 
-- **Pure Go**: No CGO required, uses purego for C interop
+- **Pure Go**: No CGO required, uses purego and libffi for C interop
 - **Cross-Platform**: Supports macOS (CPU/Metal), Linux (CPU/NVIDIA/AMD), Windows (CPU/NVIDIA/AMD)
+- **Struct Support**: Uses libffi for calling C functions with struct parameters/returns on all platforms
 - **Performance**: Direct bindings to llama.cpp shared libraries
 - **Compatibility**: Version-synchronized with llama.cpp releases
 - **Easy Integration**: Simple Go API for LLM inference
 - **GPU Acceleration**: Supports Metal, CUDA, HIP, Vulkan, OpenCL, SYCL, and other backends
+- **Embedded Runtime Libraries**: Optional go:embed bundle for all supported platforms
 
 ## Supported Platforms
 
@@ -30,21 +32,26 @@ Gollama.cpp uses a **platform-specific architecture** with build tags to ensure 
 #### Linux
 - **CPU**: x86_64, ARM64
 - **GPU**: NVIDIA (CUDA/Vulkan), AMD (HIP/ROCm/Vulkan), Intel (SYCL/Vulkan)
-- **Status**: Full feature support with purego
+- **Status**: Full feature support with purego and libffi
 - **Build Tags**: Uses `!windows` build tag
-
-### 🚧 In Development
 
 #### Windows
 - **CPU**: x86_64, ARM64 
-- **GPU**: NVIDIA (CUDA/Vulkan), AMD (HIP/Vulkan), Intel (SYCL/Vulkan), Qualcomm Adreno (OpenCL) - planned
-- **Status**: **Build compatibility implemented**, runtime support in development
+- **GPU**: NVIDIA (CUDA/Vulkan), AMD (HIP/Vulkan), Intel (SYCL/Vulkan), Qualcomm Adreno (OpenCL)
+- **Status**: **Full feature support with libffi**
 - **Build Tags**: Uses `windows` build tag with syscall-based library loading
 - **Current State**: 
   - ✅ Compiles without errors on Windows
   - ✅ Cross-compilation from other platforms works
-  - 🚧 Runtime functionality being implemented
-  - 🚧 GPU acceleration being added
+  - ✅ Runtime functionality fully enabled via libffi and GetProcAddress
+  - ✅ Full struct parameter/return support through function registration
+  - 🚧 GPU acceleration being tested
+
+> Windows runtime notes
+>
+> - The loader now adds the DLL's directory to the Windows DLL search path and uses `LoadLibraryExW` with safe search flags to reliably resolve sibling dependencies (ggml, libomp, libcurl, etc.).
+> - If you see “The specified module could not be found.” while loading `llama.dll`, it often indicates a missing system runtime (e.g., Microsoft Visual C++ Redistributable 2015–2022). Installing the latest x64/x86 redistributable typically resolves it.
+> - CI runners set PATH for later steps, but the downloader verifies loading immediately after download; the improved loader handles dependency resolution without relying on PATH.
 
 ### Platform-Specific Implementation Details
 
@@ -52,6 +59,7 @@ Our platform abstraction layer uses Go build tags to provide:
 
 - **Unix-like systems** (`!windows`): Uses [purego](https://github.com/ebitengine/purego) for dynamic library loading
 - **Windows** (`windows`): Uses native Windows syscalls (`LoadLibraryW`, `FreeLibrary`, `GetProcAddress`)
+- **All platforms**: Uses [libffi](https://github.com/jupiterrider/ffi) for calling C functions with struct parameters/returns
 - **Cross-compilation**: Supports building for any platform from any platform
 - **Automatic detection**: Runtime platform capability detection
 
@@ -63,6 +71,20 @@ go get github.com/dianlight/gollama.cpp
 
 The Go module automatically downloads pre-built llama.cpp libraries from the official [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) releases on first use. No manual compilation required!
 
+### Embedding Libraries
+
+For reproducible builds you can embed the pre-built libraries directly into the Go module. A helper Makefile target downloads the configured llama.cpp build (`LLAMA_CPP_BUILD`) for every supported platform and synchronises the `./libs` directory which is picked up by `go:embed`:
+
+```bash
+# Download all platform builds for the configured llama.cpp version and populate ./libs
+make populate-libs
+
+# Alternatively, use the CLI directly
+go run ./cmd/gollama-download -download-all -version b6862 -copy-libs
+```
+
+Only a single llama.cpp version is stored in `./libs` at a time. Running `populate-libs` removes outdated directories automatically. Subsequent `go build` invocations embed the freshly synchronised libraries and `LoadLibraryWithVersion("")` will prefer the embedded bundle.
+
 ## Cross-Platform Development
 
 ### Build Compatibility Matrix
@@ -70,13 +92,13 @@ The Go module automatically downloads pre-built llama.cpp libraries from the off
 Our CI system tests compilation across all platforms:
 
 | Target Platform | Build From Linux | Build From macOS | Build From Windows |
-|------------------|:----------------:|:----------------:|:------------------:|
-| Linux (amd64)    | ✅               | ✅               | ✅                 |
-| Linux (arm64)    | ✅               | ✅               | ✅                 |
-| macOS (amd64)    | ✅               | ✅               | ✅                 |
-| macOS (arm64)    | ✅               | ✅               | ✅                 |
-| Windows (amd64)  | ✅               | ✅               | ✅                 |
-| Windows (arm64)  | ✅               | ✅               | ✅                 |
+| --------------- | :--------------: | :--------------: | :----------------: |
+| Linux (amd64)   |        ✅         |        ✅         |         ✅          |
+| Linux (arm64)   |        ✅         |        ✅         |         ✅          |
+| macOS (amd64)   |        ✅         |        ✅         |         ✅          |
+| macOS (arm64)   |        ✅         |        ✅         |         ✅          |
+| Windows (amd64) |        ✅         |        ✅         |         ✅          |
+| Windows (arm64) |        ✅         |        ✅         |         ✅          |
 
 ### Development Workflow
 
@@ -184,25 +206,25 @@ params.split_mode = gollama.LLAMA_SPLIT_MODE_LAYER
 
 #### GPU Support Matrix
 
-| Platform | GPU Type | Backend | Status |
-|----------|----------|---------|--------|
-| macOS | Apple Silicon | Metal | ✅ Supported |
-| macOS | Intel/AMD | CPU only | ✅ Supported |
-| Linux | NVIDIA | CUDA | ✅ Available in releases |
-| Linux | NVIDIA | Vulkan | ✅ Available in releases |
-| Linux | AMD | HIP/ROCm | ✅ Available in releases |
-| Linux | AMD | Vulkan | ✅ Available in releases |
-| Linux | Intel | SYCL | ✅ Available in releases |
-| Linux | Intel/Other | Vulkan | ✅ Available in releases |
-| Linux | Intel/Other | CPU | ✅ Fallback |
-| Windows | NVIDIA | CUDA | ✅ Available in releases |
-| Windows | NVIDIA | Vulkan | ✅ Available in releases |
-| Windows | AMD | HIP | ✅ Available in releases |
-| Windows | AMD | Vulkan | ✅ Available in releases |
-| Windows | Intel | SYCL | ✅ Available in releases |
-| Windows | Qualcomm Adreno | OpenCL | ✅ Available in releases |
-| Windows | Intel/Other | Vulkan | ✅ Available in releases |
-| Windows | Intel/Other | CPU | ✅ Fallback |
+| Platform | GPU Type        | Backend  | Status                  |
+| -------- | --------------- | -------- | ----------------------- |
+| macOS    | Apple Silicon   | Metal    | ✅ Supported             |
+| macOS    | Intel/AMD       | CPU only | ✅ Supported             |
+| Linux    | NVIDIA          | CUDA     | ✅ Available in releases |
+| Linux    | NVIDIA          | Vulkan   | ✅ Available in releases |
+| Linux    | AMD             | HIP/ROCm | ✅ Available in releases |
+| Linux    | AMD             | Vulkan   | ✅ Available in releases |
+| Linux    | Intel           | SYCL     | ✅ Available in releases |
+| Linux    | Intel/Other     | Vulkan   | ✅ Available in releases |
+| Linux    | Intel/Other     | CPU      | ✅ Fallback              |
+| Windows  | NVIDIA          | CUDA     | ✅ Available in releases |
+| Windows  | NVIDIA          | Vulkan   | ✅ Available in releases |
+| Windows  | AMD             | HIP      | ✅ Available in releases |
+| Windows  | AMD             | Vulkan   | ✅ Available in releases |
+| Windows  | Intel           | SYCL     | ✅ Available in releases |
+| Windows  | Qualcomm Adreno | OpenCL   | ✅ Available in releases |
+| Windows  | Intel/Other     | Vulkan   | ✅ Available in releases |
+| Windows  | Intel/Other     | CPU      | ✅ Fallback              |
 
 The library automatically downloads pre-built binaries from the official llama.cpp releases with the appropriate GPU support for your platform. The download happens automatically on first use!
 
@@ -222,7 +244,7 @@ Gollama.cpp automatically downloads pre-built binaries from the official llama.c
 
 ```go
 // Load a specific version
-err := gollama.LoadLibraryWithVersion("b6099")
+err := gollama.LoadLibraryWithVersion("b6862")
 
 // Clean cache to force re-download
 err := gollama.CleanLibraryCache()
@@ -260,9 +282,39 @@ The downloader automatically selects the best variant for your platform:
 
 #### Cache Location
 
-Downloaded libraries are cached in:
+Downloaded libraries are cached in platform-specific locations:
 - **Linux/macOS**: `~/.cache/gollama/libs/`
 - **Windows**: `%LOCALAPPDATA%/gollama/libs/`
+
+You can customize the cache directory in several ways:
+
+**Environment Variable:**
+```bash
+export GOLLAMA_CACHE_DIR=/custom/path/to/cache
+```
+
+**Configuration File:**
+```json
+{
+  "cache_dir": "/custom/path/to/cache"
+}
+```
+
+**Programmatically:**
+```go
+config := gollama.DefaultConfig()
+config.CacheDir = "/custom/path/to/cache"
+gollama.SetGlobalConfig(config)
+```
+
+To get the current cache directory:
+```go
+cacheDir, err := gollama.GetLibraryCacheDir()
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Using cache directory: %s\n", cacheDir)
+```
 
 ## Building from Source
 
@@ -317,7 +369,7 @@ Where:
 - `X.Y.Z` is the gollama.cpp semantic version
 - `ABCD` is the corresponding llama.cpp build number
 
-For example: `v0.2.0-llamacpp.b6099` uses llama.cpp build b6099.
+For example: `v0.2.0-llamacpp.b6862` uses llama.cpp build b6862.
 
 ## Documentation
 

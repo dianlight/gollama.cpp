@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"strings"
 
-	"github.com/dianlight/gollama.cpp"
+	gollama "github.com/dianlight/gollama.cpp"
 )
 
 func main() {
@@ -21,6 +22,8 @@ func main() {
 		showVersion    = flag.Bool("v", false, "Show version information")
 		showChecksum   = flag.Bool("checksum", false, "Show SHA256 checksum of downloaded files")
 		verifyChecksum = flag.String("verify-checksum", "", "Verify SHA256 checksum of a file")
+		copyLibs       = flag.Bool("copy-libs", false, "Copy downloaded libraries into ./libs for embedding")
+		libsDir        = flag.String("libs-dir", "libs", "Target directory for embedded libraries (default: ./libs)")
 	)
 	flag.Parse()
 
@@ -62,7 +65,16 @@ func main() {
 			log.Fatalf("Failed to download libraries: %v", err)
 		}
 
-		printDownloadResults(results, *showChecksum)
+		successCount := printDownloadResults(results, *showChecksum)
+		if *copyLibs {
+			if successCount == 0 {
+				log.Fatalf("No libraries were downloaded successfully; skipping copy to %s", *libsDir)
+			}
+			if err := copyResultsIntoLibs(results, *libsDir, *version); err != nil {
+				log.Fatalf("Failed to copy libraries into %s: %v", *libsDir, err)
+			}
+			fmt.Printf("Embedded libraries synchronized to %s\n", *libsDir)
+		}
 		return
 	}
 
@@ -78,7 +90,16 @@ func main() {
 			log.Fatalf("Failed to download libraries: %v", err)
 		}
 
-		printDownloadResults(results, *showChecksum)
+		successCount := printDownloadResults(results, *showChecksum)
+		if *copyLibs {
+			if successCount == 0 {
+				log.Fatalf("No libraries were downloaded successfully; skipping copy to %s", *libsDir)
+			}
+			if err := copyResultsIntoLibs(results, *libsDir, *version); err != nil {
+				log.Fatalf("Failed to copy libraries into %s: %v", *libsDir, err)
+			}
+			fmt.Printf("Embedded libraries synchronized to %s\n", *libsDir)
+		}
 		return
 	}
 
@@ -102,7 +123,11 @@ func main() {
 			log.Fatalf("Failed to get release info: %v", err)
 		}
 
-		fmt.Printf("Found release: %s\n", release.TagName)
+		tagName := ""
+		if release.TagName != nil {
+			tagName = *release.TagName
+		}
+		fmt.Printf("Found release: %s\n", tagName)
 
 		pattern, err := downloader.GetPlatformAssetPattern()
 		if err != nil {
@@ -125,29 +150,29 @@ func main() {
 	if *download {
 		fmt.Println("Downloading llama.cpp library...")
 
-		var err error
-		if *version != "" {
-			fmt.Printf("Downloading version %s...\n", *version)
-			err = gollama.LoadLibraryWithVersion(*version)
-		} else {
-			fmt.Println("Downloading latest version...")
-			err = gollama.LoadLibraryWithVersion("")
-		}
-
+		platform := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+		results, err := gollama.DownloadLibrariesForPlatforms([]string{platform}, *version)
 		if err != nil {
 			log.Fatalf("Failed to download library: %v", err)
 		}
 
-		fmt.Println("Library downloaded and loaded successfully")
-
-		// Show checksum if requested
-		if *showChecksum {
-			// For single platform download, calculate checksum of the main library cache
-			fmt.Println("Calculating SHA256 checksums...")
-			// Note: This is a simplified approach - for more detailed checksums,
-			// users should use the parallel download features
+		successCount := printDownloadResults(results, *showChecksum)
+		if successCount == 0 {
+			log.Fatalf("No libraries were downloaded successfully for %s", platform)
 		}
 
+		if *copyLibs {
+			if err := copyResultsIntoLibs(results, *libsDir, *version); err != nil {
+				log.Fatalf("Failed to copy libraries into %s: %v", *libsDir, err)
+			}
+			fmt.Printf("Embedded libraries synchronized to %s\n", *libsDir)
+		}
+
+		if err := gollama.LoadLibraryWithVersion(*version); err != nil {
+			log.Fatalf("Failed to load library: %v", err)
+		}
+
+		fmt.Println("Library downloaded and loaded successfully")
 		return
 	}
 
@@ -164,11 +189,42 @@ func main() {
 	fmt.Printf("  %s -test-download               # Test download without loading\n", os.Args[0])
 	fmt.Printf("  %s -clean-cache                 # Clean cache directory\n", os.Args[0])
 	fmt.Printf("  %s -checksum -download           # Download and show checksums\n", os.Args[0])
+	fmt.Printf("  %s -download-all -version %s -copy-libs  # Download all platforms and sync ./libs\n", os.Args[0], gollama.LlamaCppBuild)
 	fmt.Printf("  %s -verify-checksum file.zip     # Verify checksum of a file\n", os.Args[0])
 }
 
-// printDownloadResults prints the results of parallel downloads
-func printDownloadResults(results []gollama.DownloadResult, showChecksum bool) {
+func copyResultsIntoLibs(results []gollama.DownloadResult, libsDir, versionFlag string) error {
+	resolvedVersion, err := resolveVersionForCopy(versionFlag, results)
+	if err != nil {
+		return err
+	}
+
+	if err := gollama.PopulateLibDirectoryFromResults(results, resolvedVersion, libsDir); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func resolveVersionForCopy(versionFlag string, results []gollama.DownloadResult) (string, error) {
+	if versionFlag != "" {
+		if versionFlag != gollama.LlamaCppBuild {
+			return "", fmt.Errorf("copying libraries requires llama.cpp build %s (got %s)", gollama.LlamaCppBuild, versionFlag)
+		}
+		return versionFlag, nil
+	}
+
+	for _, res := range results {
+		if res.Success && res.Embedded {
+			return gollama.LlamaCppBuild, nil
+		}
+	}
+
+	return "", fmt.Errorf("unable to determine llama.cpp build for library copy; rerun with -version %s", gollama.LlamaCppBuild)
+}
+
+// printDownloadResults prints the results of parallel downloads and returns the number of successful entries.
+func printDownloadResults(results []gollama.DownloadResult, showChecksum bool) int {
 	fmt.Printf("\nDownload Results:\n")
 	fmt.Printf("================\n")
 
@@ -176,7 +232,11 @@ func printDownloadResults(results []gollama.DownloadResult, showChecksum bool) {
 	for _, result := range results {
 		if result.Success {
 			successCount++
-			fmt.Printf("✅ %s: SUCCESS", result.Platform)
+			status := "SUCCESS"
+			if result.Embedded {
+				status = "SUCCESS (embedded)"
+			}
+			fmt.Printf("✅ %s: %s", result.Platform, status)
 			if result.LibraryPath != "" {
 				fmt.Printf(" (Library: %s)", result.LibraryPath)
 			}
@@ -194,4 +254,5 @@ func printDownloadResults(results []gollama.DownloadResult, showChecksum bool) {
 	}
 
 	fmt.Printf("\nSummary: %d/%d platforms downloaded successfully\n", successCount, len(results))
+	return successCount
 }

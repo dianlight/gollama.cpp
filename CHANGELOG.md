@@ -8,10 +8,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Windows Function Registration**: Implemented proper `registerLibFunc` for Windows using `GetProcAddress` to resolve function addresses from loaded DLLs. This enables cross-platform struct parameter/return support on Windows through libffi.
+- **libffi Support**: Cross-platform struct handling for C function calls on all platforms (Windows, Linux, macOS)
+  - Added `github.com/jupiterrider/ffi v0.5.1` dependency for FFI support
+  - Implemented FFI wrapper layer (`ffi.go`) with 10 wrapper functions for struct-based operations
+  - Added `Encode()` and `Sampler_chain_init()` public wrapper functions
+  - Platform-agnostic GetProcAddress helper for symbol resolution
+- **Embedded Library Packaging**: `go:embed` support for pre-built llama.cpp binaries across all platforms
+  - New `make populate-libs` target and `-copy-libs` CLI flag to sync the `./libs` directory
+  - Runtime prefers embedded libraries when requesting the bundled llama.cpp build
+  - Release workflow auto-populates and commits the embedded library bundle
 
 ### Changed
+- **llama.cpp Version**: Updated from b6099 to b6862
+  - Updated Makefile, CI workflows, and all documentation
+  - Improved compatibility with latest llama.cpp features
+  - Deprecated KV cache functions (removed from b6862 API): `llama_kv_cache_clear`, `llama_kv_cache_seq_*`, `llama_kv_cache_defrag`, `llama_kv_cache_update`
+  - Removed non-existent functions: `llama_sampler_init_softmax`
+- **CI/CD Improvements**: 
+  - Added automatic library download step before running tests
+  - Configured platform-specific library paths (LD_LIBRARY_PATH, DYLD_LIBRARY_PATH, PATH)
+  - Updated GO_VERSION to 1.25
+- **Windows Support**: Enabled full runtime support with FFI (previously build-only)
+- **Test Behavior**: FFI tests now fail instead of skip when library is unavailable
 
 ### Fixed
+
+- Windows DLL loading: Improve reliability by adding the library directory to the DLL search path and preferring `LoadLibraryExW` with safe search flags. This resolves "The specified module could not be found" when loading embedded `llama.dll` on CI.
 
 ### Removed
 
@@ -82,15 +105,15 @@ This release significantly expands GPU support with **three new GPU backends** a
 - **Documentation**: Updated to reflect hf.sh script integration and usage
 
 ### GPU Backend Support Matrix
-| Backend | Platforms | GPU Vendors | Detection Command | Status |
-|---------|-----------|-------------|-------------------|--------|
-| **Metal** | macOS | Apple Silicon | `system_profiler` | ✅ Production |
-| **CUDA** | Linux, Windows | NVIDIA | `nvcc` | ✅ Production |
-| **HIP/ROCm** | Linux, Windows | AMD | `hipconfig` | ✅ Production |
-| **Vulkan** | Linux, Windows | NVIDIA, AMD, Intel | `vulkaninfo` | ✅ Production |
-| **OpenCL** | Windows, Linux | Qualcomm Adreno, Intel, AMD | `clinfo` | ✅ Production |
-| **SYCL** | Linux, Windows | Intel, NVIDIA | `sycl-ls` | ✅ Production |
-| **CPU** | All | All | N/A | ✅ Fallback |
+| Backend      | Platforms      | GPU Vendors                 | Detection Command | Status       |
+| ------------ | -------------- | --------------------------- | ----------------- | ------------ |
+| **Metal**    | macOS          | Apple Silicon               | `system_profiler` | ✅ Production |
+| **CUDA**     | Linux, Windows | NVIDIA                      | `nvcc`            | ✅ Production |
+| **HIP/ROCm** | Linux, Windows | AMD                         | `hipconfig`       | ✅ Production |
+| **Vulkan**   | Linux, Windows | NVIDIA, AMD, Intel          | `vulkaninfo`      | ✅ Production |
+| **OpenCL**   | Windows, Linux | Qualcomm Adreno, Intel, AMD | `clinfo`          | ✅ Production |
+| **SYCL**     | Linux, Windows | Intel, NVIDIA               | `sycl-ls`         | ✅ Production |
+| **CPU**      | All            | All                         | N/A               | ✅ Fallback   |
 
 ### Dependencies
 - llama.cpp: Updated from b6076 to b6099 (managed by Renovate)

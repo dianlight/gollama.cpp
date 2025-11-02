@@ -96,7 +96,7 @@ Set up your development environment:
 
 ```bash
 # Optional: Specify custom llama.cpp build
-export LLAMA_CPP_BUILD=b6099
+export LLAMA_CPP_BUILD=b6862
 
 # Optional: Enable verbose testing
 export GOLLAMA_TEST_VERBOSE=1
@@ -410,7 +410,7 @@ func Tokenize(model LlamaModel, text string, addSpecial, parseSpecial bool) ([]L
 We follow semantic versioning with llama.cpp build numbers:
 
 - Format: `vX.Y.Z-llamacpp.BUILD`
-- Example: `v0.2.0-llamacpp.b6099`
+- Example: `v0.2.0-llamacpp.b6862`
 
 ### Release Checklist
 

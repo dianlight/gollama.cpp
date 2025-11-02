@@ -223,6 +223,55 @@ make interactive       # Interactive prompt input
 
 **Note:** This is a conceptual demonstration of diffusion principles. A full implementation would require specialized diffusion model architectures and non-causal attention mechanisms not available in standard chat models.
 
+### 8. Cache Directory Configuration (`cache-directory-demo/`)
+Demonstrates how to configure and manage the cache directory used for downloading and storing llama.cpp library binaries.
+
+**Features:**
+- Get the default cache directory location
+- Configure cache directory via environment variable
+- Configure cache directory via Config object  
+- Configure cache directory via JSON configuration file
+- Clean cache to force re-download
+- Platform-specific cache location defaults
+- Security validation against path traversal attacks
+
+**Usage:**
+```bash
+cd cache-directory-demo
+go run main.go
+
+# With custom environment variable
+GOLLAMA_CACHE_DIR=/tmp/my_cache go run main.go
+```
+
+**Configuration Methods:**
+
+Environment Variable:
+```bash
+export GOLLAMA_CACHE_DIR=/path/to/cache
+```
+
+Config Object:
+```go
+config := gollama.DefaultConfig()
+config.CacheDir = "/path/to/cache"
+gollama.SetGlobalConfig(config)
+```
+
+Configuration File (config.json):
+```json
+{
+  "cache_dir": "/path/to/cache",
+  "enable_logging": true,
+  "num_threads": 8
+}
+```
+
+**Default Cache Locations:**
+- Linux: `~/.cache/gollama/libs/`
+- macOS: `~/Library/Caches/gollama/libs/`
+- Windows: `%LOCALAPPDATA%\gollama\libs\`
+
 ## Getting Started
 
 ### Prerequisites

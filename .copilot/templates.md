@@ -112,7 +112,7 @@ strategy:
 ```yaml
 env:
   GO_VERSION: '1.21'
-  LLAMA_CPP_BUILD: 'b6099'  # Update this when upgrading llama.cpp
+  LLAMA_CPP_BUILD: 'b6862'  # Update this when upgrading llama.cpp
 ```
 
 ### Adding New Platform

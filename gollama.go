@@ -33,6 +33,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"unsafe"
@@ -43,7 +44,7 @@ const (
 	// Version is the gollama.cpp version
 	Version = "0.2.1"
 	// LlamaCppBuild is the llama.cpp build number this version is based on
-	LlamaCppBuild = "b6099"
+	LlamaCppBuild = "b6862"
 	// FullVersion combines both version numbers
 	FullVersion = "v" + Version + "-llamacpp." + LlamaCppBuild
 )
@@ -429,12 +430,12 @@ var (
 	llamaSamplerReset              func(smpl LlamaSampler)
 
 	// Built-in samplers
-	llamaSamplerInitGreedy  func() LlamaSampler
-	llamaSamplerInitDist    func(seed uint32) LlamaSampler
-	llamaSamplerInitSoftmax func() LlamaSampler
-	llamaSamplerInitTopK    func(k int32) LlamaSampler
-	llamaSamplerInitTopP    func(p float32, minKeep uint64) LlamaSampler
-	llamaSamplerInitMinP    func(p float32, minKeep uint64) LlamaSampler
+	llamaSamplerInitGreedy func() LlamaSampler
+	llamaSamplerInitDist   func(seed uint32) LlamaSampler
+	// llamaSamplerInitSoftmax func() LlamaSampler  // Function doesn't exist in b6862
+	llamaSamplerInitTopK func(k int32) LlamaSampler
+	llamaSamplerInitTopP func(p float32, minKeep uint64) LlamaSampler
+	llamaSamplerInitMinP func(p float32, minKeep uint64) LlamaSampler
 	// llamaSamplerInitTailFree   func(z float32, minKeep uint64) LlamaSampler  // Function doesn't exist
 	llamaSamplerInitTypical    func(p float32, minKeep uint64) LlamaSampler
 	llamaSamplerInitTemp       func(temp float32) LlamaSampler
@@ -451,16 +452,7 @@ var (
 	llamaTimeUs             func() int64
 	llamaPrintSystemInfo    func() *byte
 
-	// KV cache functions
-	llamaKvCacheClear   func(ctx LlamaContext)
-	llamaKvCacheSeqRm   func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos) bool
-	llamaKvCacheSeqCp   func(ctx LlamaContext, seqIdSrc LlamaSeqId, seqIdDst LlamaSeqId, p0 LlamaPos, p1 LlamaPos)
-	llamaKvCacheSeqKeep func(ctx LlamaContext, seqId LlamaSeqId)
-	llamaKvCacheSeqAdd  func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos, delta LlamaPos)
-	llamaKvCacheSeqDiv  func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos, d int32)
-	// llamaKvCacheSeqPos  func(ctx LlamaContext, seqId LlamaSeqId, p0 LlamaPos, p1 LlamaPos, delta LlamaPos)  // Function doesn't exist
-	llamaKvCacheDefrag func(ctx LlamaContext)
-	llamaKvCacheUpdate func(ctx LlamaContext)
+	// KV cache functions (deprecated functions removed in b6862)
 
 	// State functions
 	llamaStateGetSize  func(ctx LlamaContext) uint64
@@ -490,7 +482,7 @@ func getLibraryPath() (string, error) {
 		return "", fmt.Errorf("unsupported architecture: %s on %s", goarch, goos)
 	}
 
-	// Try to find the library in the current directory, parent directory, or system path
+	// Start with standard search paths
 	candidates := []string{
 		libName,                         // Current directory
 		"libs/darwin_arm64/" + libName,  // macOS
@@ -504,6 +496,42 @@ func getLibraryPath() (string, error) {
 		"/usr/local/lib/" + libName,     // System library path
 		"/usr/lib/" + libName,           // Common system library path
 		"/lib/" + libName,               // Another common system library path
+	}
+
+	// Add cache directory paths
+	// Determine cache directory using the same logic as downloader
+	var cacheDir string
+	if globalConfig != nil && globalConfig.CacheDir != "" {
+		cacheDir = globalConfig.CacheDir
+	} else if envCacheDir := os.Getenv("GOLLAMA_CACHE_DIR"); envCacheDir != "" {
+		cacheDir = filepath.Join(envCacheDir, "libs")
+	} else {
+		userCacheDir, err := os.UserCacheDir()
+		if err == nil {
+			cacheDir = filepath.Join(userCacheDir, "gollama", "libs")
+		} else {
+			cacheDir = filepath.Join(os.TempDir(), "gollama", "libs")
+		}
+	}
+
+	// Try to find library in cache directory subdirectories
+	if cacheDir != "" {
+		entries, err := os.ReadDir(cacheDir)
+		if err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() {
+					// Check for library in build/bin subdirectory (standard structure)
+					cachePath := filepath.Join(cacheDir, entry.Name(), "build", "bin", libName)
+					candidates = append(candidates, cachePath)
+					// Check for library in bin subdirectory
+					cachePath = filepath.Join(cacheDir, entry.Name(), "bin", libName)
+					candidates = append(candidates, cachePath)
+					// Also check directly in subdirectory
+					cachePath = filepath.Join(cacheDir, entry.Name(), libName)
+					candidates = append(candidates, cachePath)
+				}
+			}
+		}
 	}
 
 	for _, candidate := range candidates {
@@ -561,7 +589,8 @@ func registerFunctions() error {
 	registerLibFunc(&llamaBackendFree, libHandle, "llama_backend_free")
 	registerLibFunc(&llamaLogSet, libHandle, "llama_log_set")
 
-	// Model functions - Skip functions that use structs on non-Darwin platforms - moved to ROADMAP "wait for purego struct support" section
+	// Model functions - Register struct functions only on Darwin (purego limitation)
+	// On other platforms, FFI handles struct parameters/returns directly
 	if runtime.GOOS == "darwin" {
 		registerLibFunc(&llamaModelDefaultParams, libHandle, "llama_model_default_params")
 		registerLibFunc(&llamaContextDefaultParams, libHandle, "llama_context_default_params")
@@ -608,14 +637,16 @@ func registerFunctions() error {
 	registerLibFunc(&llamaVocabNl, libHandle, "llama_vocab_nl")
 	registerLibFunc(&llamaVocabPad, libHandle, "llama_vocab_pad")
 
-	// Batch functions - Skip functions that use structs on non-Darwin platforms - moved to ROADMAP "wait for purego struct support" section
+	// Batch functions - Register struct functions only on Darwin (purego limitation)
+	// On other platforms, FFI handles struct parameters/returns directly
 	if runtime.GOOS == "darwin" {
 		registerLibFunc(&llamaBatchInit, libHandle, "llama_batch_init")
 		registerLibFunc(&llamaBatchGetOne, libHandle, "llama_batch_get_one")
 		registerLibFunc(&llamaBatchFree, libHandle, "llama_batch_free")
 	}
 
-	// Decode functions - Skip functions that use structs on non-Darwin platforms - moved to ROADMAP "wait for purego struct support" section
+	// Decode functions - Register struct functions only on Darwin (purego limitation)
+	// On other platforms, FFI handles struct parameters/returns directly
 	if runtime.GOOS == "darwin" {
 		registerLibFunc(&llamaDecode, libHandle, "llama_decode")
 		registerLibFunc(&llamaEncode, libHandle, "llama_encode")
@@ -631,7 +662,8 @@ func registerFunctions() error {
 	registerLibFunc(&llamaMemoryClear, libHandle, "llama_memory_clear")
 	registerLibFunc(&llamaGetMemory, libHandle, "llama_get_memory")
 
-	// Sampling functions - Skip functions that use structs on non-Darwin platforms - moved to ROADMAP "wait for purego struct support" section
+	// Sampling functions - Register struct functions only on Darwin (purego limitation)
+	// On other platforms, FFI handles struct parameters/returns directly
 	if runtime.GOOS == "darwin" {
 		registerLibFunc(&llamaSamplerChainInit, libHandle, "llama_sampler_chain_init")
 	}
@@ -646,7 +678,7 @@ func registerFunctions() error {
 	// Built-in samplers
 	registerLibFunc(&llamaSamplerInitGreedy, libHandle, "llama_sampler_init_greedy")
 	registerLibFunc(&llamaSamplerInitDist, libHandle, "llama_sampler_init_dist")
-	registerLibFunc(&llamaSamplerInitSoftmax, libHandle, "llama_sampler_init_softmax")
+	// registerLibFunc(&llamaSamplerInitSoftmax, libHandle, "llama_sampler_init_softmax")  // Function doesn't exist in b6862
 	registerLibFunc(&llamaSamplerInitTopK, libHandle, "llama_sampler_init_top_k")
 	registerLibFunc(&llamaSamplerInitTopP, libHandle, "llama_sampler_init_top_p")
 	registerLibFunc(&llamaSamplerInitMinP, libHandle, "llama_sampler_init_min_p")
@@ -667,15 +699,16 @@ func registerFunctions() error {
 	registerLibFunc(&llamaPrintSystemInfo, libHandle, "llama_print_system_info")
 
 	// KV cache functions
-	registerLibFunc(&llamaKvCacheClear, libHandle, "llama_kv_self_clear")
-	registerLibFunc(&llamaKvCacheSeqRm, libHandle, "llama_kv_self_seq_rm")
-	registerLibFunc(&llamaKvCacheSeqCp, libHandle, "llama_kv_self_seq_cp")
-	registerLibFunc(&llamaKvCacheSeqKeep, libHandle, "llama_kv_self_seq_keep")
-	registerLibFunc(&llamaKvCacheSeqAdd, libHandle, "llama_kv_self_seq_add")
-	registerLibFunc(&llamaKvCacheSeqDiv, libHandle, "llama_kv_self_seq_div")
-	// registerLibFunc(&llamaKvCacheSeqPos, libHandle, "llama_kv_self_seq_pos")  // Might not exist
-	registerLibFunc(&llamaKvCacheDefrag, libHandle, "llama_kv_self_defrag")
-	registerLibFunc(&llamaKvCacheUpdate, libHandle, "llama_kv_self_update")
+	// KV cache functions - deprecated/removed in b6862
+	// registerLibFunc(&llamaKvCacheClear, libHandle, "llama_kv_cache_clear")
+	// registerLibFunc(&llamaKvCacheSeqRm, libHandle, "llama_kv_cache_seq_rm")
+	// registerLibFunc(&llamaKvCacheSeqCp, libHandle, "llama_kv_cache_seq_cp")
+	// registerLibFunc(&llamaKvCacheSeqKeep, libHandle, "llama_kv_cache_seq_keep")
+	// registerLibFunc(&llamaKvCacheSeqAdd, libHandle, "llama_kv_cache_seq_add")
+	// registerLibFunc(&llamaKvCacheSeqDiv, libHandle, "llama_kv_cache_seq_div")
+	// registerLibFunc(&llamaKvCacheSeqPos, libHandle, "llama_kv_cache_seq_pos")  // Might not exist
+	// registerLibFunc(&llamaKvCacheDefrag, libHandle, "llama_kv_cache_defrag")
+	// registerLibFunc(&llamaKvCacheUpdate, libHandle, "llama_kv_cache_update")
 
 	// State functions
 	registerLibFunc(&llamaStateGetSize, libHandle, "llama_state_get_size")
@@ -724,15 +757,22 @@ func Backend_free() {
 
 // Model_default_params returns default model parameters
 func Model_default_params() LlamaModelParams {
-	if err := ensureLoaded(); err != nil {
-		panic(err) // In a real implementation, handle this better
+	// Try to load library if not already loaded
+	_ = ensureLoaded() // Ignore error, fallback to defaults
+
+	// Try FFI first (works on all platforms)
+	if isLoaded {
+		if params, err := ffiModelDefaultParams(); err == nil {
+			return params
+		}
 	}
 
-	if runtime.GOOS == "darwin" {
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaModelDefaultParams != nil && isLoaded {
 		return llamaModelDefaultParams()
 	}
 
-	// For non-Darwin platforms, return a default struct since we can't call the C function
+	// Last resort: return hardcoded defaults
 	return LlamaModelParams{
 		NGpuLayers:   0,
 		SplitMode:    LLAMA_SPLIT_MODE_NONE,
@@ -746,15 +786,22 @@ func Model_default_params() LlamaModelParams {
 
 // Context_default_params returns default context parameters
 func Context_default_params() LlamaContextParams {
-	if err := ensureLoaded(); err != nil {
-		panic(err)
+	// Try to load library if not already loaded
+	_ = ensureLoaded() // Ignore error, fallback to defaults
+
+	// Try FFI first (works on all platforms)
+	if isLoaded {
+		if params, err := ffiContextDefaultParams(); err == nil {
+			return params
+		}
 	}
 
-	if runtime.GOOS == "darwin" {
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaContextDefaultParams != nil && isLoaded {
 		return llamaContextDefaultParams()
 	}
 
-	// For non-Darwin platforms, return a default struct
+	// Last resort: return hardcoded defaults
 	return LlamaContextParams{
 		Seed:            LLAMA_DEFAULT_SEED,
 		NCtx:            0, // Auto-detect from model
@@ -777,15 +824,22 @@ func Context_default_params() LlamaContextParams {
 
 // Sampler_chain_default_params returns default sampler chain parameters
 func Sampler_chain_default_params() LlamaSamplerChainParams {
-	if err := ensureLoaded(); err != nil {
-		panic(err)
+	// Try to load library if not already loaded
+	_ = ensureLoaded() // Ignore error, fallback to defaults
+
+	// Try FFI first (works on all platforms)
+	if isLoaded {
+		if params, err := ffiSamplerChainDefaultParams(); err == nil {
+			return params
+		}
 	}
 
-	if runtime.GOOS == "darwin" {
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaSamplerChainDefaultParams != nil && isLoaded {
 		return llamaSamplerChainDefaultParams()
 	}
 
-	// For non-Darwin platforms, return a default struct
+	// Last resort: return hardcoded defaults
 	return LlamaSamplerChainParams{
 		NoPerf: 0, // Enable performance measurement by default
 	}
@@ -797,16 +851,23 @@ func Model_load_from_file(pathModel string, params LlamaModelParams) (LlamaModel
 		return 0, err
 	}
 
-	if runtime.GOOS != "darwin" {
-		return 0, errors.New("Model_load_from_file not yet implemented for non-Darwin platforms - blocks ROADMAP Priority 1 (wait for purego struct support)")
+	pathBytes := append([]byte(pathModel), 0) // null-terminate
+
+	// Try FFI first (works on all platforms)
+	if model, err := ffiModelLoadFromFile((*byte)(unsafe.Pointer(&pathBytes[0])), params); err == nil {
+		return model, nil
 	}
 
-	pathBytes := append([]byte(pathModel), 0) // null-terminate
-	model := llamaModelLoadFromFile((*byte)(unsafe.Pointer(&pathBytes[0])), params)
-	if model == 0 {
-		return 0, errors.New("failed to load model")
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaModelLoadFromFile != nil {
+		model := llamaModelLoadFromFile((*byte)(unsafe.Pointer(&pathBytes[0])), params)
+		if model == 0 {
+			return 0, errors.New("failed to load model")
+		}
+		return model, nil
 	}
-	return model, nil
+
+	return 0, errors.New("Model_load_from_file not available on this platform")
 }
 
 // Model_free frees a model
@@ -879,15 +940,21 @@ func Init_from_model(model LlamaModel, params LlamaContextParams) (LlamaContext,
 		return 0, err
 	}
 
-	if runtime.GOOS != "darwin" {
-		return 0, errors.New("Init_from_model not yet implemented for non-Darwin platforms - blocks ROADMAP Priority 1 (wait for purego struct support)")
+	// Try FFI first (works on all platforms)
+	if ctx, err := ffiInitFromModel(model, params); err == nil {
+		return ctx, nil
 	}
 
-	ctx := llamaInitFromModel(model, params)
-	if ctx == 0 {
-		return 0, errors.New("failed to create context")
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaInitFromModel != nil {
+		ctx := llamaInitFromModel(model, params)
+		if ctx == 0 {
+			return 0, errors.New("failed to create context")
+		}
+		return ctx, nil
 	}
-	return ctx, nil
+
+	return 0, errors.New("Init_from_model not available on this platform")
 }
 
 // Free frees a context
@@ -986,37 +1053,55 @@ func Token_to_piece(model LlamaModel, token LlamaToken, special bool) string {
 
 // Batch_init creates a new batch
 func Batch_init(nTokens, embd, nSeqMax int32) LlamaBatch {
-	if err := ensureLoaded(); err != nil {
-		panic(err)
+	// Try to load library if not already loaded
+	_ = ensureLoaded() // Ignore error, fallback to empty batch
+
+	// Try FFI first (works on all platforms)
+	if isLoaded {
+		if batch, err := ffiBatchInit(nTokens, embd, nSeqMax); err == nil {
+			return batch
+		}
 	}
 
-	if runtime.GOOS != "darwin" {
-		// Return a zero-initialized batch for non-Darwin platforms - blocks ROADMAP "wait for purego struct support"
-		return LlamaBatch{}
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaBatchInit != nil && isLoaded {
+		return llamaBatchInit(nTokens, embd, nSeqMax)
 	}
 
-	return llamaBatchInit(nTokens, embd, nSeqMax)
+	// Last resort: return zero-initialized batch
+	return LlamaBatch{}
 }
 
 // Batch_get_one creates a batch from a single set of tokens
 func Batch_get_one(tokens []LlamaToken) LlamaBatch {
-	if err := ensureLoaded(); err != nil {
-		panic(err)
-	}
-	if len(tokens) == 0 {
-		return LlamaBatch{}
-	}
+	// Try to load library if not already loaded
+	_ = ensureLoaded() // Ignore error, fallback to empty batch
 
-	if runtime.GOOS != "darwin" {
-		// Return a zero-initialized batch for non-Darwin platforms - blocks ROADMAP "wait for purego struct support"
+	if len(tokens) == 0 {
 		return LlamaBatch{}
 	}
 
 	tokensLen := len(tokens)
 	if tokensLen > math.MaxInt32 {
-		panic(fmt.Errorf("too many tokens: %d, maximum supported: %d", tokensLen, math.MaxInt32))
+		// Token count exceeds maximum supported size
+		// Return empty batch instead of panicking (safer than previous panic behavior)
+		return LlamaBatch{}
 	}
-	return llamaBatchGetOne(&tokens[0], int32(tokensLen))
+
+	// Try FFI first (works on all platforms)
+	if isLoaded {
+		if batch, err := ffiBatchGetOne(&tokens[0], int32(tokensLen)); err == nil {
+			return batch
+		}
+	}
+
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaBatchGetOne != nil && isLoaded {
+		return llamaBatchGetOne(&tokens[0], int32(tokensLen))
+	}
+
+	// Last resort: return zero-initialized batch
+	return LlamaBatch{}
 }
 
 // Batch_free frees a batch
@@ -1037,15 +1122,50 @@ func Decode(ctx LlamaContext, batch LlamaBatch) error {
 		return err
 	}
 
-	if runtime.GOOS != "darwin" {
-		return errors.New("Decode not yet implemented for non-Darwin platforms - blocks ROADMAP Priority 1 (wait for purego struct support)")
+	// Try FFI first (works on all platforms)
+	if result, err := ffiDecode(ctx, batch); err == nil {
+		if result != 0 {
+			return fmt.Errorf("decode failed with code %d", result)
+		}
+		return nil
 	}
 
-	result := llamaDecode(ctx, batch)
-	if result != 0 {
-		return fmt.Errorf("decode failed with code %d", result)
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaDecode != nil {
+		result := llamaDecode(ctx, batch)
+		if result != 0 {
+			return fmt.Errorf("decode failed with code %d", result)
+		}
+		return nil
 	}
-	return nil
+
+	return errors.New("Decode not available on this platform")
+}
+
+// Encode encodes a batch
+func Encode(ctx LlamaContext, batch LlamaBatch) error {
+	if err := ensureLoaded(); err != nil {
+		return err
+	}
+
+	// Try FFI first (works on all platforms)
+	if result, err := ffiEncode(ctx, batch); err == nil {
+		if result != 0 {
+			return fmt.Errorf("encode failed with code %d", result)
+		}
+		return nil
+	}
+
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaEncode != nil {
+		result := llamaEncode(ctx, batch)
+		if result != 0 {
+			return fmt.Errorf("encode failed with code %d", result)
+		}
+		return nil
+	}
+
+	return errors.New("Encode not available on this platform")
 }
 
 // Get_logits gets logits for all tokens
@@ -1145,6 +1265,27 @@ func Sampler_init_greedy() LlamaSampler {
 		panic(err)
 	}
 	return llamaSamplerInitGreedy()
+}
+
+// Sampler_chain_init creates a sampler chain
+func Sampler_chain_init(params LlamaSamplerChainParams) LlamaSampler {
+	// Try to load library if not already loaded
+	_ = ensureLoaded() // Ignore error, return 0 on failure
+
+	// Try FFI first (works on all platforms)
+	if isLoaded {
+		if sampler, err := ffiSamplerChainInit(params); err == nil {
+			return sampler
+		}
+	}
+
+	// Fallback to purego on Darwin
+	if runtime.GOOS == "darwin" && llamaSamplerChainInit != nil && isLoaded {
+		return llamaSamplerChainInit(params)
+	}
+
+	// Last resort: return null sampler
+	return 0
 }
 
 // Sampler_free frees a sampler

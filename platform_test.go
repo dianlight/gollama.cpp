@@ -10,17 +10,17 @@ func TestPlatformSpecific(t *testing.T) {
 		supported := isPlatformSupported()
 
 		if runtime.GOOS == "windows" {
-			// Windows support is currently disabled
-			if supported {
-				t.Error("Windows platform should not be supported yet")
+			// Windows support is now enabled with FFI
+			if !supported {
+				t.Error("Windows platform should be supported with FFI")
 			}
 
 			err := getPlatformError()
-			if err == nil {
-				t.Error("getPlatformError should return an error for Windows")
+			if err != nil {
+				t.Errorf("getPlatformError should return nil for Windows with FFI support, got: %v", err)
 			}
 
-			t.Logf("Windows platform correctly reports as unsupported: %v", err)
+			t.Log("Windows platform correctly reports as supported with FFI")
 		} else {
 			// Unix-like platforms should be supported
 			if !supported {
@@ -56,6 +56,13 @@ func TestPlatformSpecific(t *testing.T) {
 			var dummy uintptr
 			registerLibFunc(&dummy, 0, "test_function")
 			t.Log("Windows registerLibFunc completed without panic")
+
+			// Test getProcAddressPlatform with invalid handle
+			_, err = getProcAddressPlatform(0, "test_function")
+			if err == nil {
+				t.Error("getProcAddressPlatform should fail for invalid handle")
+			}
+			t.Logf("Windows getProcAddressPlatform correctly failed: %v", err)
 		} else {
 			// For Unix-like systems, we can test that the functions exist
 			// but we don't want to actually load libraries in unit tests

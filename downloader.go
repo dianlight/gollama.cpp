@@ -2,9 +2,9 @@ package gollama
 
 import (
 	"archive/zip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,14 +16,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/go-github/v60/github"
 )
 
 const (
-	llamaCppRepo      = "ggml-org/llama.cpp"
-	githubReleasesAPI = "https://api.github.com/repos"
-	githubReleasesURL = "https://github.com/ggml-org/llama.cpp/releases/download"
-	downloadTimeout   = 10 * time.Minute
-	userAgent         = "gollama.cpp/1.0.0"
+	downloadTimeout = 10 * time.Minute
+	userAgent       = "gollama.cpp/1.0.0"
 )
 
 // isValidPath checks if a file path is safe for extraction
@@ -48,14 +47,8 @@ func isValidPath(dest, filename string) error {
 }
 
 // ReleaseInfo represents GitHub release information
-type ReleaseInfo struct {
-	TagName string `json:"tag_name"`
-	Assets  []struct {
-		Name               string `json:"name"`
-		BrowserDownloadURL string `json:"browser_download_url"`
-		Size               int64  `json:"size"`
-	} `json:"assets"`
-}
+// Using go-github's Release type directly
+type ReleaseInfo = github.RepositoryRelease
 
 // DownloadTask represents a single download task for parallel processing
 type DownloadTask struct {
@@ -64,115 +57,103 @@ type DownloadTask struct {
 	DownloadURL  string
 	TargetDir    string
 	ExpectedSHA2 string
+	ResultIndex  int
 }
 
 // DownloadResult represents the result of a download task
 type DownloadResult struct {
-	Platform    string
-	Success     bool
-	Error       error
-	LibraryPath string
-	SHA256Sum   string
+	Platform     string
+	Success      bool
+	Error        error
+	LibraryPath  string
+	SHA256Sum    string
+	ExtractedDir string
+	Embedded     bool
 }
 
 // LibraryDownloader handles downloading pre-built llama.cpp binaries
 type LibraryDownloader struct {
-	cacheDir   string
-	userAgent  string
-	httpClient *http.Client
+	cacheDir  string
+	userAgent string
+	client    *github.Client
 }
 
 // NewLibraryDownloader creates a new library downloader instance
 func NewLibraryDownloader() (*LibraryDownloader, error) {
-	// Create cache directory in user's cache or temp directory
+	return NewLibraryDownloaderWithCacheDir("")
+}
+
+// NewLibraryDownloaderWithCacheDir creates a new library downloader instance with a custom cache directory
+func NewLibraryDownloaderWithCacheDir(customCacheDir string) (*LibraryDownloader, error) {
 	var cacheDir string
 
-	// Try user cache directory first
-	userCacheDir, err := os.UserCacheDir()
-	if err == nil {
-		cacheDir = filepath.Join(userCacheDir, "gollama", "libs")
+	// Use custom cache directory if provided
+	if customCacheDir != "" {
+		cacheDir = customCacheDir
 	} else {
-		// Fallback to temp directory
-		cacheDir = filepath.Join(os.TempDir(), "gollama", "libs")
+		// Check for environment variable
+		if envCacheDir := os.Getenv("GOLLAMA_CACHE_DIR"); envCacheDir != "" {
+			cacheDir = filepath.Join(envCacheDir, "libs")
+		} else {
+			// Try user cache directory first
+			userCacheDir, err := os.UserCacheDir()
+			if err == nil {
+				cacheDir = filepath.Join(userCacheDir, "gollama", "libs")
+			} else {
+				// Fallback to temp directory
+				cacheDir = filepath.Join(os.TempDir(), "gollama", "libs")
+			}
+		}
 	}
 
 	if err := os.MkdirAll(cacheDir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
+	// Create go-github client with optional authentication
+	var client *github.Client
+	token := os.Getenv("GITHUB_TOKEN")
+	if token != "" {
+		// Authenticated client using GITHUB_TOKEN
+		httpClient := &http.Client{Timeout: downloadTimeout}
+		client = github.NewClient(httpClient).WithAuthToken(token)
+	} else {
+		// Unauthenticated client
+		httpClient := &http.Client{Timeout: downloadTimeout}
+		client = github.NewClient(httpClient)
+	}
+
 	return &LibraryDownloader{
-		cacheDir:   cacheDir,
-		userAgent:  userAgent,
-		httpClient: &http.Client{Timeout: downloadTimeout},
+		cacheDir:  cacheDir,
+		userAgent: userAgent,
+		client:    client,
 	}, nil
 }
 
 // GetLatestRelease fetches the latest release information from GitHub
 func (d *LibraryDownloader) GetLatestRelease() (*ReleaseInfo, error) {
-	url := fmt.Sprintf("%s/%s/releases/latest", githubReleasesAPI, llamaCppRepo)
+	ctx, cancel := context.WithTimeout(context.Background(), downloadTimeout)
+	defer cancel()
 
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("User-Agent", d.userAgent)
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-
-	resp, err := d.httpClient.Do(req)
+	release, _, err := d.client.Repositories.GetLatestRelease(ctx, "ggml-org", "llama.cpp")
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch release info: %w", err)
 	}
-	defer func() {
-		_ = resp.Body.Close() // Ignore error in defer
-	}()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
-	}
-
-	var release ReleaseInfo
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return nil, fmt.Errorf("failed to decode release info: %w", err)
-	}
-
-	return &release, nil
+	return release, nil
 }
 
 // GetReleaseByTag fetches release information for a specific tag
 func (d *LibraryDownloader) GetReleaseByTag(tag string) (*ReleaseInfo, error) {
-	url := fmt.Sprintf("%s/%s/releases/tags/%s", githubReleasesAPI, llamaCppRepo, tag)
+	ctx, cancel := context.WithTimeout(context.Background(), downloadTimeout)
+	defer cancel()
 
-	req, err := http.NewRequest("GET", url, nil)
+	release, _, err := d.client.Repositories.GetReleaseByTag(ctx, "ggml-org", "llama.cpp", tag)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to fetch release info: %w (%s)", err, tag)
 	}
 
-	req.Header.Set("User-Agent", d.userAgent)
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-
-	resp, err := d.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch release info: %w", err)
-	}
-	defer func() {
-		_ = resp.Body.Close() // Ignore error in defer
-	}()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("release %s not found", tag)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
-	}
-
-	var release ReleaseInfo
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return nil, fmt.Errorf("failed to decode release info: %w", err)
-	}
-
-	return &release, nil
+	return release, nil
 }
 
 // GetPlatformAssetPattern returns the asset name pattern for the current platform
@@ -282,8 +263,18 @@ func (d *LibraryDownloader) FindAssetByPattern(release *ReleaseInfo, pattern str
 	}
 
 	for _, asset := range release.Assets {
-		if regex.MatchString(asset.Name) {
-			return asset.Name, asset.BrowserDownloadURL, nil
+		// go-github returns pointers to strings, so we need to dereference them
+		assetName := ""
+		downloadURL := ""
+		if asset.Name != nil {
+			assetName = *asset.Name
+		}
+		if asset.BrowserDownloadURL != nil {
+			downloadURL = *asset.BrowserDownloadURL
+		}
+
+		if regex.MatchString(assetName) {
+			return assetName, downloadURL, nil
 		}
 	}
 	return "", "", fmt.Errorf("no asset found matching pattern: %s", pattern)
@@ -386,51 +377,123 @@ func (d *LibraryDownloader) GetPlatformAssetPatternForPlatform(goos, goarch stri
 
 // DownloadMultiplePlatforms downloads libraries for multiple platforms in parallel
 func (d *LibraryDownloader) DownloadMultiplePlatforms(platforms []string, version string) ([]DownloadResult, error) {
-	var release *ReleaseInfo
-	var err error
-
-	// Get release information
-	if version != "" {
-		release, err = d.GetReleaseByTag(version)
-	} else {
-		release, err = d.GetLatestRelease()
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to get release information: %w", err)
+	preferEmbedded := version == "" || version == LlamaCppBuild
+	effectiveVersion := version
+	if effectiveVersion == "" {
+		effectiveVersion = LlamaCppBuild
 	}
 
-	// Create download tasks
+	results := make([]DownloadResult, 0, len(platforms))
 	var tasks []DownloadTask
+	var release *ReleaseInfo
+
+	fetchRelease := func() error {
+		if release != nil {
+			return nil
+		}
+		var err error
+		if version != "" {
+			release, err = d.GetReleaseByTag(version)
+		} else {
+			release, err = d.GetLatestRelease()
+			if err == nil && release != nil && release.TagName != nil {
+				effectiveVersion = release.GetTagName()
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("failed to get release information: %w (%s)", err, version)
+		}
+		return nil
+	}
+
 	for _, platform := range platforms {
 		parts := strings.Split(platform, "/")
 		if len(parts) != 2 {
-			continue // Skip invalid platform specifications
+			continue
 		}
 		goos, goarch := parts[0], parts[1]
 
+		// Attempt to use embedded libraries when allowed and available.
+		if preferEmbedded && effectiveVersion == LlamaCppBuild && hasEmbeddedLibraryForPlatform(goos, goarch) {
+			targetDir := filepath.Join(d.cacheDir, "embedded", embeddedPlatformDirName(goos, goarch))
+			if !d.isLibraryReady(targetDir) {
+				if err := extractEmbeddedLibrariesTo(targetDir, goos, goarch); err == nil {
+					// extracted successfully
+				} else {
+					targetDir = ""
+				}
+			}
+
+			if targetDir != "" {
+				if libPath, err := d.FindLibraryPathForPlatform(targetDir, goos); err == nil {
+					results = append(results, DownloadResult{
+						Platform:     platform,
+						Success:      true,
+						LibraryPath:  libPath,
+						ExtractedDir: targetDir,
+						Embedded:     true,
+					})
+					continue
+				}
+			}
+		}
+
+		if err := fetchRelease(); err != nil {
+			return nil, err
+		}
+
 		pattern, err := d.GetPlatformAssetPatternForPlatform(goos, goarch)
 		if err != nil {
-			continue // Skip unsupported platforms
+			results = append(results, DownloadResult{
+				Platform: platform,
+				Success:  false,
+				Error:    err,
+			})
+			continue
 		}
 
 		assetName, downloadURL, err := d.FindAssetByPattern(release, pattern)
 		if err != nil {
-			continue // Skip platforms without available assets
+			results = append(results, DownloadResult{
+				Platform: platform,
+				Success:  false,
+				Error:    err,
+			})
+			continue
 		}
 
 		targetDir := filepath.Join(d.cacheDir, strings.TrimSuffix(assetName, ".zip"))
+		idx := len(results)
+		results = append(results, DownloadResult{Platform: platform})
 		tasks = append(tasks, DownloadTask{
-			Platform:    platform,
-			AssetName:   assetName,
-			DownloadURL: downloadURL,
-			TargetDir:   targetDir,
-			// No expected checksum since llama.cpp doesn't provide them
+			Platform:     platform,
+			AssetName:    assetName,
+			DownloadURL:  downloadURL,
+			TargetDir:    targetDir,
 			ExpectedSHA2: "",
+			ResultIndex:  idx,
 		})
 	}
 
-	// Execute downloads in parallel
-	return d.executeParallelDownloads(tasks)
+	if len(tasks) == 0 {
+		return results, nil
+	}
+
+	taskResults, err := d.executeParallelDownloads(tasks)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, taskResult := range taskResults {
+		idx := tasks[i].ResultIndex
+		if idx < len(results) {
+			results[idx] = taskResult
+		} else {
+			results = append(results, taskResult)
+		}
+	}
+
+	return results, nil
 }
 
 // executeParallelDownloads executes multiple download tasks concurrently
@@ -451,8 +514,9 @@ func (d *LibraryDownloader) executeParallelDownloads(tasks []DownloadTask) ([]Do
 			defer func() { <-semaphore }()
 
 			result := DownloadResult{
-				Platform: t.Platform,
-				Success:  false,
+				Platform:     t.Platform,
+				Success:      false,
+				ExtractedDir: t.TargetDir,
 			}
 
 			// Check if already exists and ready
@@ -471,6 +535,7 @@ func (d *LibraryDownloader) executeParallelDownloads(tasks []DownloadTask) ([]Do
 				if checksum, err := d.calculateSHA256(archivePath); err == nil {
 					result.SHA256Sum = checksum
 				}
+				result.ExtractedDir = t.TargetDir
 				results[index] = result
 				return
 			}
@@ -501,6 +566,7 @@ func (d *LibraryDownloader) executeParallelDownloads(tasks []DownloadTask) ([]Do
 			result.Success = true
 			result.LibraryPath = libPath
 			result.SHA256Sum = checksum
+			result.ExtractedDir = extractedDir
 			results[index] = result
 		}(i, task)
 	}
@@ -518,7 +584,9 @@ func (d *LibraryDownloader) downloadFile(url, filepath string) error {
 
 	req.Header.Set("User-Agent", d.userAgent)
 
-	resp, err := d.httpClient.Do(req)
+	// Use the HTTP client from go-github
+	httpClient := &http.Client{Timeout: downloadTimeout}
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to download file: %w", err)
 	}
@@ -555,7 +623,9 @@ func (d *LibraryDownloader) downloadFileWithChecksum(url, filepath string) (stri
 
 	req.Header.Set("User-Agent", d.userAgent)
 
-	resp, err := d.httpClient.Do(req)
+	// Use a fresh HTTP client for file downloads
+	httpClient := &http.Client{Timeout: downloadTimeout}
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to download file: %w", err)
 	}
@@ -804,4 +874,9 @@ func (d *LibraryDownloader) FindLibraryPathForPlatform(extractedDir, goos string
 // CleanCache removes old cached library files
 func (d *LibraryDownloader) CleanCache() error {
 	return os.RemoveAll(d.cacheDir)
+}
+
+// GetCacheDir returns the cache directory being used
+func (d *LibraryDownloader) GetCacheDir() string {
+	return d.cacheDir
 }

@@ -17,7 +17,7 @@ All libraries are configured with proper rpath settings to ensure correct depend
 Expected structure:
 ```
 libs/
-├── darwin_amd64/
+├── darwin_amd64_<version>/
 │   ├── libggml.dylib
 │   ├── libggml-base.dylib
 │   ├── libggml-blas.dylib
@@ -25,7 +25,7 @@ libs/
 │   ├── libggml-metal.dylib
 │   ├── libllama.dylib
 │   └── libmtmd.dylib
-├── darwin_arm64/
+├── darwin_arm64_<version>/
 │   ├── libggml.dylib
 │   ├── libggml-base.dylib
 │   ├── libggml-blas.dylib
@@ -33,7 +33,7 @@ libs/
 │   ├── libggml-metal.dylib
 │   ├── libllama.dylib
 │   └── libmtmd.dylib
-├── linux_amd64/
+├── linux_amd64_<version>/
 │   ├── libggml.so
 │   ├── libggml-base.so
 │   ├── libggml-blas.so
@@ -41,14 +41,14 @@ libs/
 │   ├── libggml-cuda.so
 │   ├── libllama.so
 │   └── libmtmd.so
-├── linux_arm64/
+├── linux_arm64_<version>/
 │   ├── libggml.so
 │   ├── libggml-base.so
 │   ├── libggml-blas.so
 │   ├── libggml-cpu.so
 │   ├── libllama.so
 │   └── libmtmd.so
-├── windows_amd64/
+├── windows_amd64_<version>/
 │   ├── ggml.dll
 │   ├── ggml-base.dll
 │   ├── ggml-blas.dll
@@ -56,7 +56,7 @@ libs/
 │   ├── ggml-cuda.dll
 │   ├── llama.dll
 │   └── mtmd.dll
-└── windows_arm64/
+└── windows_arm64_<version>/
     ├── ggml.dll
     ├── ggml-base.dll
     ├── ggml-blas.dll
@@ -65,5 +65,14 @@ libs/
     └── mtmd.dll
 ```
 
-These libraries will be embedded into the Go binary and extracted at runtime when needed.
-The build system will automatically populate this directory during the release process.
+These libraries are embedded into the Go binary (via `go:embed`) and extracted to the cache at runtime when needed. Use the tooling below to keep the directory in sync with the configured llama.cpp build:
+
+```bash
+# Download all supported platforms for the configured llama.cpp build and refresh ./libs
+make populate-libs
+
+# Or run the downloader directly
+go run ./cmd/gollama-download -download-all -version b6862 -copy-libs
+```
+
+Only one llama.cpp version is stored at a time; older directories are removed automatically during the sync.

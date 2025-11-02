@@ -2,7 +2,7 @@
 # Cross-platform Go bindings for llama.cpp using purego
 
 # Version information
-VERSION ?= 0.2.1
+VERSION ?= 0.2.2
 LLAMA_CPP_BUILD ?= b6862
 FULL_VERSION = v$(VERSION)-llamacpp.$(LLAMA_CPP_BUILD)
 

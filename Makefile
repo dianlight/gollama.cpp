@@ -79,7 +79,7 @@ build-examples: build
 .PHONY: test
 test: deps download-libs
 	@echo "Running tests (libraries will be downloaded automatically)"
-	$(GO) test -p 1 -failfast -timeout 120s -tags embedallowed_no -coverprofile=coverage.out -cover ./... && \
+	$(GO) test -v -p 1 -failfast -timeout 120s -tags embedallowed_no -coverprofile=coverage.out -cover ./... && \
 	$(GO) tool cover -func=coverage.out | grep total: | awk '{print "Total coverage: " $$3}'
 
 

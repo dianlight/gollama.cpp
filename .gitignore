@@ -12,4 +12,5 @@ examples/simple-chat-with-loader/simple-chat-with-loader
 examples/retrieval/retrieval
 examples/batched/batched
 examples/diffusion/diffusion
+examples/cache-directory-demo/cache-directory-demo
 coverage.out

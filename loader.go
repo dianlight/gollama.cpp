@@ -67,6 +67,11 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 
 		libPath, err := l.downloader.FindLibraryPathForPlatform(targetDir, runtime.GOOS)
 		if err == nil {
+			// Preload dependent libraries before loading main library
+			if err := l.preloadDependentLibraries(libPath); err != nil {
+				return fmt.Errorf("failed to preload dependent libraries: %w", err)
+			}
+
 			handle, err := l.loadSharedLibrary(libPath)
 			if err != nil {
 				return fmt.Errorf("failed to load embedded library %s: %w", libPath, err)
@@ -100,6 +105,11 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 	extractedDir := filepath.Join(l.downloader.cacheDir, strings.TrimSuffix(assetName, ".zip"))
 	libPath, err := l.downloader.FindLibraryPath(extractedDir)
 	if err == nil {
+		// Preload dependent libraries before loading main library
+		if err := l.preloadDependentLibraries(libPath); err != nil {
+			return fmt.Errorf("failed to preload dependent libraries: %w", err)
+		}
+
 		handle, err := l.loadSharedLibrary(libPath)
 		if err != nil {
 			return fmt.Errorf("failed to load library %s: %w", libPath, err)
@@ -122,6 +132,11 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 	libPath, err = l.downloader.FindLibraryPath(extractedDir)
 	if err != nil {
 		return fmt.Errorf("failed to find library file: %w", err)
+	}
+
+	// Preload dependent libraries on Unix-like systems to ensure correct library versions are used
+	if err := l.preloadDependentLibraries(libPath); err != nil {
+		return fmt.Errorf("failed to preload dependent libraries: %w", err)
 	}
 
 	// Load the library
@@ -228,6 +243,58 @@ func (l *LibraryLoader) IsLoaded() bool {
 // loadSharedLibrary loads a shared library using the appropriate method for the platform
 func (l *LibraryLoader) loadSharedLibrary(path string) (uintptr, error) {
 	return loadLibraryPlatform(path)
+}
+
+// preloadDependentLibraries preloads all dependent libraries from the same directory
+// on Unix-like systems to ensure correct library versions are used
+func (l *LibraryLoader) preloadDependentLibraries(mainLibPath string) error {
+	// Only preload on Unix-like systems where @rpath can cause version conflicts
+	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+		return nil
+	}
+
+	// Get the directory containing the main library
+	libDir := filepath.Dir(mainLibPath)
+
+	// Define the order of libraries to preload (based on dependency chain)
+	// These must be loaded in the correct order to satisfy dependencies
+	dependentLibs := []string{
+		"libggml-base.dylib",  // Base library - must be loaded first
+		"libggml-cpu.dylib",   // CPU implementation
+		"libggml-blas.dylib",  // BLAS implementation
+		"libggml-metal.dylib", // Metal implementation (macOS)
+		"libggml-rpc.dylib",   // RPC implementation
+		"libggml.dylib",       // Main GGML library
+		"libmtmd.dylib",       // MTMD library
+	}
+
+	// On Linux, use .so extension
+	if runtime.GOOS == "linux" {
+		for i, lib := range dependentLibs {
+			dependentLibs[i] = strings.Replace(lib, ".dylib", ".so", 1)
+		}
+	}
+
+	// Preload each dependent library
+	for _, libName := range dependentLibs {
+		libPath := filepath.Join(libDir, libName)
+
+		// Check if the library exists
+		if _, err := os.Stat(libPath); err != nil {
+			// Skip if library doesn't exist (some may be optional)
+			continue
+		}
+
+		// Preload the library using RTLD_NOW | RTLD_GLOBAL
+		_, err := l.loadSharedLibrary(libPath)
+		if err != nil {
+			// Log but don't fail - some libraries may be optional
+			// The main library load will fail if truly required libraries are missing
+			continue
+		}
+	}
+
+	return nil
 }
 
 // Global functions for backward compatibility

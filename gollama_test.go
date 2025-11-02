@@ -267,6 +267,8 @@ func TestTokenization(t *testing.T) {
 	// Note: ggml_backend_load_all_devices and ggml_backend_free_all_devices
 	// don't exist in the GGML API - removed for now
 	// If backend loading is needed, use Ggml_backend_load_all() instead
+	ggmlBackendLoadAll()
+	//defer ggmlBackendFree()
 
 	// Look for a test model in the models directory
 	modelPath := "./models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf"

@@ -231,12 +231,13 @@ var (
 	ggmlBackendBufferName     func(buffer GgmlBackendBuffer) *byte
 
 	// Backend functions
-	ggmlBackendFree     func(backend GgmlBackend)
-	ggmlBackendName     func(backend GgmlBackend) *byte
-	ggmlBackendIsCpu    func(backend GgmlBackend) bool
-	ggmlBackendSupports func(backend GgmlBackend, buft GgmlBackendBufferType) bool
-	ggmlBackendLoad     func(name *byte, search_path *byte) GgmlBackend
-	ggmlBackendLoadAll  func()
+	ggmlBackendFree            func(backend GgmlBackend)
+	ggmlBackendName            func(backend GgmlBackend) *byte
+	ggmlBackendIsCpu           func(backend GgmlBackend) bool
+	ggmlBackendSupports        func(backend GgmlBackend, buft GgmlBackendBufferType) bool
+	ggmlBackendLoad            func(name *byte, search_path *byte) GgmlBackend
+	ggmlBackendLoadAll         func()
+	ggmlBackendLoadAllFromPath func(path *byte)
 
 	// Tensor utility functions
 	ggmlNbytes       func(tensor GgmlTensor) uint64
@@ -304,6 +305,7 @@ func registerGgmlFunctions() error {
 	_ = tryRegisterLibFunc(&ggmlBackendSupports, libHandle, "ggml_backend_supports_buft")
 	_ = tryRegisterLibFunc(&ggmlBackendLoad, libHandle, "ggml_backend_load")
 	_ = tryRegisterLibFunc(&ggmlBackendLoadAll, libHandle, "ggml_backend_load_all")
+	_ = tryRegisterLibFunc(&ggmlBackendLoadAllFromPath, libHandle, "ggml_backend_load_all_from_path")
 
 	// Tensor utility functions
 	_ = tryRegisterLibFunc(&ggmlNbytes, libHandle, "ggml_nbytes")
@@ -577,6 +579,25 @@ func Ggml_backend_load_all() error {
 		return fmt.Errorf("ggml_backend_load_all function not available")
 	}
 	ggmlBackendLoadAll()
+	return nil
+}
+
+// Ggml_backend_load_all_from_path loads all available backends from a specific path
+func Ggml_backend_load_all_from_path(path string) error {
+	if err := ensureLoaded(); err != nil {
+		return err
+	}
+	if ggmlBackendLoadAllFromPath == nil {
+		return fmt.Errorf("ggml_backend_load_all_from_path function not available")
+	}
+
+	var pathPtr *byte
+	if path != "" {
+		pathBytes := append([]byte(path), 0)
+		pathPtr = &pathBytes[0]
+	}
+
+	ggmlBackendLoadAllFromPath(pathPtr)
 	return nil
 }
 

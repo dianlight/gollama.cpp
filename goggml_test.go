@@ -273,6 +273,28 @@ func TestGgmlBackendLoadAll(t *testing.T) {
 	}
 }
 
+// TestGgmlBackendLoadAllFromPath tests loading all backends from a specific path
+func TestGgmlBackendLoadAllFromPath(t *testing.T) {
+	// Initialize backend
+	if err := Backend_init(); err != nil {
+		t.Fatalf("Failed to initialize backend: %v", err)
+	}
+	defer Backend_free()
+
+	// Try loading all backends from current directory
+	err := Ggml_backend_load_all_from_path(".")
+	if err != nil {
+		t.Logf("ggml_backend_load_all_from_path not available: %v", err)
+		return
+	}
+
+	// If successful, try to enumerate devices
+	count, err := Ggml_backend_dev_count()
+	if err == nil {
+		t.Logf("Backend device count after load_all_from_path: %d", count)
+	}
+}
+
 // BenchmarkGgmlTypeSize benchmarks the type size function
 func BenchmarkGgmlTypeSize(b *testing.B) {
 	// Initialize backend

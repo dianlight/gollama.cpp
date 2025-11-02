@@ -52,9 +52,10 @@ func TestLibraryLoader_LoadSharedLibrary(t *testing.T) {
 			t.Skip("Skipping Windows test on non-Windows platform")
 		}
 
+		// Test with invalid path (should fail since test.dll doesn't exist)
 		_, err := loader.loadSharedLibrary("test.dll")
-		if err != nil {
-			t.Error("Unexpected error for Windows platform:", err)
+		if err == nil {
+			t.Error("Expected error for non-existent DLL, but got none")
 		}
 	})
 

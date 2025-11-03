@@ -164,6 +164,7 @@ type GgmlBackendBuffer uintptr
 type GgmlBackendBufferType uintptr
 type GgmlBackendDevice uintptr
 type GgmlBackendReg uintptr
+type GgmlGuid [16]byte // ggml_guid_t
 
 // GGML tensor type
 type GgmlTensor uintptr
@@ -206,6 +207,25 @@ const (
 	GGML_BACKEND_DEVICE_TYPE_ACCEL GgmlBackendDevType = 3
 )
 
+// GGML backend device capabilities
+type GgmlBackendDevCaps struct {
+	Async             bool // asynchronous operations
+	HostBuffer        bool // pinned host buffer
+	BufferFromHostPtr bool // creating buffers from host ptr
+	Events            bool // event synchronization
+}
+
+// GGML backend device properties
+type GgmlBackendDevProps struct {
+	Name        string             // device name
+	Description string             // device description
+	MemoryFree  uint64             // device free memory in bytes
+	MemoryTotal uint64             // device total memory in bytes
+	Type        GgmlBackendDevType // device type
+	DeviceID    string             // device id (e.g., PCI bus id)
+	Caps        GgmlBackendDevCaps // device capabilities
+}
+
 // Function pointers for GGML functions
 var (
 	// Type size functions
@@ -215,13 +235,21 @@ var (
 	ggmlIsQuantized func(typ GgmlType) bool
 
 	// Backend device functions
-	ggmlBackendDevCount       func() uint64
-	ggmlBackendDevGet         func(index uint64) GgmlBackendDevice
-	ggmlBackendDevByType      func(typ int32) GgmlBackendDevice
-	ggmlBackendDevInit        func(device GgmlBackendDevice, params uintptr) GgmlBackend
-	ggmlBackendDevName        func(device GgmlBackendDevice) *byte
-	ggmlBackendDevDescription func(device GgmlBackendDevice) *byte
-	ggmlBackendDevMemory      func(device GgmlBackendDevice, free *uint64, total *uint64)
+	ggmlBackendDevCount             func() uint64
+	ggmlBackendDevGet               func(index uint64) GgmlBackendDevice
+	ggmlBackendDevByName            func(name *byte) GgmlBackendDevice
+	ggmlBackendDevByType            func(typ int32) GgmlBackendDevice
+	ggmlBackendDevInit              func(device GgmlBackendDevice, params *byte) GgmlBackend
+	ggmlBackendDevName              func(device GgmlBackendDevice) *byte
+	ggmlBackendDevDescription       func(device GgmlBackendDevice) *byte
+	ggmlBackendDevMemory            func(device GgmlBackendDevice, free *uint64, total *uint64)
+	ggmlBackendDevType              func(device GgmlBackendDevice) int32
+	ggmlBackendDevGetProps          func(device GgmlBackendDevice, props unsafe.Pointer)
+	ggmlBackendDevBackendReg        func(device GgmlBackendDevice) GgmlBackendReg
+	ggmlBackendDevBufferFromHostPtr func(device GgmlBackendDevice, ptr unsafe.Pointer, size uint64, maxTensorSize uint64) GgmlBackendBuffer
+	ggmlBackendDevSupportsOp        func(device GgmlBackendDevice, op GgmlTensor) bool
+	ggmlBackendDevSupportsBuft      func(device GgmlBackendDevice, buft GgmlBackendBufferType) bool
+	ggmlBackendDevOffloadOp         func(device GgmlBackendDevice, op GgmlTensor) bool
 
 	// Backend buffer type functions
 	ggmlBackendDevBufferType     func(device GgmlBackendDevice) GgmlBackendBufferType
@@ -229,25 +257,54 @@ var (
 	ggmlBackendCpuBufferType     func() GgmlBackendBufferType
 	ggmlBackendBuftName          func(buft GgmlBackendBufferType) *byte
 	ggmlBackendBuftAllocBuffer   func(buft GgmlBackendBufferType, size uint64) GgmlBackendBuffer
+	ggmlBackendBuftGetAlignment  func(buft GgmlBackendBufferType) uint64
+	ggmlBackendBuftGetMaxSize    func(buft GgmlBackendBufferType) uint64
+	ggmlBackendBuftGetAllocSize  func(buft GgmlBackendBufferType, tensor GgmlTensor) uint64
 	ggmlBackendBuftIsHost        func(buft GgmlBackendBufferType) bool
+	ggmlBackendBuftGetDevice     func(buft GgmlBackendBufferType) GgmlBackendDevice
 
 	// Backend buffer functions
-	ggmlBackendBufferFree     func(buffer GgmlBackendBuffer)
-	ggmlBackendBufferGetBase  func(buffer GgmlBackendBuffer) unsafe.Pointer
-	ggmlBackendBufferGetSize  func(buffer GgmlBackendBuffer) uint64
-	ggmlBackendBufferClear    func(buffer GgmlBackendBuffer, value uint8)
-	ggmlBackendBufferIsHost   func(buffer GgmlBackendBuffer) bool
-	ggmlBackendBufferSetUsage func(buffer GgmlBackendBuffer, usage int32)
-	ggmlBackendBufferGetType  func(buffer GgmlBackendBuffer) GgmlBackendBufferType
-	ggmlBackendBufferName     func(buffer GgmlBackendBuffer) *byte
+	ggmlBackendBufferFree         func(buffer GgmlBackendBuffer)
+	ggmlBackendBufferGetBase      func(buffer GgmlBackendBuffer) unsafe.Pointer
+	ggmlBackendBufferGetSize      func(buffer GgmlBackendBuffer) uint64
+	ggmlBackendBufferInitTensor   func(buffer GgmlBackendBuffer, tensor GgmlTensor) int32 // enum ggml_status
+	ggmlBackendBufferGetAlignment func(buffer GgmlBackendBuffer) uint64
+	ggmlBackendBufferGetMaxSize   func(buffer GgmlBackendBuffer) uint64
+	ggmlBackendBufferGetAllocSize func(buffer GgmlBackendBuffer, tensor GgmlTensor) uint64
+	ggmlBackendBufferClear        func(buffer GgmlBackendBuffer, value uint8)
+	ggmlBackendBufferIsHost       func(buffer GgmlBackendBuffer) bool
+	ggmlBackendBufferSetUsage     func(buffer GgmlBackendBuffer, usage int32)
+	ggmlBackendBufferGetUsage     func(buffer GgmlBackendBuffer) int32
+	ggmlBackendBufferGetType      func(buffer GgmlBackendBuffer) GgmlBackendBufferType
+	ggmlBackendBufferName         func(buffer GgmlBackendBuffer) *byte
+	ggmlBackendBufferReset        func(buffer GgmlBackendBuffer)
 
 	// Backend functions
-	ggmlBackendFree            func(backend GgmlBackend)
-	ggmlBackendName            func(backend GgmlBackend) *byte
-	ggmlBackendSupports        func(backend GgmlBackend, buft GgmlBackendBufferType) bool
-	ggmlBackendInitBest        func() GgmlBackend
-	ggmlBackendInitByName      func(name *byte, params *byte) GgmlBackend
-	ggmlBackendInitByType      func(typ int32, params *byte) GgmlBackend
+	ggmlBackendGuid                 func(backend GgmlBackend, guid *GgmlGuid)
+	ggmlBackendFree                 func(backend GgmlBackend)
+	ggmlBackendName                 func(backend GgmlBackend) *byte
+	ggmlBackendGetDefaultBufferType func(backend GgmlBackend) GgmlBackendBufferType
+	ggmlBackendAllocBuffer          func(backend GgmlBackend, size uint64) GgmlBackendBuffer
+	ggmlBackendGetAlignment         func(backend GgmlBackend) uint64
+	ggmlBackendGetMaxSize           func(backend GgmlBackend) uint64
+	ggmlBackendSupports             func(backend GgmlBackend, buft GgmlBackendBufferType) bool
+	ggmlBackendGetDevice            func(backend GgmlBackend) GgmlBackendDevice
+	ggmlBackendInitBest             func() GgmlBackend
+	ggmlBackendInitByName           func(name *byte, params *byte) GgmlBackend
+	ggmlBackendInitByType           func(typ int32, params *byte) GgmlBackend
+
+	// Backend registry functions
+	ggmlBackendRegName           func(reg GgmlBackendReg) *byte
+	ggmlBackendRegDevCount       func(reg GgmlBackendReg) uint64
+	ggmlBackendRegDevGet         func(reg GgmlBackendReg, index uint64) GgmlBackendDevice
+	ggmlBackendRegGetProcAddress func(reg GgmlBackendReg, name *byte) unsafe.Pointer
+	ggmlBackendRegister          func(reg GgmlBackendReg)
+	ggmlBackendDeviceRegister    func(device GgmlBackendDevice)
+	ggmlBackendRegCount          func() uint64
+	ggmlBackendRegGet            func(index uint64) GgmlBackendReg
+	ggmlBackendRegByName         func(name *byte) GgmlBackendReg
+
+	// Backend loading functions
 	ggmlBackendLoad            func(path *byte) GgmlBackendReg
 	ggmlBackendUnload          func(reg GgmlBackendReg)
 	ggmlBackendLoadAll         func()
@@ -303,10 +360,40 @@ func registerGgmlFunctions() error {
 	_ = tryRegisterLibFunc(&ggmlBackendBufferGetType, libHandle, "ggml_backend_buffer_get_type")
 	_ = tryRegisterLibFunc(&ggmlBackendBufferName, libHandle, "ggml_backend_buffer_name")
 
+	// Backend device functions (extended)
+	_ = tryRegisterLibFunc(&ggmlBackendDevByName, libHandle, "ggml_backend_dev_by_name")
+	_ = tryRegisterLibFunc(&ggmlBackendDevType, libHandle, "ggml_backend_dev_type")
+	_ = tryRegisterLibFunc(&ggmlBackendDevGetProps, libHandle, "ggml_backend_dev_get_props")
+	_ = tryRegisterLibFunc(&ggmlBackendDevBackendReg, libHandle, "ggml_backend_dev_backend_reg")
+	_ = tryRegisterLibFunc(&ggmlBackendDevBufferFromHostPtr, libHandle, "ggml_backend_dev_buffer_from_host_ptr")
+	_ = tryRegisterLibFunc(&ggmlBackendDevSupportsOp, libHandle, "ggml_backend_dev_supports_op")
+	_ = tryRegisterLibFunc(&ggmlBackendDevSupportsBuft, libHandle, "ggml_backend_dev_supports_buft")
+	_ = tryRegisterLibFunc(&ggmlBackendDevOffloadOp, libHandle, "ggml_backend_dev_offload_op")
+
+	// Backend buffer type functions (extended)
+	_ = tryRegisterLibFunc(&ggmlBackendBuftGetAlignment, libHandle, "ggml_backend_buft_get_alignment")
+	_ = tryRegisterLibFunc(&ggmlBackendBuftGetMaxSize, libHandle, "ggml_backend_buft_get_max_size")
+	_ = tryRegisterLibFunc(&ggmlBackendBuftGetAllocSize, libHandle, "ggml_backend_buft_get_alloc_size")
+	_ = tryRegisterLibFunc(&ggmlBackendBuftGetDevice, libHandle, "ggml_backend_buft_get_device")
+
+	// Backend buffer functions (extended)
+	_ = tryRegisterLibFunc(&ggmlBackendBufferInitTensor, libHandle, "ggml_backend_buffer_init_tensor")
+	_ = tryRegisterLibFunc(&ggmlBackendBufferGetAlignment, libHandle, "ggml_backend_buffer_get_alignment")
+	_ = tryRegisterLibFunc(&ggmlBackendBufferGetMaxSize, libHandle, "ggml_backend_buffer_get_max_size")
+	_ = tryRegisterLibFunc(&ggmlBackendBufferGetAllocSize, libHandle, "ggml_backend_buffer_get_alloc_size")
+	_ = tryRegisterLibFunc(&ggmlBackendBufferGetUsage, libHandle, "ggml_backend_buffer_get_usage")
+	_ = tryRegisterLibFunc(&ggmlBackendBufferReset, libHandle, "ggml_backend_buffer_reset")
+
 	// Backend functions
+	_ = tryRegisterLibFunc(&ggmlBackendGuid, libHandle, "ggml_backend_guid")
 	_ = tryRegisterLibFunc(&ggmlBackendFree, libHandle, "ggml_backend_free")
 	_ = tryRegisterLibFunc(&ggmlBackendName, libHandle, "ggml_backend_name")
 	_ = tryRegisterLibFunc(&ggmlBackendSupports, libHandle, "ggml_backend_supports_buft")
+	_ = tryRegisterLibFunc(&ggmlBackendGetDefaultBufferType, libHandle, "ggml_backend_get_default_buffer_type")
+	_ = tryRegisterLibFunc(&ggmlBackendAllocBuffer, libHandle, "ggml_backend_alloc_buffer")
+	_ = tryRegisterLibFunc(&ggmlBackendGetAlignment, libHandle, "ggml_backend_get_alignment")
+	_ = tryRegisterLibFunc(&ggmlBackendGetMaxSize, libHandle, "ggml_backend_get_max_size")
+	_ = tryRegisterLibFunc(&ggmlBackendGetDevice, libHandle, "ggml_backend_get_device")
 	_ = tryRegisterLibFunc(&ggmlBackendInitBest, libHandle, "ggml_backend_init_best")
 	_ = tryRegisterLibFunc(&ggmlBackendInitByName, libHandle, "ggml_backend_init_by_name")
 	_ = tryRegisterLibFunc(&ggmlBackendInitByType, libHandle, "ggml_backend_init_by_type")
@@ -314,6 +401,17 @@ func registerGgmlFunctions() error {
 	_ = tryRegisterLibFunc(&ggmlBackendUnload, libHandle, "ggml_backend_unload")
 	_ = tryRegisterLibFunc(&ggmlBackendLoadAll, libHandle, "ggml_backend_load_all")
 	_ = tryRegisterLibFunc(&ggmlBackendLoadAllFromPath, libHandle, "ggml_backend_load_all_from_path")
+
+	// Backend registry functions
+	_ = tryRegisterLibFunc(&ggmlBackendRegName, libHandle, "ggml_backend_reg_name")
+	_ = tryRegisterLibFunc(&ggmlBackendRegDevCount, libHandle, "ggml_backend_reg_dev_count")
+	_ = tryRegisterLibFunc(&ggmlBackendRegDevGet, libHandle, "ggml_backend_reg_dev_get")
+	_ = tryRegisterLibFunc(&ggmlBackendRegGetProcAddress, libHandle, "ggml_backend_reg_get_proc_address")
+	_ = tryRegisterLibFunc(&ggmlBackendRegister, libHandle, "ggml_backend_register")
+	_ = tryRegisterLibFunc(&ggmlBackendDeviceRegister, libHandle, "ggml_backend_device_register")
+	_ = tryRegisterLibFunc(&ggmlBackendRegCount, libHandle, "ggml_backend_reg_count")
+	_ = tryRegisterLibFunc(&ggmlBackendRegGet, libHandle, "ggml_backend_reg_get")
+	_ = tryRegisterLibFunc(&ggmlBackendRegByName, libHandle, "ggml_backend_reg_by_name")
 
 	// Tensor utility functions
 	_ = tryRegisterLibFunc(&ggmlNbytes, libHandle, "ggml_nbytes")

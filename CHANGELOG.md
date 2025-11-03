@@ -18,10 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Graceful handling of optional GGML functions (may not be exported in all builds)
   - Helper function `tryRegisterLibFunc()` for optional function registration
   - Comprehensive test suite (`goggml_test.go`) with type tests, backend tests, and benchmarks
+- **Comprehensive GGML Backend API** synchronized with `ggml-backend.h`:
+  - **Backend Device Functions** (8 new): `ggml_backend_dev_by_name`, `ggml_backend_dev_type`, `ggml_backend_dev_get_props`, `ggml_backend_dev_backend_reg`, `ggml_backend_dev_buffer_from_host_ptr`, `ggml_backend_dev_supports_op`, `ggml_backend_dev_supports_buft`, `ggml_backend_dev_offload_op`
+  - **Backend Registry Functions** (9 new): `ggml_backend_reg_name`, `ggml_backend_reg_dev_count`, `ggml_backend_reg_dev_get`, `ggml_backend_reg_get_proc_address`, `ggml_backend_register`, `ggml_backend_device_register`, `ggml_backend_reg_count`, `ggml_backend_reg_get`, `ggml_backend_reg_by_name`
+  - **Backend Buffer Type Functions** (4 new): `ggml_backend_buft_get_alignment`, `ggml_backend_buft_get_max_size`, `ggml_backend_buft_get_alloc_size`, `ggml_backend_buft_get_device`
+  - **Backend Buffer Functions** (6 new): `ggml_backend_buffer_init_tensor`, `ggml_backend_buffer_get_alignment`, `ggml_backend_buffer_get_max_size`, `ggml_backend_buffer_get_alloc_size`, `ggml_backend_buffer_get_usage`, `ggml_backend_buffer_reset`
+  - **Backend Functions** (6 new): `ggml_backend_guid`, `ggml_backend_get_default_buffer_type`, `ggml_backend_alloc_buffer`, `ggml_backend_get_alignment`, `ggml_backend_get_max_size`, `ggml_backend_get_device`
+  - **New Types**: `GgmlGuid` (16-byte backend identifier), `GgmlBackendDevCaps` (device capabilities), `GgmlBackendDevProps` (device properties)
+  - **Device Type Constants**: `GGML_BACKEND_DEVICE_TYPE_CPU`, `GGML_BACKEND_DEVICE_TYPE_GPU`, `GGML_BACKEND_DEVICE_TYPE_IGPU`, `GGML_BACKEND_DEVICE_TYPE_ACCEL`
 
 ### Changed
 
 ### Fixed
+
+- **GGML Backend Signatures**: Fixed `Ggml_backend_load()` to accept only one parameter (path) instead of two, matching the actual GGML C API. Function now returns `GgmlBackendReg` instead of `GgmlBackend`.
+- **Function Parameter Validation**: Verified all ~50 GGML backend function signatures against official `ggml-backend.h` to ensure correct parameter types and counts.
 
 ### Removed
 

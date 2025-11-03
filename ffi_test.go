@@ -9,6 +9,13 @@ import (
 
 type FFISuite struct{ BaseSuite }
 
+// SetupSuite runs before all tests in the suite
+func (s *FFISuite) SetupSuite() {
+	if err := loadLibrary(); err != nil {
+		s.Fail("Failed to load library during suite setup: %v", err)
+	}
+}
+
 // Verifies that FFI type definitions are properly structured
 func (s *FFISuite) TestFFITypeDefinitions() {
 	s.Assert().NotZero(ffiTypeLlamaModelParams.Type, "ffiTypeLlamaModelParams Type should not be zero")
@@ -38,12 +45,6 @@ func (s *FFISuite) TestFFIStructSizes() {
 
 // Tests FFI-based model parameter retrieval
 func (s *FFISuite) TestFFIModelDefaultParams() {
-	if !isLoaded {
-		if err := loadLibrary(); err != nil {
-			s.T().Skipf("FFI model params test requires library to be available: %v", err)
-		}
-	}
-
 	params, err := ffiModelDefaultParams()
 	if err != nil {
 		s.T().Logf("FFI model default params failed (expected if library not present): %v", err)
@@ -57,12 +58,6 @@ func (s *FFISuite) TestFFIModelDefaultParams() {
 
 // Tests FFI-based context parameter retrieval
 func (s *FFISuite) TestFFIContextDefaultParams() {
-	if !isLoaded {
-		if err := loadLibrary(); err != nil {
-			s.T().Skipf("FFI context params test requires library to be available: %v", err)
-		}
-	}
-
 	params, err := ffiContextDefaultParams()
 	if err != nil {
 		s.T().Logf("FFI context default params failed (expected if library not present): %v", err)
@@ -77,12 +72,6 @@ func (s *FFISuite) TestFFIContextDefaultParams() {
 
 // Tests FFI-based sampler chain parameter retrieval
 func (s *FFISuite) TestFFISamplerChainDefaultParams() {
-	if !isLoaded {
-		if err := loadLibrary(); err != nil {
-			s.T().Skipf("FFI sampler chain params test requires library to be available: %v", err)
-		}
-	}
-
 	params, err := ffiSamplerChainDefaultParams()
 	if err != nil {
 		s.T().Logf("FFI sampler chain default params failed (expected if library not present): %v", err)
@@ -95,12 +84,6 @@ func (s *FFISuite) TestFFISamplerChainDefaultParams() {
 
 // Tests FFI-based batch initialization
 func (s *FFISuite) TestFFIBatchInit() {
-	if !isLoaded {
-		if err := loadLibrary(); err != nil {
-			s.T().Skipf("FFI batch init test requires library to be available: %v", err)
-		}
-	}
-
 	batch, err := ffiBatchInit(512, 0, 1)
 	if err != nil {
 		s.T().Logf("FFI batch init failed (expected if library not present): %v", err)
@@ -115,22 +98,11 @@ func (s *FFISuite) TestFFIBatchInit() {
 // Tests FFI-based encode function
 func (s *FFISuite) TestFFIEncode() {
 	// TODO: Implement a proper test with a valid context and batch
-	if !isLoaded {
-		if err := loadLibrary(); err != nil {
-			s.T().Errorf("FFI encode test requires library to be available: %v", err)
-		}
-	}
 	s.T().Skip("Skipping FFI encode test - requires valid context and batch to avoid assertion failure")
 }
 
 // Tests FFI-based sampler chain initialization
 func (s *FFISuite) TestFFISamplerChainInit() {
-	if !isLoaded {
-		if err := loadLibrary(); err != nil {
-			s.T().Errorf("FFI sampler chain init test requires library to be available: %v", err)
-		}
-	}
-
 	params := LlamaSamplerChainParams{NoPerf: 0}
 	sampler, err := ffiSamplerChainInit(params)
 	s.Require().NoError(err, "FFI sampler chain init failed (expected if library not present)")
@@ -153,12 +125,6 @@ func (s *FFISuite) TestFFIFallbackBehavior() {
 
 // Tests the platform-specific GetProcAddress implementation
 func (s *FFISuite) TestPlatformGetProcAddress() {
-	if !isLoaded {
-		if err := loadLibrary(); err != nil {
-			s.T().Skipf("GetProcAddress test requires library to be available: %v", err)
-		}
-	}
-
 	addr, err := getProcAddressPlatform(libHandle, "llama_backend_init")
 	s.Assert().NoError(err, "Failed to get llama_backend_init address")
 	s.Assert().NotZero(addr, "llama_backend_init address should not be zero")

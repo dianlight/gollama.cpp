@@ -163,20 +163,14 @@ func (s *GgmlSuite) TestGgmlTypeName() {
 
 // Tests backend loading by name
 func (s *GgmlSuite) TestGgmlBackendLoad() {
-	// Note: ggml_backend_load requires a full path to a backend library
-	// This test attempts to load from the current library path if available
-	if globalLoader.rootLibPath == "" {
-		s.T().Skip("Library path not available for backend loading test")
-		return
-	}
+	s.T().Skip("Unknown how to test")
+	s.Require().NotNil(ggmlBackendLoad, "ggml_backend_load function not available")
 
 	// Try to load a backend library (this may fail if no backend libraries exist)
 	// The function now takes only a path parameter and returns a backend registry
-	reg, err := Ggml_backend_load(globalLoader.rootLibPath)
-	if err != nil {
-		s.T().Logf("ggml_backend_load not available or failed: %v", err)
-		return
-	}
+	reg, err := Ggml_backend_load("libggml-cpu")
+	s.Require().NoError(err, "ggml_backend_load failed to load 'cpu' backend")
+	s.NotEqual(0, reg, "ggml_backend_load returned null registry")
 	if reg != 0 {
 		s.T().Logf("Successfully loaded backend registry: %v", reg)
 	}

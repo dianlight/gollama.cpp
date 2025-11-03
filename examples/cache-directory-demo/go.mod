@@ -1,6 +1,6 @@
 module github.com/dianlight/gollama.cpp/examples/cache-directory-demo
 
-go 1.21
+go 1.21.0
 
 replace github.com/dianlight/gollama.cpp => ../..
 

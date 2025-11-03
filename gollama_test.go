@@ -176,7 +176,7 @@ func (s *GollamaSuite) TestTokenization() {
 	}
 	defer Backend_free()
 	if err := Ggml_backend_load_all(); err != nil {
-		s.T().Logf("ggml_backend_load not available or failed: %v", err)
+		s.T().Fatalf("ggml_backend_load not available or failed: %v", err)
 		return
 	}
 	modelPath := "./models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf"

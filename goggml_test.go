@@ -99,7 +99,7 @@ func (s *GgmlSuite) TestGgmlBackendDevCount() {
 	defer Backend_free()
 
 	if err := Ggml_backend_load_all(); err != nil {
-		s.T().Logf("ggml_backend_load not available or failed: %v", err)
+		s.T().Fatalf("ggml_backend_load not available or failed: %v", err)
 		return
 	}
 
@@ -120,7 +120,7 @@ func (s *GgmlSuite) TestGgmlBackendDevInfo() {
 	defer Backend_free()
 
 	if err := Ggml_backend_load_all(); err != nil {
-		s.T().Logf("ggml_backend_load not available or failed: %v", err)
+		s.T().Fatalf("ggml_backend_load not available or failed: %v", err)
 		return
 	}
 
@@ -191,15 +191,22 @@ func (s *GgmlSuite) TestGgmlBackendLoad() {
 	}
 	defer Backend_free()
 
-	backend, err := Ggml_backend_load("CPU", "")
+	// Note: ggml_backend_load requires a full path to a backend library
+	// This test attempts to load from the current library path if available
+	if globalLoader.rootLibPath == "" {
+		s.T().Skip("Library path not available for backend loading test")
+		return
+	}
+
+	// Try to load a backend library (this may fail if no backend libraries exist)
+	// The function now takes only a path parameter and returns a backend registry
+	reg, err := Ggml_backend_load(globalLoader.rootLibPath)
 	if err != nil {
 		s.T().Logf("ggml_backend_load not available or failed: %v", err)
 		return
 	}
-	if backend != 0 {
-		if name, err := Ggml_backend_name(backend); err == nil {
-			s.T().Logf("Loaded backend: %s", name)
-		}
+	if reg != 0 {
+		s.T().Logf("Successfully loaded backend registry: %v", reg)
 	}
 }
 
@@ -211,11 +218,24 @@ func (s *GgmlSuite) TestGgmlBackendLoadAll() {
 	defer Backend_free()
 
 	if err := Ggml_backend_load_all(); err != nil {
-		s.T().Logf("ggml_backend_load_all not available: %v", err)
+		s.T().Fatalf("ggml_backend_load_all not available: %v", err)
 		return
 	}
 	if count, err := Ggml_backend_dev_count(); err == nil {
 		s.T().Logf("Backend device count after load_all: %d", count)
+		for i := uint64(0); i < count; i++ {
+			device, err := Ggml_backend_dev_get(i)
+			if err != nil {
+				s.T().Logf("Failed to get backend device %d: %v", i, err)
+				continue
+			}
+			name, err := Ggml_backend_dev_name(device)
+			if err != nil {
+				s.T().Logf("Failed to get backend device name for %d: %v", i, err)
+				continue
+			}
+			s.T().Logf("Device %d: %s", i, name)
+		}
 	}
 }
 
@@ -232,6 +252,80 @@ func (s *GgmlSuite) TestGgmlBackendLoadAllFromPath() {
 	}
 	if count, err := Ggml_backend_dev_count(); err == nil {
 		s.T().Logf("Backend device count after load_all_from_path: %d", count)
+	}
+}
+
+// Tests initializing the best available backend
+func (s *GgmlSuite) TestGgmlBackendInitBest() {
+	if err := Backend_init(); err != nil {
+		s.T().Fatalf("Failed to initialize backend: %v", err)
+	}
+	defer Backend_free()
+
+	backend, err := Ggml_backend_init_best()
+	if err != nil {
+		s.T().Logf("ggml_backend_init_best not available or failed: %v", err)
+		return
+	}
+
+	if backend != 0 {
+		if name, err := Ggml_backend_name(backend); err == nil {
+			s.T().Logf("Initialized best backend: %s", name)
+		}
+		// Clean up
+		if err := Ggml_backend_free(backend); err != nil {
+			s.T().Logf("Failed to free backend: %v", err)
+		}
+	}
+}
+
+// Tests initializing a backend by name
+func (s *GgmlSuite) TestGgmlBackendInitByName() {
+	if err := Backend_init(); err != nil {
+		s.T().Fatalf("Failed to initialize backend: %v", err)
+	}
+	defer Backend_free()
+
+	// Try to initialize CPU backend by name
+	backend, err := Ggml_backend_init_by_name("CPU", "")
+	if err != nil {
+		s.T().Logf("ggml_backend_init_by_name not available or failed: %v", err)
+		return
+	}
+
+	if backend != 0 {
+		if name, err := Ggml_backend_name(backend); err == nil {
+			s.T().Logf("Initialized backend by name: %s", name)
+		}
+		// Clean up
+		if err := Ggml_backend_free(backend); err != nil {
+			s.T().Logf("Failed to free backend: %v", err)
+		}
+	}
+}
+
+// Tests initializing a backend by type
+func (s *GgmlSuite) TestGgmlBackendInitByType() {
+	if err := Backend_init(); err != nil {
+		s.T().Fatalf("Failed to initialize backend: %v", err)
+	}
+	defer Backend_free()
+
+	// Try to initialize CPU backend by type
+	backend, err := Ggml_backend_init_by_type(GGML_BACKEND_DEVICE_TYPE_CPU, "")
+	if err != nil {
+		s.T().Logf("ggml_backend_init_by_type not available or failed: %v", err)
+		return
+	}
+
+	if backend != 0 {
+		if name, err := Ggml_backend_name(backend); err == nil {
+			s.T().Logf("Initialized backend by type: %s", name)
+		}
+		// Clean up
+		if err := Ggml_backend_free(backend); err != nil {
+			s.T().Logf("Failed to free backend: %v", err)
+		}
 	}
 }
 

@@ -196,6 +196,16 @@ const (
 	// Add more operations as needed
 )
 
+// GGML backend device types
+type GgmlBackendDevType int32
+
+const (
+	GGML_BACKEND_DEVICE_TYPE_CPU   GgmlBackendDevType = 0
+	GGML_BACKEND_DEVICE_TYPE_GPU   GgmlBackendDevType = 1
+	GGML_BACKEND_DEVICE_TYPE_IGPU  GgmlBackendDevType = 2
+	GGML_BACKEND_DEVICE_TYPE_ACCEL GgmlBackendDevType = 3
+)
+
 // Function pointers for GGML functions
 var (
 	// Type size functions
@@ -235,7 +245,11 @@ var (
 	ggmlBackendFree            func(backend GgmlBackend)
 	ggmlBackendName            func(backend GgmlBackend) *byte
 	ggmlBackendSupports        func(backend GgmlBackend, buft GgmlBackendBufferType) bool
-	ggmlBackendLoad            func(name *byte, search_path *byte) GgmlBackend
+	ggmlBackendInitBest        func() GgmlBackend
+	ggmlBackendInitByName      func(name *byte, params *byte) GgmlBackend
+	ggmlBackendInitByType      func(typ int32, params *byte) GgmlBackend
+	ggmlBackendLoad            func(path *byte) GgmlBackendReg
+	ggmlBackendUnload          func(reg GgmlBackendReg)
 	ggmlBackendLoadAll         func()
 	ggmlBackendLoadAllFromPath func(path *byte)
 
@@ -293,7 +307,11 @@ func registerGgmlFunctions() error {
 	_ = tryRegisterLibFunc(&ggmlBackendFree, libHandle, "ggml_backend_free")
 	_ = tryRegisterLibFunc(&ggmlBackendName, libHandle, "ggml_backend_name")
 	_ = tryRegisterLibFunc(&ggmlBackendSupports, libHandle, "ggml_backend_supports_buft")
+	_ = tryRegisterLibFunc(&ggmlBackendInitBest, libHandle, "ggml_backend_init_best")
+	_ = tryRegisterLibFunc(&ggmlBackendInitByName, libHandle, "ggml_backend_init_by_name")
+	_ = tryRegisterLibFunc(&ggmlBackendInitByType, libHandle, "ggml_backend_init_by_type")
 	_ = tryRegisterLibFunc(&ggmlBackendLoad, libHandle, "ggml_backend_load")
+	_ = tryRegisterLibFunc(&ggmlBackendUnload, libHandle, "ggml_backend_unload")
 	_ = tryRegisterLibFunc(&ggmlBackendLoadAll, libHandle, "ggml_backend_load_all")
 	_ = tryRegisterLibFunc(&ggmlBackendLoadAllFromPath, libHandle, "ggml_backend_load_all_from_path")
 
@@ -531,8 +549,68 @@ func Ggml_type_name(typ GgmlType) (string, error) {
 	return bytePointerToString(namePtr), nil
 }
 
-// Ggml_backend_load dynamically loads a backend by name from a search path
-func Ggml_backend_load(name string, searchPath string) (GgmlBackend, error) {
+// Ggml_backend_init_best initializes the best available backend (GPU or CPU)
+func Ggml_backend_init_best() (GgmlBackend, error) {
+	if err := ensureLoaded(); err != nil {
+		return 0, err
+	}
+	if ggmlBackendInitBest == nil {
+		return 0, fmt.Errorf("ggml_backend_init_best function not available")
+	}
+	backend := ggmlBackendInitBest()
+	if backend == 0 {
+		return 0, fmt.Errorf("failed to initialize best backend")
+	}
+	return backend, nil
+}
+
+// Ggml_backend_init_by_name initializes a backend by name with optional parameters
+func Ggml_backend_init_by_name(name string, params string) (GgmlBackend, error) {
+	if err := ensureLoaded(); err != nil {
+		return 0, err
+	}
+	if ggmlBackendInitByName == nil {
+		return 0, fmt.Errorf("ggml_backend_init_by_name function not available")
+	}
+
+	nameBytes := append([]byte(name), 0)
+	var paramsPtr *byte
+	if params != "" {
+		paramsBytes := append([]byte(params), 0)
+		paramsPtr = &paramsBytes[0]
+	}
+
+	backend := ggmlBackendInitByName(&nameBytes[0], paramsPtr)
+	if backend == 0 {
+		return 0, fmt.Errorf("failed to initialize backend by name: %s", name)
+	}
+	return backend, nil
+}
+
+// Ggml_backend_init_by_type initializes a backend by device type with optional parameters
+func Ggml_backend_init_by_type(deviceType GgmlBackendDevType, params string) (GgmlBackend, error) {
+	if err := ensureLoaded(); err != nil {
+		return 0, err
+	}
+	if ggmlBackendInitByType == nil {
+		return 0, fmt.Errorf("ggml_backend_init_by_type function not available")
+	}
+
+	var paramsPtr *byte
+	if params != "" {
+		paramsBytes := append([]byte(params), 0)
+		paramsPtr = &paramsBytes[0]
+	}
+
+	backend := ggmlBackendInitByType(int32(deviceType), paramsPtr)
+	if backend == 0 {
+		return 0, fmt.Errorf("failed to initialize backend by type: %d", deviceType)
+	}
+	return backend, nil
+}
+
+// Ggml_backend_load dynamically loads a backend from a library path and returns a backend registry
+func Ggml_backend_load(path string) (GgmlBackendReg, error) {
 	if err := ensureLoaded(); err != nil {
 		return 0, err
 	}
@@ -540,14 +618,32 @@ func Ggml_backend_load(name string, searchPath string) (GgmlBackend, error) {
 		return 0, fmt.Errorf("ggml_backend_load function not available")
 	}
 
-	nameBytes := append([]byte(name), 0)
-	var pathPtr *byte
-	if searchPath != "" {
-		pathBytes := append([]byte(searchPath), 0)
-		pathPtr = &pathBytes[0]
+	if globalLoader.rootLibPath == "" {
+		err := globalLoader.LoadLibrary()
+		if err != nil {
+			return 0, fmt.Errorf("failed to load library for backend loading: %v", err)
+		}
 	}
 
-	return ggmlBackendLoad(&nameBytes[0], pathPtr), nil
+	pathBytes := append([]byte(path), 0)
+	reg := ggmlBackendLoad(&pathBytes[0])
+	if reg == 0 {
+		return 0, fmt.Errorf("failed to load backend from path: %s", path)
+	}
+	return reg, nil
+}
+
+// Ggml_backend_unload unloads a dynamically loaded backend and unregisters it
+func Ggml_backend_unload(reg GgmlBackendReg) error {
+	if err := ensureLoaded(); err != nil {
+		return err
+	}
+	if ggmlBackendUnload == nil {
+		return fmt.Errorf("ggml_backend_unload function not available")
+	}
+
+	ggmlBackendUnload(reg)
+	return nil
 }
 
 // Ggml_backend_load_all loads all available backends

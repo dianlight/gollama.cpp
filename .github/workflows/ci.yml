@@ -8,7 +8,6 @@ on:
     branches: [main, develop]
 
 env:
-  GO_VERSION: "1.25"
   LLAMA_CPP_BUILD: "b6862"
 
 jobs:
@@ -224,68 +223,6 @@ jobs:
       - name: Run benchmarks
         run: go test -bench=. -benchmem ./...
 
-  # gpu-detection:
-  #   name: GPU Detection Testing
-  #   runs-on: ${{ matrix.os }}
-  #   strategy:
-  #     matrix:
-  #       os: [ubuntu-latest, macos-latest, windows-latest]
-
-  #   steps:
-  #   - name: Checkout code
-  #     uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-  #   - name: Set up Go
-  #     uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
-  #     with:
-  #       go-version: ${{ env.GO_VERSION }}
-
-  #   - name: Cache Go modules
-  #     uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
-  #     with:
-  #       path: |
-  #         ~/.cache/go-build
-  #         ~/go/pkg/mod
-  #       key: ${{ runner.os }}-go-gpu-${{ hashFiles('**/go.sum') }}
-  #       restore-keys: |
-  #         ${{ runner.os }}-go-gpu-
-
-  #   - name: Install GPU detection tools (Ubuntu)
-  #     if: matrix.os == 'ubuntu-latest'
-  #     run: |
-  #       sudo apt-get update
-  #       sudo apt-get install -y vulkan-tools clinfo || echo "Optional GPU tools not available"
-
-  #   - name: Install GPU detection tools (macOS)
-  #     if: matrix.os == 'macos-latest'
-  #     run: |
-  #       # Metal is built-in on macOS
-  #       system_profiler SPDisplaysDataType | grep Metal || echo "Metal info not available"
-
-  #   - name: Install GPU detection tools (Windows)
-  #     if: matrix.os == 'windows-latest'
-  #     run: |
-  #       # Try to install Vulkan SDK (optional)
-  #       choco install vulkan-sdk || echo "Vulkan SDK not available"
-
-  #   - name: Download dependencies
-  #     run: go mod download
-
-  #   - name: Test GPU backend detection
-  #     run: |
-  #       echo "Testing GPU backend detection..."
-  #       make test-gpu || echo "GPU tests completed"
-
-  #   - name: Test GPU backend downloader functionality
-  #     run: |
-  #       echo "Testing GPU-aware library downloading..."
-  #       go test -v -run TestPlatformAsset ./...
-
-  #   - name: Comprehensive GPU detection
-  #     run: |
-  #       echo "Running comprehensive GPU detection..."
-  #       make detect-gpu || echo "GPU detection completed"
-
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -297,7 +234,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
@@ -315,7 +252,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
 
       - name: Run Gosec Security Scanner
         uses: securego/gosec@master
@@ -350,7 +287,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
 
       - name: Populate embedded libraries and publish sync branch
         env:
@@ -376,16 +313,6 @@ jobs:
 
           git checkout "${GITHUB_SHA}"
           make populate-libs
-
-      - name: Cache Go modules
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-${{ env.GO_VERSION }}-
 
       - name: Validate release version in CHANGELOG.md
         env:
@@ -517,7 +444,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
 
       - name: Cache Go modules
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -525,9 +452,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-examples-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-examples-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-examples-${{ env.GO_VERSION }}-
+            ${{ runner.os }}-go-examples-
 
       - name: Cache libllama libraries
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -556,7 +483,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
 
       - name: Install doc2go
         run: go install go.abhg.dev/doc2go@latest

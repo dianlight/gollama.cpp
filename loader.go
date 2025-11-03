@@ -2,6 +2,7 @@ package gollama
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -11,13 +12,14 @@ import (
 
 // Library loader manages the loading and lifecycle of llama.cpp shared libraries
 type LibraryLoader struct {
-	handle       uintptr
-	loaded       bool
-	llamaLibPath string
-	rootLibPath  string
-	downloader   *LibraryDownloader
-	tempDir      string
-	mutex        sync.RWMutex
+	handle          uintptr
+	loaded          bool
+	llamaLibPath    string
+	rootLibPath     string
+	extensionSuffix string
+	downloader      *LibraryDownloader
+	tempDir         string
+	mutex           sync.RWMutex
 }
 
 var globalLoader = &LibraryLoader{}
@@ -28,7 +30,13 @@ func (l *LibraryLoader) LoadLibrary() error {
 }
 
 // LoadLibraryWithVersion loads the llama.cpp library for a specific version
-// If version is empty, it loads the latest version
+// If version is empty, it loads the default build version (LlamaCppBuild)
+// Resolution order:
+// 1) Embedded (only if version == LlamaCppBuild)
+// 2) Local ./libs (only if version == LlamaCppBuild)
+// 3) Cache directory entries matching current GOOS (best-effort scan)
+// 4) Download + extract to cache
+// 5) Return a detailed error if all fail
 func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
@@ -57,99 +65,183 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 		l.downloader = downloader
 	}
 
-	// Prefer embedded libraries if available for the requested version
+	var reasons []string
+
+	// 1) Embedded libraries
 	if resolvedVersion == LlamaCppBuild && hasEmbeddedLibraryForPlatform(runtime.GOOS, runtime.GOARCH) {
 		targetDir := filepath.Join(l.downloader.cacheDir, "embedded", embeddedPlatformDirName(runtime.GOOS, runtime.GOARCH))
 		if !l.downloader.isLibraryReady(targetDir) {
 			if err := extractEmbeddedLibrariesTo(targetDir, runtime.GOOS, runtime.GOARCH); err != nil {
-				return fmt.Errorf("failed to extract embedded libraries: %w", err)
+				reasons = append(reasons, fmt.Sprintf("embedded extract failed: %v", err))
 			}
 		}
+		if l.downloader.isLibraryReady(targetDir) {
+			if libPath, err := l.downloader.FindLibraryPathForPlatform(targetDir, runtime.GOOS); err == nil {
+				if err := l.preloadDependentLibraries(libPath); err != nil {
+					reasons = append(reasons, fmt.Sprintf("embedded preload failed: %v", err))
+				} else if handle, err := l.loadSharedLibrary(libPath); err != nil {
+					reasons = append(reasons, fmt.Sprintf("embedded dlopen failed: %v", err))
+				} else {
+					l.handle = handle
+					l.llamaLibPath = libPath
+					l.loaded = true
+					l.rootLibPath = targetDir
+					suffix, err := getExpectedLibrarySuffix()
+					if err != nil {
+						slog.Warn("Failed to get expected library suffix", "error", err)
+					}
+					l.extensionSuffix = suffix
+					return nil
+				}
+			} else {
+				reasons = append(reasons, fmt.Sprintf("embedded lib not found in %s: %v", targetDir, err))
+			}
+		}
+	}
 
-		libPath, err := l.downloader.FindLibraryPathForPlatform(targetDir, runtime.GOOS)
+	// 2) Local ./libs for the same build (only when version == LlamaCppBuild)
+	if !l.loaded && resolvedVersion == LlamaCppBuild {
+		localDir := filepath.Join("libs", embeddedPlatformDirName(runtime.GOOS, runtime.GOARCH))
+		if _, statErr := os.Stat(localDir); statErr == nil {
+			if libPath, err := l.downloader.FindLibraryPathForPlatform(localDir, runtime.GOOS); err == nil {
+				if err := l.preloadDependentLibraries(libPath); err != nil {
+					reasons = append(reasons, fmt.Sprintf("./libs preload failed: %v", err))
+				} else if handle, err := l.loadSharedLibrary(libPath); err != nil {
+					reasons = append(reasons, fmt.Sprintf("./libs dlopen failed: %v", err))
+				} else {
+					l.handle = handle
+					l.llamaLibPath = libPath
+					l.loaded = true
+					l.rootLibPath = localDir
+					suffix, err := getExpectedLibrarySuffix()
+					if err != nil {
+						slog.Warn("Failed to get expected library suffix", "error", err)
+					}
+					l.extensionSuffix = suffix
+					return nil
+				}
+			} else {
+				reasons = append(reasons, fmt.Sprintf("./libs library not found: %v", err))
+			}
+		} else if statErr != nil && !os.IsNotExist(statErr) {
+			reasons = append(reasons, fmt.Sprintf("./libs check failed: %v", statErr))
+		}
+	}
+
+	// 3) Cache directory scan (best effort, match GOOS by library filename)
+	if !l.loaded {
+		entries, err := os.ReadDir(l.downloader.cacheDir)
 		if err == nil {
-			// Preload dependent libraries before loading main library
-			if err := l.preloadDependentLibraries(libPath); err != nil {
-				return fmt.Errorf("failed to preload dependent libraries: %w", err)
+			for _, e := range entries {
+				if !e.IsDir() {
+					continue
+				}
+				name := e.Name()
+				if name == "embedded" { // already handled in step 1
+					continue
+				}
+				candDir := filepath.Join(l.downloader.cacheDir, name)
+				if libPath, err := l.downloader.FindLibraryPathForPlatform(candDir, runtime.GOOS); err == nil {
+					if err := l.preloadDependentLibraries(libPath); err != nil {
+						reasons = append(reasons, fmt.Sprintf("cache preload failed (%s): %v", name, err))
+						continue
+					}
+					if h, err := l.loadSharedLibrary(libPath); err != nil {
+						reasons = append(reasons, fmt.Sprintf("cache dlopen failed (%s): %v", name, err))
+						continue
+					} else {
+						l.handle = h
+						l.llamaLibPath = libPath
+						l.loaded = true
+						l.rootLibPath = candDir
+						suffix, err := getExpectedLibrarySuffix()
+						if err != nil {
+							slog.Warn("Failed to get expected library suffix", "error", err)
+						}
+						l.extensionSuffix = suffix
+						return nil
+					}
+				}
 			}
+		} else {
+			reasons = append(reasons, fmt.Sprintf("cache scan failed: %v", err))
+		}
+	}
 
-			handle, err := l.loadSharedLibrary(libPath)
-			if err != nil {
-				return fmt.Errorf("failed to load embedded library %s: %w", libPath, err)
-			}
+	// 4) Download and extract into cache
+	// Fetch release according to resolvedVersion
+	release, err := l.getReleaseForVersion(resolvedVersion)
+	if err != nil {
+		reasons = append(reasons, fmt.Sprintf("release fetch failed: %v", err))
+		return fmt.Errorf("failed to resolve llama.cpp libraries: %s", strings.Join(reasons, "; "))
+	}
+
+	pattern, err := l.downloader.GetPlatformAssetPattern()
+	if err != nil {
+		reasons = append(reasons, fmt.Sprintf("platform pattern failed: %v", err))
+		return fmt.Errorf("failed to resolve llama.cpp libraries: %s", strings.Join(reasons, "; "))
+	}
+
+	assetName, downloadURL, err := l.downloader.FindAssetByPattern(release, pattern)
+	if err != nil {
+		reasons = append(reasons, fmt.Sprintf("no matching asset: %v", err))
+		return fmt.Errorf("failed to resolve llama.cpp libraries: %s", strings.Join(reasons, "; "))
+	}
+
+	// If already extracted in cache (by exact asset name), use it
+	extractedDir := filepath.Join(l.downloader.cacheDir, strings.TrimSuffix(assetName, ".zip"))
+	if libPath, err := l.downloader.FindLibraryPathForPlatform(extractedDir, runtime.GOOS); err == nil {
+		if err := l.preloadDependentLibraries(libPath); err != nil {
+			reasons = append(reasons, fmt.Sprintf("cached (by asset) preload failed: %v", err))
+		} else if handle, err := l.loadSharedLibrary(libPath); err != nil {
+			reasons = append(reasons, fmt.Sprintf("cached (by asset) dlopen failed: %v", err))
+		} else {
 			l.handle = handle
 			l.llamaLibPath = libPath
 			l.loaded = true
-			l.rootLibPath = targetDir
+			l.rootLibPath = extractedDir
+			suffix, err := getExpectedLibrarySuffix()
+			if err != nil {
+				slog.Warn("Failed to get expected library suffix", "error", err)
+			}
+			l.extensionSuffix = suffix
 			return nil
 		}
 	}
 
-	// Get the appropriate release when embedded libs are unavailable
-	release, err := l.getReleaseForVersion(version)
-	if err != nil {
-		return err
-	}
-
-	// Get platform-specific asset pattern
-	pattern, err := l.downloader.GetPlatformAssetPattern()
-	if err != nil {
-		return fmt.Errorf("failed to get platform pattern: %w", err)
-	}
-
-	// Find the appropriate asset
-	assetName, downloadURL, err := l.downloader.FindAssetByPattern(release, pattern)
-	if err != nil {
-		return fmt.Errorf("failed to find platform asset: %w", err)
-	}
-
-	// Check if library is already cached and ready
-	extractedDir := filepath.Join(l.downloader.cacheDir, strings.TrimSuffix(assetName, ".zip"))
-	libPath, err := l.downloader.FindLibraryPath(extractedDir)
-	if err == nil {
-		// Preload dependent libraries before loading main library
-		if err := l.preloadDependentLibraries(libPath); err != nil {
-			return fmt.Errorf("failed to preload dependent libraries: %w", err)
-		}
-
-		handle, err := l.loadSharedLibrary(libPath)
-		if err != nil {
-			return fmt.Errorf("failed to load library %s: %w", libPath, err)
-		}
-
-		l.handle = handle
-		l.llamaLibPath = libPath
-		l.loaded = true
-
-		return nil
-	}
-
-	// Download and extract the library
+	// Download and extract
 	extractedDir, err = l.downloader.DownloadAndExtract(downloadURL, assetName)
 	if err != nil {
-		return fmt.Errorf("failed to download library: %w", err)
+		reasons = append(reasons, fmt.Sprintf("download failed: %v", err))
+		return fmt.Errorf("failed to resolve llama.cpp libraries: %s", strings.Join(reasons, "; "))
 	}
 
-	// Find the main library file
-	libPath, err = l.downloader.FindLibraryPath(extractedDir)
+	libPath, err := l.downloader.FindLibraryPathForPlatform(extractedDir, runtime.GOOS)
 	if err != nil {
-		return fmt.Errorf("failed to find library file: %w", err)
+		reasons = append(reasons, fmt.Sprintf("post-extract lib not found: %v", err))
+		return fmt.Errorf("failed to resolve llama.cpp libraries: %s", strings.Join(reasons, "; "))
 	}
 
-	// Preload dependent libraries on Unix-like systems to ensure correct library versions are used
 	if err := l.preloadDependentLibraries(libPath); err != nil {
-		return fmt.Errorf("failed to preload dependent libraries: %w", err)
+		reasons = append(reasons, fmt.Sprintf("post-extract preload failed: %v", err))
+		return fmt.Errorf("failed to resolve llama.cpp libraries: %s", strings.Join(reasons, "; "))
 	}
 
-	// Load the library
 	handle, err := l.loadSharedLibrary(libPath)
 	if err != nil {
-		return fmt.Errorf("failed to load library %s: %w", libPath, err)
+		reasons = append(reasons, fmt.Sprintf("post-extract dlopen failed: %v", err))
+		return fmt.Errorf("failed to resolve llama.cpp libraries: %s", strings.Join(reasons, "; "))
 	}
 
 	l.handle = handle
 	l.llamaLibPath = libPath
 	l.loaded = true
+	l.rootLibPath = extractedDir
+	suffix, err := getExpectedLibrarySuffix()
+	if err != nil {
+		slog.Warn("Failed to get expected library suffix", "error", err)
+	}
+	l.extensionSuffix = suffix
 
 	return nil
 }
@@ -397,4 +489,17 @@ func GetLibraryCacheDir() (string, error) {
 	}
 
 	return globalLoader.downloader.GetCacheDir(), nil
+}
+
+func getExpectedLibrarySuffix() (string, error) {
+	switch runtime.GOOS {
+	case "darwin":
+		return ".dylib", nil
+	case "linux":
+		return ".so", nil
+	case "windows":
+		return ".dll", nil
+	default:
+		return "", fmt.Errorf("unsupported OS: %s", runtime.GOOS)
+	}
 }

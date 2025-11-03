@@ -114,9 +114,10 @@ func (s *FFISuite) TestFFIBatchInit() {
 
 // Tests FFI-based encode function
 func (s *FFISuite) TestFFIEncode() {
+	// TODO: Implement a proper test with a valid context and batch
 	if !isLoaded {
 		if err := loadLibrary(); err != nil {
-			s.T().Skipf("FFI encode test requires library to be available: %v", err)
+			s.T().Errorf("FFI encode test requires library to be available: %v", err)
 		}
 	}
 	s.T().Skip("Skipping FFI encode test - requires valid context and batch to avoid assertion failure")
@@ -126,7 +127,7 @@ func (s *FFISuite) TestFFIEncode() {
 func (s *FFISuite) TestFFISamplerChainInit() {
 	if !isLoaded {
 		if err := loadLibrary(); err != nil {
-			s.T().Skipf("FFI sampler chain init test requires library to be available: %v", err)
+			s.T().Errorf("FFI sampler chain init test requires library to be available: %v", err)
 		}
 	}
 

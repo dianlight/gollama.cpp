@@ -133,10 +133,7 @@ func (s *FFISuite) TestFFISamplerChainInit() {
 
 	params := LlamaSamplerChainParams{NoPerf: 0}
 	sampler, err := ffiSamplerChainInit(params)
-	if err != nil {
-		s.T().Logf("FFI sampler chain init failed (expected if library not present): %v", err)
-		return
-	}
+	s.Require().NoError(err, "FFI sampler chain init failed (expected if library not present)")
 	s.Assert().NotZero(sampler, "FFI sampler chain init returned null sampler")
 }
 
@@ -178,7 +175,9 @@ func (s *FFISuite) TestFFICrossCompileCompatibility() {
 	s.T().Log("All platform-specific functions are properly defined")
 }
 
-func TestFFISuite(t *testing.T) { suite.Run(t, new(FFISuite)) }
+func TestFFISuite(t *testing.T) {
+	suite.Run(t, new(FFISuite))
+}
 
 // BenchmarkFFIModelDefaultParams benchmarks FFI model parameter retrieval
 func BenchmarkFFIModelDefaultParams(b *testing.B) {

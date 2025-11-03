@@ -2,7 +2,6 @@ package gollama
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -77,21 +76,12 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 		}
 		if l.downloader.isLibraryReady(targetDir) {
 			if libPath, err := l.downloader.FindLibraryPathForPlatform(targetDir, runtime.GOOS); err == nil {
-				if err := l.preloadDependentLibraries(libPath); err != nil {
-					reasons = append(reasons, fmt.Sprintf("embedded preload failed: %v", err))
-				} else if handle, err := l.loadSharedLibrary(libPath); err != nil {
-					reasons = append(reasons, fmt.Sprintf("embedded dlopen failed: %v", err))
-				} else {
-					l.handle = handle
-					l.llamaLibPath = libPath
-					l.loaded = true
-					l.rootLibPath = targetDir
-					suffix, err := getExpectedLibrarySuffix()
-					if err != nil {
-						slog.Warn("Failed to get expected library suffix", "error", err)
+				info, errs := l.LoadLibraryWithDependencies(libPath)
+				reasons = append(reasons, errs...)
+				if info.Success {
+					if err := l.ApplyLibraryLoad(info, targetDir); err == nil {
+						return nil
 					}
-					l.extensionSuffix = suffix
-					return nil
 				}
 			} else {
 				reasons = append(reasons, fmt.Sprintf("embedded lib not found in %s: %v", targetDir, err))
@@ -104,26 +94,17 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 		localDir := filepath.Join("libs", embeddedPlatformDirName(runtime.GOOS, runtime.GOARCH))
 		if _, statErr := os.Stat(localDir); statErr == nil {
 			if libPath, err := l.downloader.FindLibraryPathForPlatform(localDir, runtime.GOOS); err == nil {
-				if err := l.preloadDependentLibraries(libPath); err != nil {
-					reasons = append(reasons, fmt.Sprintf("./libs preload failed: %v", err))
-				} else if handle, err := l.loadSharedLibrary(libPath); err != nil {
-					reasons = append(reasons, fmt.Sprintf("./libs dlopen failed: %v", err))
-				} else {
-					l.handle = handle
-					l.llamaLibPath = libPath
-					l.loaded = true
-					l.rootLibPath = localDir
-					suffix, err := getExpectedLibrarySuffix()
-					if err != nil {
-						slog.Warn("Failed to get expected library suffix", "error", err)
+				info, errs := l.LoadLibraryWithDependencies(libPath)
+				reasons = append(reasons, errs...)
+				if info.Success {
+					if err := l.ApplyLibraryLoad(info, localDir); err == nil {
+						return nil
 					}
-					l.extensionSuffix = suffix
-					return nil
 				}
 			} else {
 				reasons = append(reasons, fmt.Sprintf("./libs library not found: %v", err))
 			}
-		} else if statErr != nil && !os.IsNotExist(statErr) {
+		} else if !os.IsNotExist(statErr) {
 			reasons = append(reasons, fmt.Sprintf("./libs check failed: %v", statErr))
 		}
 	}
@@ -142,24 +123,15 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 				}
 				candDir := filepath.Join(l.downloader.cacheDir, name)
 				if libPath, err := l.downloader.FindLibraryPathForPlatform(candDir, runtime.GOOS); err == nil {
-					if err := l.preloadDependentLibraries(libPath); err != nil {
-						reasons = append(reasons, fmt.Sprintf("cache preload failed (%s): %v", name, err))
+					info, errs := l.LoadLibraryWithDependencies(libPath)
+					if len(errs) > 0 {
+						reasons = append(reasons, errs...)
 						continue
 					}
-					if h, err := l.loadSharedLibrary(libPath); err != nil {
-						reasons = append(reasons, fmt.Sprintf("cache dlopen failed (%s): %v", name, err))
-						continue
-					} else {
-						l.handle = h
-						l.llamaLibPath = libPath
-						l.loaded = true
-						l.rootLibPath = candDir
-						suffix, err := getExpectedLibrarySuffix()
-						if err != nil {
-							slog.Warn("Failed to get expected library suffix", "error", err)
+					if info.Success {
+						if err := l.ApplyLibraryLoad(info, candDir); err == nil {
+							return nil
 						}
-						l.extensionSuffix = suffix
-						return nil
 					}
 				}
 			}
@@ -191,21 +163,12 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 	// If already extracted in cache (by exact asset name), use it
 	extractedDir := filepath.Join(l.downloader.cacheDir, strings.TrimSuffix(assetName, ".zip"))
 	if libPath, err := l.downloader.FindLibraryPathForPlatform(extractedDir, runtime.GOOS); err == nil {
-		if err := l.preloadDependentLibraries(libPath); err != nil {
-			reasons = append(reasons, fmt.Sprintf("cached (by asset) preload failed: %v", err))
-		} else if handle, err := l.loadSharedLibrary(libPath); err != nil {
-			reasons = append(reasons, fmt.Sprintf("cached (by asset) dlopen failed: %v", err))
-		} else {
-			l.handle = handle
-			l.llamaLibPath = libPath
-			l.loaded = true
-			l.rootLibPath = extractedDir
-			suffix, err := getExpectedLibrarySuffix()
-			if err != nil {
-				slog.Warn("Failed to get expected library suffix", "error", err)
+		info, errs := l.LoadLibraryWithDependencies(libPath)
+		reasons = append(reasons, errs...)
+		if info.Success {
+			if err := l.ApplyLibraryLoad(info, extractedDir); err == nil {
+				return nil
 			}
-			l.extensionSuffix = suffix
-			return nil
 		}
 	}
 
@@ -222,26 +185,15 @@ func (l *LibraryLoader) LoadLibraryWithVersion(version string) error {
 		return fmt.Errorf("failed to resolve llama.cpp libraries: %s", strings.Join(reasons, "; "))
 	}
 
-	if err := l.preloadDependentLibraries(libPath); err != nil {
-		reasons = append(reasons, fmt.Sprintf("post-extract preload failed: %v", err))
+	info, errs := l.LoadLibraryWithDependencies(libPath)
+	reasons = append(reasons, errs...)
+	if !info.Success {
 		return fmt.Errorf("failed to resolve llama.cpp libraries: %s", strings.Join(reasons, "; "))
 	}
 
-	handle, err := l.loadSharedLibrary(libPath)
-	if err != nil {
-		reasons = append(reasons, fmt.Sprintf("post-extract dlopen failed: %v", err))
-		return fmt.Errorf("failed to resolve llama.cpp libraries: %s", strings.Join(reasons, "; "))
+	if err := l.ApplyLibraryLoad(info, extractedDir); err != nil {
+		return fmt.Errorf("failed to apply library load: %w", err)
 	}
-
-	l.handle = handle
-	l.llamaLibPath = libPath
-	l.loaded = true
-	l.rootLibPath = extractedDir
-	suffix, err := getExpectedLibrarySuffix()
-	if err != nil {
-		slog.Warn("Failed to get expected library suffix", "error", err)
-	}
-	l.extensionSuffix = suffix
 
 	return nil
 }
@@ -393,6 +345,28 @@ func (l *LibraryLoader) preloadDependentLibraries(mainLibPath string) error {
 
 // Global functions for backward compatibility
 
+// ensureDownloader initializes the global downloader if needed
+// and returns a reference to it. This consolidates the repeated
+// downloader initialization pattern used in several functions
+func ensureDownloader() (*LibraryDownloader, error) {
+	if globalLoader.downloader != nil {
+		return globalLoader.downloader, nil
+	}
+
+	// Check if global config has a custom cache directory
+	cacheDir := ""
+	if globalConfig != nil && globalConfig.CacheDir != "" {
+		cacheDir = globalConfig.CacheDir
+	}
+
+	downloader, err := NewLibraryDownloaderWithCacheDir(cacheDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create library downloader: %w", err)
+	}
+	globalLoader.downloader = downloader
+	return downloader, nil
+}
+
 // LoadLibraryWithVersion loads a specific version of the llama.cpp library
 func LoadLibraryWithVersion(version string) error {
 	return globalLoader.LoadLibraryWithVersion(version)
@@ -436,59 +410,32 @@ func CleanLibraryCache() error {
 // platforms should be in the format []string{"linux/amd64", "darwin/arm64", "windows/amd64"}
 // version can be empty for latest version or specify a specific version like "b6862"
 func DownloadLibrariesForPlatforms(platforms []string, version string) ([]DownloadResult, error) {
-	if globalLoader.downloader == nil {
-		// Check if global config has a custom cache directory
-		cacheDir := ""
-		if globalConfig != nil && globalConfig.CacheDir != "" {
-			cacheDir = globalConfig.CacheDir
-		}
-
-		downloader, err := NewLibraryDownloaderWithCacheDir(cacheDir)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create library downloader: %w", err)
-		}
-		globalLoader.downloader = downloader
+	downloader, err := ensureDownloader()
+	if err != nil {
+		return nil, err
 	}
 
-	return globalLoader.downloader.DownloadMultiplePlatforms(platforms, version)
+	return downloader.DownloadMultiplePlatforms(platforms, version)
 }
 
 // GetSHA256ForFile calculates the SHA256 checksum for a given file
 func GetSHA256ForFile(filepath string) (string, error) {
-	if globalLoader.downloader == nil {
-		// Check if global config has a custom cache directory
-		cacheDir := ""
-		if globalConfig != nil && globalConfig.CacheDir != "" {
-			cacheDir = globalConfig.CacheDir
-		}
-
-		downloader, err := NewLibraryDownloaderWithCacheDir(cacheDir)
-		if err != nil {
-			return "", fmt.Errorf("failed to create library downloader: %w", err)
-		}
-		globalLoader.downloader = downloader
+	downloader, err := ensureDownloader()
+	if err != nil {
+		return "", err
 	}
 
-	return globalLoader.downloader.calculateSHA256(filepath)
+	return downloader.calculateSHA256(filepath)
 }
 
 // GetLibraryCacheDir returns the directory where downloaded libraries are cached
 func GetLibraryCacheDir() (string, error) {
-	if globalLoader.downloader == nil {
-		// Check if global config has a custom cache directory
-		cacheDir := ""
-		if globalConfig != nil && globalConfig.CacheDir != "" {
-			cacheDir = globalConfig.CacheDir
-		}
-
-		downloader, err := NewLibraryDownloaderWithCacheDir(cacheDir)
-		if err != nil {
-			return "", fmt.Errorf("failed to create library downloader: %w", err)
-		}
-		globalLoader.downloader = downloader
+	downloader, err := ensureDownloader()
+	if err != nil {
+		return "", err
 	}
 
-	return globalLoader.downloader.GetCacheDir(), nil
+	return downloader.GetCacheDir(), nil
 }
 
 func getExpectedLibrarySuffix() (string, error) {

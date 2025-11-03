@@ -12,7 +12,7 @@ type FFISuite struct{ BaseSuite }
 // SetupSuite runs before all tests in the suite
 func (s *FFISuite) SetupSuite() {
 	if err := loadLibrary(); err != nil {
-		s.Fail("Failed to load library during suite setup: %v", err)
+		s.Require().Failf("SetupSuite", "Failed to load library during suite setup: %v", err)
 	}
 }
 

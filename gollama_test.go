@@ -11,6 +11,22 @@ import (
 
 type GollamaSuite struct{ BaseSuite }
 
+// ensureLibLoaded guarantees the native llama library is loaded; fail immediately if not.
+func ensureLibLoaded(tb testing.TB) {
+	tb.Helper()
+	if !isLoaded {
+		if err := loadLibrary(); err != nil {
+			tb.Fatalf("Failed to load llama library: %v", err)
+		}
+	}
+}
+
+// SetupTest runs before each test in this suite and ensures the llama library is available.
+func (s *GollamaSuite) SetupTest() {
+	s.BaseSuite.SetupTest()
+	ensureLibLoaded(s.T())
+}
+
 func (s *GollamaSuite) TestVersion() {
 	assert.NotEmpty(s.T(), Version)
 	assert.NotEmpty(s.T(), LlamaCppBuild)
@@ -21,9 +37,7 @@ func (s *GollamaSuite) TestVersion() {
 
 func (s *GollamaSuite) TestLibraryPath() {
 	path, err := getLibraryPath()
-	if err != nil {
-		s.T().Skipf("Skipping library path test on unsupported platform: %v", err)
-	}
+	s.Require().NoError(err, "getLibraryPath failed")
 	assert.NotEmpty(s.T(), path)
 }
 
@@ -34,11 +48,6 @@ func (s *GollamaSuite) TestConstants() {
 
 // Ensure we can call functions that don't require a loaded library
 func (s *GollamaSuite) TestUtilityFunctions() {
-	if !isLoaded {
-		if err := loadLibrary(); err != nil {
-			s.T().Skipf("Skipping utility function tests: library not available: %v", err)
-		}
-	}
 	_ = Supports_mmap()
 	_ = Supports_mlock()
 	_ = Supports_gpu_offload()
@@ -47,28 +56,17 @@ func (s *GollamaSuite) TestUtilityFunctions() {
 }
 
 func (s *GollamaSuite) TestBackendInitialization() {
-	if err := Backend_init(); err != nil {
-		s.T().Skipf("Skipping backend test: %v", err)
-	}
+	err := Backend_init()
+	s.Require().NoError(err, "Backend_init failed")
 	Backend_free()
 }
 
 func (s *GollamaSuite) TestModelParams() {
-	if !isLoaded {
-		if err := loadLibrary(); err != nil {
-			s.T().Skipf("Skipping model params test: library not available: %v", err)
-		}
-	}
 	params := Model_default_params()
 	assert.GreaterOrEqual(s.T(), int(params.NGpuLayers), 0, "NGpuLayers should not be negative")
 }
 
 func (s *GollamaSuite) TestContextParams() {
-	if !isLoaded {
-		if err := loadLibrary(); err != nil {
-			s.T().Skipf("Skipping context params test: library not available: %v", err)
-		}
-	}
 	params := Context_default_params()
 	assert.NotZero(s.T(), params.NBatch, "NBatch should not be zero")
 }
@@ -81,12 +79,7 @@ func BenchmarkGetLibraryPath(b *testing.B) {
 }
 
 func BenchmarkModelDefaultParams(b *testing.B) {
-	if !isLoaded {
-		err := loadLibrary()
-		if err != nil {
-			b.Skipf("Skipping benchmark: library not available: %v", err)
-		}
-	}
+	ensureLibLoaded(b)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -95,12 +88,7 @@ func BenchmarkModelDefaultParams(b *testing.B) {
 }
 
 func BenchmarkContextDefaultParams(b *testing.B) {
-	if !isLoaded {
-		err := loadLibrary()
-		if err != nil {
-			b.Skipf("Skipping benchmark: library not available: %v", err)
-		}
-	}
+	ensureLibLoaded(b)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -110,11 +98,6 @@ func BenchmarkContextDefaultParams(b *testing.B) {
 
 // Test default parameters functionality (from debug-params.go)
 func (s *GollamaSuite) TestContextDefaultParamsDetailed() {
-	if !isLoaded {
-		if err := loadLibrary(); err != nil {
-			s.T().Skipf("Skipping context default params test: library not available: %v", err)
-		}
-	}
 	params := Context_default_params()
 	assert.NotZero(s.T(), params.NSeqMax)
 	assert.NotZero(s.T(), params.NCtx)
@@ -128,19 +111,12 @@ func (s *GollamaSuite) TestContextDefaultParamsDetailed() {
 
 // Test token data array functionality (from token_array_test.go)
 func (s *GollamaSuite) TestTokenDataArrayFromLogits() {
-	if !isLoaded {
-		if err := loadLibrary(); err != nil {
-			s.T().Skipf("Skipping token data array test: library not available: %v", err)
-		}
-	}
 	logits := make([]float32, 256)
 	for i := 0; i < 256; i++ {
 		logits[i] = float32(i) * 0.1
 	}
 	tokenArray := Token_data_array_from_logits(LlamaModel(0), &logits[0])
-	if tokenArray == nil {
-		s.T().Fatal("Token array should not be nil")
-	}
+	s.NotEmpty(tokenArray, "Token array should not be empty")
 	assert.NotZero(s.T(), tokenArray.Size)
 	assert.Equal(s.T(), int64(-1), tokenArray.Selected)
 	assert.Equal(s.T(), uint8(0x0), tokenArray.Sorted)
@@ -166,19 +142,11 @@ func (s *GollamaSuite) TestTokenization() {
 	if testing.Short() {
 		s.T().Skip("Skipping integration test in short mode")
 	}
-	if !isLoaded {
-		if err := loadLibrary(); err != nil {
-			s.T().Skipf("Skipping tokenization test: library not available: %v", err)
-		}
-	}
-	if err := Backend_init(); err != nil {
-		s.T().Fatalf("Failed to initialize backend: %v", err)
-	}
+	err := Backend_init()
+	s.Require().NoError(err, "Backend_init failed")
 	defer Backend_free()
-	if err := Ggml_backend_load_all(); err != nil {
-		s.T().Fatalf("ggml_backend_load not available or failed: %v", err)
-		return
-	}
+	err = Ggml_backend_load_all()
+	s.Require().NoError(err, "ggml_backend_load not available or failed")
 	modelPath := "./models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf"
 	params := Model_default_params()
 	params.NGpuLayers = 0

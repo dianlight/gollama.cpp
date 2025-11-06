@@ -4,6 +4,7 @@ package gollama
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -243,12 +244,12 @@ func loadOneDll(path string) (uintptr, error) {
 			0,
 			uintptr(loadLibrarySearchDllLoadDir|loadLibrarySearchDefaultDirs|loadLibrarySearchSystem32|loadLibrarySearchUserDirs),
 		); ret != 0 {
-			fmt.Printf("debug: preloaded sibling DLL: %s (handle: 0x%x)\n", path, ret)
+			slog.Debug(fmt.Sprintf("debug: preloaded sibling DLL: %s (handle: 0x%x)\n", path, ret))
 			return ret, nil
 		}
 	}
 	if ret, _, _ := procLoadLibraryW.Call(uintptr(unsafe.Pointer(p))); ret != 0 {
-		fmt.Printf("debug: preloaded sibling DLL (fallback): %s (handle: 0x%x)\n", path, ret)
+		slog.Debug(fmt.Sprintf("debug: preloaded sibling DLL (fallback): %s (handle: 0x%x)\n", path, ret))
 		return ret, nil
 	}
 	return 0, fmt.Errorf("failed to preload dll: %s", path)

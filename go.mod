@@ -20,5 +20,5 @@ require (
 
 require (
 	github.com/google/go-querystring v1.1.0 // indirect
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.11.1
 )

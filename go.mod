@@ -4,7 +4,7 @@ go 1.21.0
 
 toolchain go1.21.13
 
-require github.com/ebitengine/purego v0.9.0
+require github.com/ebitengine/purego v0.9.1
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect

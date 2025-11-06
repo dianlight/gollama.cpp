@@ -56,7 +56,7 @@ func main() {
 		fmt.Println("Downloading libraries for all supported platforms...")
 		allPlatforms := []string{
 			"darwin/amd64", "darwin/arm64",
-			"linux/amd64", "linux/arm64",
+			"linux/amd64", //"linux/arm64",
 			"windows/amd64", "windows/arm64",
 		}
 

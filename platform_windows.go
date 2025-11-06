@@ -4,6 +4,7 @@ package gollama
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"syscall"
 	"unsafe"
@@ -20,6 +21,24 @@ var (
 	procSetDefaultDllDirectories = kernel32.NewProc("SetDefaultDllDirectories")
 	procSetDllDirectoryW         = kernel32.NewProc("SetDllDirectoryW")
 )
+
+// keep a small registry of loaded DLL handles from the target directory so we can
+// resolve symbols that might be exported by sibling DLLs (e.g., ggml.dll)
+var loadedDllHandles []uintptr
+
+// addLoadedHandle saves a successfully loaded DLL handle for later symbol lookup
+func addLoadedHandle(h uintptr) {
+	// avoid duplicates and nil
+	if h == 0 {
+		return
+	}
+	for _, existing := range loadedDllHandles {
+		if existing == h {
+			return
+		}
+	}
+	loadedDllHandles = append(loadedDllHandles, h)
+}
 
 // Flags for LoadLibraryEx and SetDefaultDllDirectories
 const (
@@ -103,6 +122,9 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 			if addedDir && procRemoveDllDirectory.Find() == nil {
 				_, _, _ = procRemoveDllDirectory.Call(cookie)
 			}
+			// Also try to proactively load sibling DLLs from the same directory to ensure
+			// all exports are available (some symbols may live in ggml*.dll on Windows).
+			preloadSiblingDlls(dir, ret)
 			return ret, nil
 		}
 		loadErr = fmt.Errorf("LoadLibraryExW failed for %s: %w (GetLastError: %d)", libPath, callErr, callErr.(syscall.Errno))
@@ -148,7 +170,88 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 		_, _, _ = procRemoveDllDirectory.Call(cookie)
 	}
 
+	// Proactively load sibling DLLs from the same directory
+	preloadSiblingDlls(dir, ret)
+
 	return ret, nil
+}
+
+// preloadSiblingDlls loads other DLLs from the same directory that commonly contain
+// exports used by llama.dll (e.g., ggml*.dll). This improves GetProcAddress success
+// on setups where functions are exported by a different module.
+func preloadSiblingDlls(dir string, mainHandle uintptr) {
+	// Track the main handle
+	addLoadedHandle(mainHandle)
+
+	// Scan directory for DLLs and load a short allowlist first, then best-effort all *.dll
+	// Priority list of likely dependencies
+	allowlist := []string{
+		"ggml.dll",
+		"ggml-base.dll",
+		"ggml-cpu.dll",
+		"ggml-blas.dll",
+		"ggml-rpc.dll",
+	}
+	for _, name := range allowlist {
+		dllPath := filepath.Join(dir, name)
+		if _, err := os.Stat(dllPath); err == nil {
+			if h, err := loadOneDll(dllPath); err == nil {
+				addLoadedHandle(h)
+			}
+		}
+	}
+	// Best-effort: load remaining DLLs in the directory (skip those already loaded)
+	entries, err := os.ReadDir(dir)
+	if err == nil {
+		for _, e := range entries {
+			if e.IsDir() || filepath.Ext(e.Name()) != ".dll" {
+				continue
+			}
+			name := e.Name()
+			// Skip main llama.dll; we already have it
+			if name == "llama.dll" {
+				continue
+			}
+			// Skip those in allowlist (handled above)
+			skip := false
+			for _, a := range allowlist {
+				if a == name {
+					skip = true
+					break
+				}
+			}
+			if skip {
+				continue
+			}
+			dllPath := filepath.Join(dir, name)
+			if h, err := loadOneDll(dllPath); err == nil {
+				addLoadedHandle(h)
+			}
+		}
+	}
+}
+
+// loadOneDll loads a single DLL by absolute path using LoadLibraryExW with safe flags
+func loadOneDll(path string) (uintptr, error) {
+	p, err := syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return 0, err
+	}
+	if procLoadLibraryExW.Find() == nil {
+		if ret, _, _ := procLoadLibraryExW.Call(
+			uintptr(unsafe.Pointer(p)),
+			0,
+			uintptr(loadLibrarySearchDllLoadDir|loadLibrarySearchDefaultDirs|loadLibrarySearchSystem32|loadLibrarySearchUserDirs),
+		); ret != 0 {
+			fmt.Printf("debug: preloaded sibling DLL: %s (handle: 0x%x)\n", path, ret)
+			return ret, nil
+		}
+	}
+	if ret, _, _ := procLoadLibraryW.Call(uintptr(unsafe.Pointer(p))); ret != 0 {
+		fmt.Printf("debug: preloaded sibling DLL (fallback): %s (handle: 0x%x)\n", path, ret)
+		return ret, nil
+	}
+	return 0, fmt.Errorf("failed to preload dll: %s", path)
 }
 
 // closeLibraryPlatform closes a shared library using platform-specific methods
@@ -206,15 +309,29 @@ func getProcAddressPlatform(handle uintptr, name string) (uintptr, error) {
 		return 0, fmt.Errorf("failed to convert name to byte pointer: %w", err)
 	}
 
+	// Try on the provided handle first
 	ret, _, err := procGetProcAddress.Call(handle, uintptr(unsafe.Pointer(namePtr)))
-	if ret == 0 {
-		errno := err.(syscall.Errno)
-		return 0, fmt.Errorf("GetProcAddress failed for %s in library handle 0x%x: %w (GetLastError: %d). "+
-			"This means the function is not exported by the DLL, or the DLL may not be the correct version",
-			name, handle, err, errno)
+	if ret != 0 {
+		return ret, nil
 	}
 
-	return ret, nil
+	// If not found, try on any sibling DLLs we preloaded from the same directory
+	for _, h := range loadedDllHandles {
+		if h == 0 || h == handle {
+			continue
+		}
+		addr, _, _ := procGetProcAddress.Call(h, uintptr(unsafe.Pointer(namePtr)))
+		if addr != 0 {
+			fmt.Printf("debug: symbol %s resolved from sibling handle 0x%x\n", name, h)
+			return addr, nil
+		}
+	}
+
+	// Not found anywhere; return the original error context
+	errno := err.(syscall.Errno)
+	return 0, fmt.Errorf("GetProcAddress failed for %s in library handle 0x%x and sibling DLLs: %w (GetLastError: %d). "+
+		"The symbol may not be exported by this build.",
+		name, handle, err, errno)
 }
 
 // isPlatformSupported returns whether the current platform is supported

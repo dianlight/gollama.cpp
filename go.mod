@@ -14,7 +14,7 @@ require (
 )
 
 require (
-	github.com/google/go-github/v60 v60.0.0
+	github.com/google/go-github/v68 v68.0.0
 	github.com/jupiterrider/ffi v0.5.1
 )
 

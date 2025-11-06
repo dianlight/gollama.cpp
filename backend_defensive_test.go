@@ -158,7 +158,6 @@ func (s *BackendDefensiveSuite) TestGgmlBackendInitFunctionsReturnErrors() {
 	savedInitBest := ggmlBackendInitBest
 	savedInitByName := ggmlBackendInitByName
 	savedInitByType := ggmlBackendInitByType
-
 	// Simulate missing symbols by setting to nil
 	ggmlBackendInitBest = nil
 	ggmlBackendInitByName = nil

@@ -602,119 +602,131 @@ func loadLibrary() error {
 
 // registerFunctions registers all llama.cpp function pointers
 func registerFunctions() error {
-	// Backend functions
-	registerLibFunc(&llamaBackendInit, libHandle, "llama_backend_init")
-	registerLibFunc(&llamaBackendFree, libHandle, "llama_backend_free")
-	registerLibFunc(&llamaLogSet, libHandle, "llama_log_set")
+	// Track failed registrations
+	var failedRegistrations []string
+
+	// Helper to track failed registrations
+	trackRegister := func(fptr interface{}, fname string) {
+		registerLibFunc(fptr, libHandle, fname)
+		// Check if registration was successful by verifying the pointer was set
+		if ptr, ok := fptr.(*uintptr); ok && *ptr == 0 {
+			failedRegistrations = append(failedRegistrations, fname)
+		}
+	}
+
+	// Backend functions (critical)
+	trackRegister(&llamaBackendInit, "llama_backend_init")
+	trackRegister(&llamaBackendFree, "llama_backend_free")
+	trackRegister(&llamaLogSet, "llama_log_set")
 
 	// Model functions - Register struct functions only on Darwin (purego limitation)
 	// On other platforms, FFI handles struct parameters/returns directly
 	if runtime.GOOS == "darwin" {
-		registerLibFunc(&llamaModelDefaultParams, libHandle, "llama_model_default_params")
-		registerLibFunc(&llamaContextDefaultParams, libHandle, "llama_context_default_params")
-		registerLibFunc(&llamaSamplerChainDefaultParams, libHandle, "llama_sampler_chain_default_params")
-		registerLibFunc(&llamaModelLoadFromFile, libHandle, "llama_model_load_from_file")
-		registerLibFunc(&llamaModelLoadFromSplits, libHandle, "llama_model_load_from_splits")
-		registerLibFunc(&llamaInitFromModel, libHandle, "llama_init_from_model")
+		trackRegister(&llamaModelDefaultParams, "llama_model_default_params")
+		trackRegister(&llamaContextDefaultParams, "llama_context_default_params")
+		trackRegister(&llamaSamplerChainDefaultParams, "llama_sampler_chain_default_params")
+		trackRegister(&llamaModelLoadFromFile, "llama_model_load_from_file")
+		trackRegister(&llamaModelLoadFromSplits, "llama_model_load_from_splits")
+		trackRegister(&llamaInitFromModel, "llama_init_from_model")
 	}
-	registerLibFunc(&llamaModelSaveToFile, libHandle, "llama_model_save_to_file")
-	registerLibFunc(&llamaModelFree, libHandle, "llama_model_free")
+	trackRegister(&llamaModelSaveToFile, "llama_model_save_to_file")
+	trackRegister(&llamaModelFree, "llama_model_free")
 
 	// Context functions
-	registerLibFunc(&llamaFree, libHandle, "llama_free")
+	trackRegister(&llamaFree, "llama_free")
 
 	// Model info functions
-	registerLibFunc(&llamaModelNCtxTrain, libHandle, "llama_model_n_ctx_train")
-	registerLibFunc(&llamaModelNEmbd, libHandle, "llama_model_n_embd")
-	registerLibFunc(&llamaModelNLayer, libHandle, "llama_model_n_layer")
-	registerLibFunc(&llamaModelNHead, libHandle, "llama_model_n_head")
-	registerLibFunc(&llamaModelNHeadKv, libHandle, "llama_model_n_head_kv")
-	registerLibFunc(&llamaModelVocabType, libHandle, "llama_vocab_type")
-	registerLibFunc(&llamaModelRopeType, libHandle, "llama_model_rope_type")
+	trackRegister(&llamaModelNCtxTrain, "llama_model_n_ctx_train")
+	trackRegister(&llamaModelNEmbd, "llama_model_n_embd")
+	trackRegister(&llamaModelNLayer, "llama_model_n_layer")
+	trackRegister(&llamaModelNHead, "llama_model_n_head")
+	trackRegister(&llamaModelNHeadKv, "llama_model_n_head_kv")
+	trackRegister(&llamaModelVocabType, "llama_vocab_type")
+	trackRegister(&llamaModelRopeType, "llama_model_rope_type")
 
 	// Context info functions
-	registerLibFunc(&llamaNCtx, libHandle, "llama_n_ctx")
-	registerLibFunc(&llamaNBatch, libHandle, "llama_n_batch")
-	registerLibFunc(&llamaNUbatch, libHandle, "llama_n_ubatch")
-	registerLibFunc(&llamaNSeqMax, libHandle, "llama_n_seq_max")
-	registerLibFunc(&llamaPoolingType, libHandle, "llama_pooling_type")
-	registerLibFunc(&llamaGetModel, libHandle, "llama_get_model")
+	trackRegister(&llamaNCtx, "llama_n_ctx")
+	trackRegister(&llamaNBatch, "llama_n_batch")
+	trackRegister(&llamaNUbatch, "llama_n_ubatch")
+	trackRegister(&llamaNSeqMax, "llama_n_seq_max")
+	trackRegister(&llamaPoolingType, "llama_pooling_type")
+	trackRegister(&llamaGetModel, "llama_get_model")
 
 	// Tokenization functions
-	registerLibFunc(&llamaTokenize, libHandle, "llama_tokenize")
-	registerLibFunc(&llamaTokenToPiece, libHandle, "llama_token_to_piece")
-	registerLibFunc(&llamaDetokenize, libHandle, "llama_detokenize")
-	registerLibFunc(&llamaVocabGetText, libHandle, "llama_vocab_get_text")
+	trackRegister(&llamaTokenize, "llama_tokenize")
+	trackRegister(&llamaTokenToPiece, "llama_token_to_piece")
+	trackRegister(&llamaDetokenize, "llama_detokenize")
+	trackRegister(&llamaVocabGetText, "llama_vocab_get_text")
 
 	// Vocab functions
-	registerLibFunc(&llamaModelGetVocab, libHandle, "llama_model_get_vocab")
-	registerLibFunc(&llamaVocabNTokens, libHandle, "llama_vocab_n_tokens")
-	registerLibFunc(&llamaVocabBos, libHandle, "llama_vocab_bos")
-	registerLibFunc(&llamaVocabEos, libHandle, "llama_vocab_eos")
-	registerLibFunc(&llamaVocabEot, libHandle, "llama_vocab_eot")
-	registerLibFunc(&llamaVocabNl, libHandle, "llama_vocab_nl")
-	registerLibFunc(&llamaVocabPad, libHandle, "llama_vocab_pad")
+	trackRegister(&llamaModelGetVocab, "llama_model_get_vocab")
+	trackRegister(&llamaVocabNTokens, "llama_vocab_n_tokens")
+	trackRegister(&llamaVocabBos, "llama_vocab_bos")
+	trackRegister(&llamaVocabEos, "llama_vocab_eos")
+	trackRegister(&llamaVocabEot, "llama_vocab_eot")
+	trackRegister(&llamaVocabNl, "llama_vocab_nl")
+	trackRegister(&llamaVocabPad, "llama_vocab_pad")
 
 	// Batch functions - Register struct functions only on Darwin (purego limitation)
 	// On other platforms, FFI handles struct parameters/returns directly
 	if runtime.GOOS == "darwin" {
-		registerLibFunc(&llamaBatchInit, libHandle, "llama_batch_init")
-		registerLibFunc(&llamaBatchGetOne, libHandle, "llama_batch_get_one")
-		registerLibFunc(&llamaBatchFree, libHandle, "llama_batch_free")
+		trackRegister(&llamaBatchInit, "llama_batch_init")
+		trackRegister(&llamaBatchGetOne, "llama_batch_get_one")
+		trackRegister(&llamaBatchFree, "llama_batch_free")
 	}
 
 	// Decode functions - Register struct functions only on Darwin (purego limitation)
 	// On other platforms, FFI handles struct parameters/returns directly
 	if runtime.GOOS == "darwin" {
-		registerLibFunc(&llamaDecode, libHandle, "llama_decode")
-		registerLibFunc(&llamaEncode, libHandle, "llama_encode")
+		trackRegister(&llamaDecode, "llama_decode")
+		trackRegister(&llamaEncode, "llama_encode")
 	}
 
 	// Logits and embeddings
-	registerLibFunc(&llamaGetLogits, libHandle, "llama_get_logits")
-	registerLibFunc(&llamaGetLogitsIth, libHandle, "llama_get_logits_ith")
-	registerLibFunc(&llamaGetEmbeddings, libHandle, "llama_get_embeddings")
-	registerLibFunc(&llamaGetEmbeddingsIth, libHandle, "llama_get_embeddings_ith")
-	registerLibFunc(&llamaSetCausalAttn, libHandle, "llama_set_causal_attn")
-	registerLibFunc(&llamaSetEmbeddings, libHandle, "llama_set_embeddings")
-	registerLibFunc(&llamaMemoryClear, libHandle, "llama_memory_clear")
-	registerLibFunc(&llamaGetMemory, libHandle, "llama_get_memory")
+	trackRegister(&llamaGetLogits, "llama_get_logits")
+	trackRegister(&llamaGetLogitsIth, "llama_get_logits_ith")
+	trackRegister(&llamaGetEmbeddings, "llama_get_embeddings")
+	trackRegister(&llamaGetEmbeddingsIth, "llama_get_embeddings_ith")
+	trackRegister(&llamaSetCausalAttn, "llama_set_causal_attn")
+	trackRegister(&llamaSetEmbeddings, "llama_set_embeddings")
+	trackRegister(&llamaMemoryClear, "llama_memory_clear")
+	trackRegister(&llamaGetMemory, "llama_get_memory")
 
 	// Sampling functions - Register struct functions only on Darwin (purego limitation)
 	// On other platforms, FFI handles struct parameters/returns directly
 	if runtime.GOOS == "darwin" {
-		registerLibFunc(&llamaSamplerChainInit, libHandle, "llama_sampler_chain_init")
+		trackRegister(&llamaSamplerChainInit, "llama_sampler_chain_init")
 	}
-	registerLibFunc(&llamaSamplerChainAdd, libHandle, "llama_sampler_chain_add")
-	registerLibFunc(&llamaSamplerChainGet, libHandle, "llama_sampler_chain_get")
-	registerLibFunc(&llamaSamplerChainN, libHandle, "llama_sampler_chain_n")
-	registerLibFunc(&llamaSamplerChainFree, libHandle, "llama_sampler_free")
-	registerLibFunc(&llamaSamplerSample, libHandle, "llama_sampler_sample")
-	registerLibFunc(&llamaSamplerAccept, libHandle, "llama_sampler_accept")
-	registerLibFunc(&llamaSamplerReset, libHandle, "llama_sampler_reset")
+	trackRegister(&llamaSamplerChainAdd, "llama_sampler_chain_add")
+	trackRegister(&llamaSamplerChainGet, "llama_sampler_chain_get")
+	trackRegister(&llamaSamplerChainN, "llama_sampler_chain_n")
+	trackRegister(&llamaSamplerChainFree, "llama_sampler_free")
+	trackRegister(&llamaSamplerSample, "llama_sampler_sample")
+	trackRegister(&llamaSamplerAccept, "llama_sampler_accept")
+	trackRegister(&llamaSamplerReset, "llama_sampler_reset")
 
 	// Built-in samplers
-	registerLibFunc(&llamaSamplerInitGreedy, libHandle, "llama_sampler_init_greedy")
-	registerLibFunc(&llamaSamplerInitDist, libHandle, "llama_sampler_init_dist")
+	trackRegister(&llamaSamplerInitGreedy, "llama_sampler_init_greedy")
+	trackRegister(&llamaSamplerInitDist, "llama_sampler_init_dist")
 	// registerLibFunc(&llamaSamplerInitSoftmax, libHandle, "llama_sampler_init_softmax")  // Function doesn't exist in b6862
-	registerLibFunc(&llamaSamplerInitTopK, libHandle, "llama_sampler_init_top_k")
-	registerLibFunc(&llamaSamplerInitTopP, libHandle, "llama_sampler_init_top_p")
-	registerLibFunc(&llamaSamplerInitMinP, libHandle, "llama_sampler_init_min_p")
+	trackRegister(&llamaSamplerInitTopK, "llama_sampler_init_top_k")
+	trackRegister(&llamaSamplerInitTopP, "llama_sampler_init_top_p")
+	trackRegister(&llamaSamplerInitMinP, "llama_sampler_init_min_p")
 	// registerLibFunc(&llamaSamplerInitTailFree, libHandle, "llama_sampler_init_tail_free")  // Function doesn't exist
-	registerLibFunc(&llamaSamplerInitTypical, libHandle, "llama_sampler_init_typical")
-	registerLibFunc(&llamaSamplerInitTemp, libHandle, "llama_sampler_init_temp")
-	registerLibFunc(&llamaSamplerInitTempExt, libHandle, "llama_sampler_init_temp_ext")
-	registerLibFunc(&llamaSamplerInitMirostat, libHandle, "llama_sampler_init_mirostat")
-	registerLibFunc(&llamaSamplerInitMirostatV2, libHandle, "llama_sampler_init_mirostat_v2")
+	trackRegister(&llamaSamplerInitTypical, "llama_sampler_init_typical")
+	trackRegister(&llamaSamplerInitTemp, "llama_sampler_init_temp")
+	trackRegister(&llamaSamplerInitTempExt, "llama_sampler_init_temp_ext")
+	trackRegister(&llamaSamplerInitMirostat, "llama_sampler_init_mirostat")
+	trackRegister(&llamaSamplerInitMirostatV2, "llama_sampler_init_mirostat_v2")
 
 	// Utility functions
-	registerLibFunc(&llamaMaxDevices, libHandle, "llama_max_devices")
-	registerLibFunc(&llamaSupportsMmap, libHandle, "llama_supports_mmap")
-	registerLibFunc(&llamaSupportsMlock, libHandle, "llama_supports_mlock")
-	registerLibFunc(&llamaSupportsGpuOffload, libHandle, "llama_supports_gpu_offload")
-	registerLibFunc(&llamaSupportsRpc, libHandle, "llama_supports_rpc")
-	registerLibFunc(&llamaTimeUs, libHandle, "llama_time_us")
-	registerLibFunc(&llamaPrintSystemInfo, libHandle, "llama_print_system_info")
+	trackRegister(&llamaMaxDevices, "llama_max_devices")
+	trackRegister(&llamaSupportsMmap, "llama_supports_mmap")
+	trackRegister(&llamaSupportsMlock, "llama_supports_mlock")
+	trackRegister(&llamaSupportsGpuOffload, "llama_supports_gpu_offload")
+	trackRegister(&llamaSupportsRpc, "llama_supports_rpc")
+	trackRegister(&llamaTimeUs, "llama_time_us")
+	trackRegister(&llamaPrintSystemInfo, "llama_print_system_info")
 
 	// KV cache functions
 	// KV cache functions - deprecated/removed in b6862
@@ -729,11 +741,11 @@ func registerFunctions() error {
 	// registerLibFunc(&llamaKvCacheUpdate, libHandle, "llama_kv_cache_update")
 
 	// State functions
-	registerLibFunc(&llamaStateGetSize, libHandle, "llama_state_get_size")
-	registerLibFunc(&llamaStateGetData, libHandle, "llama_state_get_data")
-	registerLibFunc(&llamaStateSetData, libHandle, "llama_state_set_data")
-	registerLibFunc(&llamaStateLoadFile, libHandle, "llama_state_load_file")
-	registerLibFunc(&llamaStateSaveFile, libHandle, "llama_state_save_file")
+	trackRegister(&llamaStateGetSize, "llama_state_get_size")
+	trackRegister(&llamaStateGetData, "llama_state_get_data")
+	trackRegister(&llamaStateSetData, "llama_state_set_data")
+	trackRegister(&llamaStateLoadFile, "llama_state_load_file")
+	trackRegister(&llamaStateSaveFile, "llama_state_save_file")
 
 	// Performance functions - These may not exist in this llama.cpp version - moved to ROADMAP "wait for llama.cpp" section
 	// registerLibFunc(&llamaGetTimings, libHandle, "llama_get_timings")
@@ -743,6 +755,19 @@ func registerFunctions() error {
 	// Register GGML functions
 	if err := registerGgmlFunctions(); err != nil {
 		return fmt.Errorf("failed to register GGML functions: %w", err)
+	}
+
+	// Report failed registrations
+	if len(failedRegistrations) > 0 {
+		fmt.Printf("warning: %d function(s) failed to register:\n", len(failedRegistrations))
+		for _, fname := range failedRegistrations {
+			fmt.Printf("  - %s\n", fname)
+		}
+		// Don't fail if only a few functions couldn't be registered
+		// Check critical functions explicitly
+		if llamaBackendInit == 0 {
+			return fmt.Errorf("critical function llama_backend_init failed to register - library may be incompatible or corrupted")
+		}
 	}
 
 	return nil
@@ -760,6 +785,46 @@ func ensureLoaded() error {
 	return loadLibrary()
 }
 
+// getLibraryDiagnostics returns detailed diagnostic information about library loading
+func getLibraryDiagnostics() string {
+	var diag string
+
+	diag += fmt.Sprintf("  - Library loaded: %v\n", isLoaded)
+	diag += fmt.Sprintf("  - Library handle: 0x%x\n", libHandle)
+	diag += fmt.Sprintf("  - Platform: %s/%s\n", runtime.GOOS, runtime.GOARCH)
+
+	// Check if loader has information
+	if globalLoader != nil {
+		diag += fmt.Sprintf("  - Loader initialized: true\n")
+		diag += fmt.Sprintf("  - Loader library path: %s\n", globalLoader.llamaLibPath)
+		diag += fmt.Sprintf("  - Loader root path: %s\n", globalLoader.rootLibPath)
+		diag += fmt.Sprintf("  - Loader extension: %s\n", globalLoader.extensionSuffix)
+	} else {
+		diag += fmt.Sprintf("  - Loader initialized: false\n")
+	}
+
+	// Check critical function pointers
+	diag += "  - Critical function status:\n"
+	diag += fmt.Sprintf("    - llama_backend_init: %v (addr: 0x%x)\n", llamaBackendInit != nil, llamaBackendInit)
+	diag += fmt.Sprintf("    - llama_backend_free: %v (addr: 0x%x)\n", llamaBackendFree != nil, llamaBackendFree)
+	diag += fmt.Sprintf("    - llama_model_load_from_file: %v\n", llamaModelLoadFromFile != nil)
+	diag += fmt.Sprintf("    - llama_tokenize: %v\n", llamaTokenize != nil)
+
+	// Try to get library path for verification
+	if libPath, err := getLibraryPath(); err == nil {
+		diag += fmt.Sprintf("  - Expected library path: %s\n", libPath)
+		if _, statErr := os.Stat(libPath); statErr == nil {
+			diag += "  - Library file exists: true\n"
+		} else {
+			diag += fmt.Sprintf("  - Library file exists: false (%v)\n", statErr)
+		}
+	} else {
+		diag += fmt.Sprintf("  - Failed to get library path: %v\n", err)
+	}
+
+	return diag
+}
+
 // Public API functions
 
 // Backend_init initializes the llama + ggml backend
@@ -768,7 +833,10 @@ func Backend_init() error {
 		return err
 	}
 	if llamaBackendInit == nil {
-		return fmt.Errorf("llama_backend_init function not available - library may not be loaded correctly")
+		// Provide detailed diagnostic information
+		diagnostics := getLibraryDiagnostics()
+		return fmt.Errorf("llama_backend_init function not available - library may not be loaded correctly.\n"+
+			"Diagnostics:\n%s", diagnostics)
 	}
 	llamaBackendInit()
 	return nil

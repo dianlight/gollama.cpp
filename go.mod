@@ -2,7 +2,7 @@ module github.com/dianlight/gollama.cpp
 
 go 1.21.0
 
-toolchain go1.21.13
+toolchain go1.25.2
 
 require github.com/ebitengine/purego v0.9.1
 

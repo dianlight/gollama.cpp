@@ -767,13 +767,16 @@ func Backend_init() error {
 	if err := ensureLoaded(); err != nil {
 		return err
 	}
+	if llamaBackendInit == nil {
+		return fmt.Errorf("llama_backend_init function not available - library may not be loaded correctly")
+	}
 	llamaBackendInit()
 	return nil
 }
 
 // Backend_free frees the llama + ggml backend
 func Backend_free() {
-	if isLoaded {
+	if isLoaded && llamaBackendFree != nil {
 		llamaBackendFree()
 	}
 }

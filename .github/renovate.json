@@ -67,7 +67,7 @@
       ],
       "automerge": true,
       "automergeType": "pr",
-      "ignoreTests": true
+      "ignoreTests": false
     },
     {
       "matchUpdateTypes": [
@@ -75,7 +75,7 @@
       ],
       "automerge": true,
       "automergeType": "pr",
-      "ignoreTests": true
+      "ignoreTests": false
     },
     {
       "matchPackageNames": [

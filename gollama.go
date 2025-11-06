@@ -529,6 +529,24 @@ func getLibraryPath() (string, error) {
 					// Also check directly in subdirectory
 					cachePath = filepath.Join(cacheDir, entry.Name(), libName)
 					candidates = append(candidates, cachePath)
+
+					// Check nested subdirectories (e.g., embedded/linux_amd64_b6862/)
+					subEntries, subErr := os.ReadDir(filepath.Join(cacheDir, entry.Name()))
+					if subErr == nil {
+						for _, subEntry := range subEntries {
+							if subEntry.IsDir() {
+								// Check for library in nested subdirectory
+								nestedPath := filepath.Join(cacheDir, entry.Name(), subEntry.Name(), libName)
+								candidates = append(candidates, nestedPath)
+								// Also check build/bin in nested subdirectory
+								nestedPath = filepath.Join(cacheDir, entry.Name(), subEntry.Name(), "build", "bin", libName)
+								candidates = append(candidates, nestedPath)
+								// Also check bin in nested subdirectory
+								nestedPath = filepath.Join(cacheDir, entry.Name(), subEntry.Name(), "bin", libName)
+								candidates = append(candidates, nestedPath)
+							}
+						}
+					}
 				}
 			}
 		}

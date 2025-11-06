@@ -765,7 +765,7 @@ func registerFunctions() error {
 		}
 		// Don't fail if only a few functions couldn't be registered
 		// Check critical functions explicitly
-		if llamaBackendInit == 0 {
+		if llamaBackendInit == nil {
 			return fmt.Errorf("critical function llama_backend_init failed to register - library may be incompatible or corrupted")
 		}
 	}
@@ -795,18 +795,18 @@ func getLibraryDiagnostics() string {
 
 	// Check if loader has information
 	if globalLoader != nil {
-		diag += fmt.Sprintf("  - Loader initialized: true\n")
+		diag += "  - Loader initialized: true\n"
 		diag += fmt.Sprintf("  - Loader library path: %s\n", globalLoader.llamaLibPath)
 		diag += fmt.Sprintf("  - Loader root path: %s\n", globalLoader.rootLibPath)
 		diag += fmt.Sprintf("  - Loader extension: %s\n", globalLoader.extensionSuffix)
 	} else {
-		diag += fmt.Sprintf("  - Loader initialized: false\n")
+		diag += "  - Loader initialized: false\n"
 	}
 
 	// Check critical function pointers
 	diag += "  - Critical function status:\n"
-	diag += fmt.Sprintf("    - llama_backend_init: %v (addr: 0x%x)\n", llamaBackendInit != nil, llamaBackendInit)
-	diag += fmt.Sprintf("    - llama_backend_free: %v (addr: 0x%x)\n", llamaBackendFree != nil, llamaBackendFree)
+	diag += fmt.Sprintf("    - llama_backend_init: %v\n", llamaBackendInit != nil)
+	diag += fmt.Sprintf("    - llama_backend_free: %v\n", llamaBackendFree != nil)
 	diag += fmt.Sprintf("    - llama_model_load_from_file: %v\n", llamaModelLoadFromFile != nil)
 	diag += fmt.Sprintf("    - llama_tokenize: %v\n", llamaTokenize != nil)
 

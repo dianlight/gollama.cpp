@@ -52,7 +52,7 @@ libs/
 │   ├── ggml.dll
 │   ├── ggml-base.dll
 │   ├── ggml-blas.dll
-│   ├── ggml-cpu.dll
+│   ├── ggml-cpu-*.dll       # Multiple CPU architecture variants (x64, sse42, alderlake, etc.)
 │   ├── ggml-cuda.dll
 │   ├── llama.dll
 │   └── mtmd.dll
@@ -60,7 +60,7 @@ libs/
     ├── ggml.dll
     ├── ggml-base.dll
     ├── ggml-blas.dll
-    ├── ggml-cpu.dll
+    ├── ggml-cpu-*.dll       # Multiple CPU architecture variants
     ├── llama.dll
     └── mtmd.dll
 ```

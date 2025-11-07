@@ -198,7 +198,7 @@ func preloadSiblingDlls(dir string, mainHandle uintptr) {
 	allowlist := []string{
 		"ggml.dll",
 		"ggml-base.dll",
-		"ggml-cpu.dll",
+		"ggml-cpu-x64.dll", // Generic x64 CPU backend (replaces ggml-cpu.dll which doesn't exist)
 		"ggml-blas.dll",
 		"ggml-rpc.dll",
 	}

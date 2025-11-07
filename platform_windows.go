@@ -77,9 +77,9 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 			if ret != 0 {
 				cookie = ret
 				addedDir = true
-				fmt.Printf("debug: Added DLL directory: %s\n", dir)
+				slog.Debug(fmt.Sprintf("debug: Added DLL directory: %s\n", dir))
 			} else {
-				fmt.Printf("warning: AddDllDirectory failed for %s: %v\n", dir, callErr)
+				slog.Warn(fmt.Sprintf("warning: AddDllDirectory failed for %s: %v\n", dir, callErr))
 			}
 		}
 	}
@@ -90,9 +90,9 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 		if err == nil {
 			ret, _, callErr := procSetDllDirectoryW.Call(uintptr(unsafe.Pointer(pathPtr)))
 			if ret != 0 {
-				fmt.Printf("debug: Set DLL directory (fallback): %s\n", dir)
+				slog.Debug(fmt.Sprintf("debug: Set DLL directory (fallback): %s\n", dir))
 			} else {
-				fmt.Printf("warning: SetDllDirectoryW failed for %s: %v\n", dir, callErr)
+				slog.Warn(fmt.Sprintf("warning: SetDllDirectoryW failed for %s: %v\n", dir, callErr))
 			}
 		}
 	}
@@ -106,7 +106,7 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 		return 0, fmt.Errorf("failed to convert path to UTF16: %w", err)
 	}
 
-	fmt.Printf("debug: Attempting to load library: %s\n", libPath)
+	slog.Debug(fmt.Sprintf("debug: Attempting to load library: %s\n", libPath))
 
 	// Prefer LoadLibraryExW with explicit search flags to ensure dependencies
 	// in the DLL's directory are discovered reliably.
@@ -129,7 +129,7 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 			return ret, nil
 		}
 		loadErr = fmt.Errorf("LoadLibraryExW failed for %s: %w (GetLastError: %d)", libPath, callErr, callErr.(syscall.Errno))
-		fmt.Printf("debug: %v, trying LoadLibraryW...\n", loadErr)
+		slog.Debug(fmt.Sprintf("debug: %v, trying LoadLibraryW...\n", loadErr))
 	}
 
 	ret, _, callErr := procLoadLibraryW.Call(uintptr(unsafe.Pointer(pathPtr)))

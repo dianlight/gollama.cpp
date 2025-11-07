@@ -25,12 +25,12 @@ func (s *GgmlMoreSuite) TearDownTest() {
 func (s *GgmlMoreSuite) TestCpuBufferHelpers() {
 	buft, err := Ggml_backend_cpu_buffer_type()
 	if err != nil {
-		s.T().Skipf("CPU buffer type not available: %v", err)
+		s.T().Errorf("CPU buffer type not available: %v", err)
 		return
 	}
 
 	if ggmlBackendBuftAllocBuffer == nil {
-		s.T().Skip("ggml_backend_buft_alloc_buffer not available in this build")
+		s.T().Error("ggml_backend_buft_alloc_buffer not available in this build")
 		return
 	}
 

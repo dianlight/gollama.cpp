@@ -66,7 +66,7 @@ func (s *GgmlSuite) TestGgmlTypeIsQuantized() {
 	for _, tt := range tests {
 		isQuantized, err := Ggml_type_is_quantized(tt.typ)
 		if err != nil {
-			s.T().Skipf("Ggml_type_is_quantized() not available: %v", err)
+			s.T().Errorf("Ggml_type_is_quantized() not available: %v", err)
 			continue
 		}
 		assert.Equal(s.T(), tt.wantQuantized, isQuantized)
@@ -98,10 +98,16 @@ func (s *GgmlSuite) TestGgmlTypeString() {
 // Tests the backend device count function
 func (s *GgmlSuite) TestGgmlBackendDevCount() {
 	err := Ggml_backend_load_all()
-	s.Require().NoError(err, "ggml_backend_load_all failed")
+	if err != nil {
+		s.T().Errorf("ggml_backend_load_all failed (backend functions may not be exported on this platform): %v", err)
+		return
+	}
 
 	count, err := Ggml_backend_dev_count()
-	s.Require().NoError(err, "Ggml_backend_dev_count() failed")
+	if err != nil {
+		s.T().Errorf("Ggml_backend_dev_count() not available (may not be exported on this platform): %v", err)
+		return
+	}
 	assert.NotZero(s.T(), count, "GGML no backend device functions available in this build")
 	s.T().Logf("Found %d backend device(s)", count)
 }
@@ -109,23 +115,34 @@ func (s *GgmlSuite) TestGgmlBackendDevCount() {
 // Tests getting backend device information
 func (s *GgmlSuite) TestGgmlBackendDevInfo() {
 	err := Ggml_backend_load_all()
-	s.Require().NoError(err, "ggml_backend_load_all failed")
+	if err != nil {
+		s.T().Errorf("ggml_backend_load_all failed (backend functions may not be exported on this platform): %v", err)
+		return
+	}
 
 	count, err := Ggml_backend_dev_count()
-	assert.NoError(s.T(), err)
+	if err != nil {
+		s.T().Errorf("Ggml_backend_dev_count() not available (may not be exported on this platform): %v", err)
+		return
+	}
 	assert.NotZero(s.T(), count, "No backend devices available")
 
 	device, err := Ggml_backend_dev_get(0)
-	assert.NoError(s.T(), err)
+	if err != nil {
+		s.T().Errorf("Ggml_backend_dev_get() not available (may not be exported on this platform): %v", err)
+		return
+	}
 
 	name, err := Ggml_backend_dev_name(device)
-	assert.NoError(s.T(), err)
+	if err != nil {
+		s.T().Errorf("Ggml_backend_dev_name() not available (may not be exported on this platform): %v", err)
+		return
+	}
 	assert.NotEmpty(s.T(), name)
 	s.T().Logf("Device 0: %s", name)
 
 	desc, err := Ggml_backend_dev_description(device)
-	assert.NoError(s.T(), err)
-	if desc != "" {
+	if err == nil && desc != "" {
 		s.T().Logf("Description: %s", desc)
 	}
 
@@ -137,7 +154,10 @@ func (s *GgmlSuite) TestGgmlBackendDevInfo() {
 // Tests getting the CPU buffer type
 func (s *GgmlSuite) TestGgmlBackendCpuBufferType() {
 	bufType, err := Ggml_backend_cpu_buffer_type()
-	assert.NoError(s.T(), err)
+	if err != nil {
+		s.T().Errorf("Ggml_backend_cpu_buffer_type() not available (may not be exported on this platform): %v", err)
+		return
+	}
 	assert.NotZero(s.T(), bufType, "Ggml_backend_cpu_buffer_type() returned null buffer type")
 }
 
@@ -156,7 +176,10 @@ func (s *GgmlSuite) TestGgmlTypeName() {
 
 	for _, tt := range tests {
 		name, err := Ggml_type_name(tt.typ)
-		assert.NoError(s.T(), err)
+		if err != nil {
+			s.T().Errorf("Ggml_type_name() not available (may not be exported on this platform): %v", err)
+			return
+		}
 		assert.Equal(s.T(), tt.wantName, name)
 	}
 }
@@ -179,7 +202,10 @@ func (s *GgmlSuite) TestGgmlBackendLoad() {
 // Tests loading all available backends
 func (s *GgmlSuite) TestGgmlBackendLoadAll() {
 	err := Ggml_backend_load_all()
-	s.Require().NoError(err, "ggml_backend_load_all failed")
+	if err != nil {
+		s.T().Errorf("ggml_backend_load_all not available (may not be exported on this platform): %v", err)
+		return
+	}
 
 	if count, err := Ggml_backend_dev_count(); err == nil {
 		s.T().Logf("Backend device count after load_all: %d", count)
@@ -202,7 +228,10 @@ func (s *GgmlSuite) TestGgmlBackendLoadAll() {
 // Tests loading all backends from a specific path
 func (s *GgmlSuite) TestGgmlBackendLoadAllFromPath() {
 	err := Ggml_backend_load_all_from_path(".")
-	s.Require().NoError(err, "ggml_backend_load_all_from_path failed")
+	if err != nil {
+		s.T().Errorf("ggml_backend_load_all_from_path not available (may not be exported on this platform): %v", err)
+		return
+	}
 	if count, err := Ggml_backend_dev_count(); err == nil {
 		s.T().Logf("Backend device count after load_all_from_path: %d", count)
 	}
@@ -211,7 +240,10 @@ func (s *GgmlSuite) TestGgmlBackendLoadAllFromPath() {
 // Tests initializing the best available backend
 func (s *GgmlSuite) TestGgmlBackendInitBest() {
 	backend, err := Ggml_backend_init_best()
-	s.Require().NoError(err, "ggml_backend_init_best not available or failed")
+	if err != nil {
+		s.T().Errorf("ggml_backend_init_best not available (may not be exported on this platform): %v", err)
+		return
+	}
 
 	if backend != 0 {
 		if name, err := Ggml_backend_name(backend); err == nil {
@@ -228,7 +260,10 @@ func (s *GgmlSuite) TestGgmlBackendInitBest() {
 func (s *GgmlSuite) TestGgmlBackendInitByName() {
 	// Try to initialize CPU backend by name
 	backend, err := Ggml_backend_init_by_name("CPU", "")
-	s.Require().NoError(err, "ggml_backend_init_by_name not available or failed")
+	if err != nil {
+		s.T().Errorf("ggml_backend_init_by_name not available (may not be exported on this platform): %v", err)
+		return
+	}
 
 	if backend != 0 {
 		if name, err := Ggml_backend_name(backend); err == nil {
@@ -245,7 +280,10 @@ func (s *GgmlSuite) TestGgmlBackendInitByName() {
 func (s *GgmlSuite) TestGgmlBackendInitByType() {
 	// Try to initialize CPU backend by type
 	backend, err := Ggml_backend_init_by_type(GGML_BACKEND_DEVICE_TYPE_CPU, "")
-	s.Require().NoError(err, "ggml_backend_init_by_type not available or failed")
+	if err != nil {
+		s.T().Errorf("ggml_backend_init_by_type not available (may not be exported on this platform): %v", err)
+		return
+	}
 
 	if backend != 0 {
 		if name, err := Ggml_backend_name(backend); err == nil {

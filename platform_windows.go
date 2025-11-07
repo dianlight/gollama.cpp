@@ -60,9 +60,12 @@ const (
 
 // loadLibraryPlatform loads a shared library using platform-specific methods
 func loadLibraryPlatform(libPath string) (uintptr, error) {
+	slog.Debug("loadLibraryPlatform: starting library load", "path", libPath)
+
 	// Ensure Windows can find dependencies alongside the target DLL by
 	// temporarily adding its directory to the DLL search path.
 	dir := filepath.Dir(libPath)
+	slog.Debug("loadLibraryPlatform: DLL directory", "dir", dir)
 
 	// Try modern safe APIs first: SetDefaultDllDirectories + AddDllDirectory
 	var cookie uintptr
@@ -75,7 +78,9 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 			uintptr(loadLibrarySearchDefaultDirs | loadLibrarySearchUserDirs | loadLibrarySearchSystem32),
 		)
 		if ret == 0 {
-			slog.Warn("SetDefaultDllDirectories failed", "error", callErr)
+			slog.Warn("loadLibraryPlatform: SetDefaultDllDirectories failed", "error", callErr)
+		} else {
+			slog.Debug("loadLibraryPlatform: SetDefaultDllDirectories succeeded")
 		}
 	}
 
@@ -86,9 +91,9 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 			if ret != 0 {
 				cookie = ret
 				addedDir = true
-				slog.Debug(fmt.Sprintf("debug: Added DLL directory: %s\n", dir))
+				slog.Debug("loadLibraryPlatform: Added DLL directory via AddDllDirectory", "dir", dir, "cookie", fmt.Sprintf("0x%x", cookie))
 			} else {
-				slog.Warn(fmt.Sprintf("warning: AddDllDirectory failed for %s: %v\n", dir, callErr))
+				slog.Warn("loadLibraryPlatform: AddDllDirectory failed", "dir", dir, "error", callErr)
 			}
 		}
 	}
@@ -99,9 +104,9 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 		if err == nil {
 			ret, _, callErr := procSetDllDirectoryW.Call(uintptr(unsafe.Pointer(pathPtr)))
 			if ret != 0 {
-				slog.Debug(fmt.Sprintf("debug: Set DLL directory (fallback): %s\n", dir))
+				slog.Debug("loadLibraryPlatform: Set DLL directory (fallback SetDllDirectoryW)", "dir", dir)
 			} else {
-				slog.Warn(fmt.Sprintf("warning: SetDllDirectoryW failed for %s: %v\n", dir, callErr))
+				slog.Warn("loadLibraryPlatform: SetDllDirectoryW failed", "dir", dir, "error", callErr)
 			}
 		}
 	}
@@ -115,7 +120,7 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 		return 0, fmt.Errorf("failed to convert path to UTF16: %w", err)
 	}
 
-	slog.Debug(fmt.Sprintf("debug: Attempting to load library: %s\n", libPath))
+	slog.Debug("loadLibraryPlatform: attempting to load library with LoadLibraryExW", "path", libPath)
 
 	// Prefer LoadLibraryExW with explicit search flags to ensure dependencies
 	// in the DLL's directory are discovered reliably.
@@ -127,19 +132,22 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 			uintptr(loadLibrarySearchDllLoadDir|loadLibrarySearchDefaultDirs|loadLibrarySearchSystem32|loadLibrarySearchUserDirs),
 		)
 		if ret != 0 {
-			slog.Debug("Successfully loaded library with LoadLibraryExW", "path", libPath, "handle", fmt.Sprintf("0x%x", ret))
+			slog.Debug("loadLibraryPlatform: Successfully loaded library with LoadLibraryExW", "path", libPath, "handle", fmt.Sprintf("0x%x", ret))
 			// Cleanup any directory we added
 			if addedDir && procRemoveDllDirectory.Find() == nil {
 				_, _, _ = procRemoveDllDirectory.Call(cookie)
 			}
 			// Also try to proactively load sibling DLLs from the same directory to ensure
 			// all exports are available (some symbols may live in ggml*.dll on Windows).
+			slog.Debug("loadLibraryPlatform: preloading sibling DLLs", "dir", dir)
 			preloadSiblingDlls(dir, ret)
 			return ret, nil
 		}
 		loadErr = fmt.Errorf("LoadLibraryExW failed for %s: %w (GetLastError: %d)", libPath, callErr, callErr.(syscall.Errno))
-		slog.Debug(fmt.Sprintf("debug: %v, trying LoadLibraryW...\n", loadErr))
+		slog.Debug("loadLibraryPlatform: LoadLibraryExW failed, trying LoadLibraryW", "error", loadErr)
 	}
+
+	slog.Debug("loadLibraryPlatform: attempting to load library with LoadLibraryW (fallback)", "path", libPath)
 
 	ret, _, callErr := procLoadLibraryW.Call(uintptr(unsafe.Pointer(pathPtr)))
 	if ret == 0 {
@@ -173,7 +181,7 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 		return 0, fmt.Errorf("%s", errMsg)
 	}
 
-	slog.Debug("Successfully loaded library with LoadLibraryW", "path", libPath, "handle", fmt.Sprintf("0x%x", ret))
+	slog.Debug("loadLibraryPlatform: Successfully loaded library with LoadLibraryW", "path", libPath, "handle", fmt.Sprintf("0x%x", ret))
 
 	// Cleanup any directory we added
 	if addedDir && procRemoveDllDirectory.Find() == nil {
@@ -181,6 +189,7 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 	}
 
 	// Proactively load sibling DLLs from the same directory
+	slog.Debug("loadLibraryPlatform: preloading sibling DLLs", "dir", dir)
 	preloadSiblingDlls(dir, ret)
 
 	return ret, nil
@@ -192,6 +201,7 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 func preloadSiblingDlls(dir string, mainHandle uintptr) {
 	// Track the main handle
 	addLoadedHandle(mainHandle)
+	slog.Debug("preloadSiblingDlls: starting DLL preload", "directory", dir, "mainHandle", fmt.Sprintf("0x%x", mainHandle))
 
 	// Scan directory for DLLs and load a short allowlist first, then best-effort all *.dll
 	// Priority list of likely dependencies
@@ -202,64 +212,84 @@ func preloadSiblingDlls(dir string, mainHandle uintptr) {
 		"ggml-blas.dll",
 		"ggml-rpc.dll",
 	}
+
+	slog.Debug("preloadSiblingDlls: loading allowlisted DLLs", "count", len(allowlist))
 	for _, name := range allowlist {
 		dllPath := filepath.Join(dir, name)
 		if _, err := os.Stat(dllPath); err == nil {
+			slog.Debug("preloadSiblingDlls: found allowlisted DLL", "name", name, "path", dllPath)
 			if h, err := loadOneDll(dllPath); err == nil {
 				addLoadedHandle(h)
+				slog.Debug("preloadSiblingDlls: successfully loaded DLL", "name", name, "handle", fmt.Sprintf("0x%x", h))
+			} else {
+				slog.Warn("preloadSiblingDlls: failed to load allowlisted DLL", "name", name, "error", err)
 			}
 		}
 	}
+
 	// Best-effort: load remaining DLLs in the directory (skip those already loaded)
+	slog.Debug("preloadSiblingDlls: scanning directory for additional DLLs", "directory", dir)
 	entries, err := os.ReadDir(dir)
-	if err == nil {
-		for _, e := range entries {
-			if e.IsDir() || filepath.Ext(e.Name()) != ".dll" {
-				continue
-			}
-			name := e.Name()
-			// Skip main llama.dll; we already have it
-			if name == "llama.dll" {
-				continue
-			}
-			// Skip those in allowlist (handled above)
-			skip := false
-			for _, a := range allowlist {
-				if a == name {
-					skip = true
-					break
-				}
-			}
-			if skip {
-				continue
-			}
-			dllPath := filepath.Join(dir, name)
-			if h, err := loadOneDll(dllPath); err == nil {
-				addLoadedHandle(h)
+	if err != nil {
+		slog.Warn("preloadSiblingDlls: failed to read directory", "directory", dir, "error", err)
+		return
+	}
+
+	loadedCount := 0
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".dll" {
+			continue
+		}
+		name := e.Name()
+		// Skip main llama.dll; we already have it
+		if name == "llama.dll" {
+			continue
+		}
+		// Skip those in allowlist (handled above)
+		skip := false
+		for _, a := range allowlist {
+			if a == name {
+				skip = true
+				break
 			}
 		}
+		if skip {
+			continue
+		}
+		dllPath := filepath.Join(dir, name)
+		if h, err := loadOneDll(dllPath); err == nil {
+			addLoadedHandle(h)
+			loadedCount++
+			slog.Debug("preloadSiblingDlls: loaded additional DLL", "name", name, "handle", fmt.Sprintf("0x%x", h))
+		}
 	}
+	slog.Debug("preloadSiblingDlls: completed", "additionalDllsLoaded", loadedCount, "totalLoadedHandles", len(loadedDllHandles))
 }
 
 // loadOneDll loads a single DLL by absolute path using LoadLibraryExW with safe flags
 func loadOneDll(path string) (uintptr, error) {
 	p, err := syscall.UTF16PtrFromString(path)
 	if err != nil {
+		slog.Debug("loadOneDll: failed to convert path", "path", path, "error", err)
 		return 0, err
 	}
 	if procLoadLibraryExW.Find() == nil {
-		if ret, _, _ := procLoadLibraryExW.Call(
+		if ret, _, callErr := procLoadLibraryExW.Call(
 			uintptr(unsafe.Pointer(p)),
 			0,
 			uintptr(loadLibrarySearchDllLoadDir|loadLibrarySearchDefaultDirs|loadLibrarySearchSystem32|loadLibrarySearchUserDirs),
 		); ret != 0 {
-			slog.Debug(fmt.Sprintf("debug: preloaded sibling DLL: %s (handle: 0x%x)\n", path, ret))
+			slog.Debug("loadOneDll: successfully loaded with LoadLibraryExW", "path", path, "handle", fmt.Sprintf("0x%x", ret))
 			return ret, nil
+		} else {
+			slog.Debug("loadOneDll: LoadLibraryExW failed", "path", path, "error", callErr)
 		}
 	}
-	if ret, _, _ := procLoadLibraryW.Call(uintptr(unsafe.Pointer(p))); ret != 0 {
-		slog.Debug(fmt.Sprintf("debug: preloaded sibling DLL (fallback): %s (handle: 0x%x)\n", path, ret))
+	if ret, _, callErr := procLoadLibraryW.Call(uintptr(unsafe.Pointer(p))); ret != 0 {
+		slog.Debug("loadOneDll: successfully loaded with LoadLibraryW (fallback)", "path", path, "handle", fmt.Sprintf("0x%x", ret))
 		return ret, nil
+	} else {
+		slog.Debug("loadOneDll: LoadLibraryW failed", "path", path, "error", callErr)
 	}
 	return 0, fmt.Errorf("failed to preload dll: %s", path)
 }
@@ -366,26 +396,34 @@ func getProcAddressPlatform(handle uintptr, name string) (uintptr, error) {
 	// Try on the provided handle first
 	ret, _, err := procGetProcAddress.Call(handle, uintptr(unsafe.Pointer(namePtr)))
 	if ret != 0 {
+		slog.Debug("symbol resolved from main library", "symbol", name, "handle", fmt.Sprintf("0x%x", handle))
 		return ret, nil
 	}
 
+	slog.Debug("symbol not found in main library", "symbol", name, "handle", fmt.Sprintf("0x%x", handle), "error", fmt.Sprintf("%v", err))
+
 	// If not found, try on any sibling DLLs we preloaded from the same directory
-	for _, h := range loadedDllHandles {
-		if h == 0 || h == handle {
-			continue
+	if len(loadedDllHandles) > 0 {
+		slog.Debug("searching in sibling DLLs", "symbol", name, "siblingCount", len(loadedDllHandles))
+		for i, h := range loadedDllHandles {
+			if h == 0 || h == handle {
+				continue
+			}
+			addr, _, _ := procGetProcAddress.Call(h, uintptr(unsafe.Pointer(namePtr)))
+			if addr != 0 {
+				slog.Debug("symbol resolved from sibling handle", "symbol", name, "handle", fmt.Sprintf("0x%x", h), "siblingIndex", i)
+				return addr, nil
+			}
 		}
-		addr, _, _ := procGetProcAddress.Call(h, uintptr(unsafe.Pointer(namePtr)))
-		if addr != 0 {
-			slog.Debug("symbol resolved from sibling handle", "symbol", name, "handle", fmt.Sprintf("0x%x", h))
-			return addr, nil
-		}
+	} else {
+		slog.Debug("no sibling DLL handles available for symbol lookup", "symbol", name)
 	}
 
 	// Not found anywhere; return the original error context
 	errno := err.(syscall.Errno)
-	return 0, fmt.Errorf("GetProcAddress failed for %s in library handle 0x%x and sibling DLLs: %w (GetLastError: %d). "+
+	return 0, fmt.Errorf("GetProcAddress failed for %s in library handle 0x%x and %d sibling DLLs: %w (GetLastError: %d). "+
 		"The symbol may not be exported by this build.",
-		name, handle, err, errno)
+		name, handle, len(loadedDllHandles), err, errno)
 }
 
 // isPlatformSupported returns whether the current platform is supported

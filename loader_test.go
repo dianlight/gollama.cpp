@@ -261,7 +261,7 @@ func (s *LoaderSuite) TestExtractEmbeddedLibrariesWriteFailure_WriteToReadOnlyDi
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
 	if err = os.Chmod(tempDir, 0444); err != nil {
-		s.T().Skipf("Cannot change directory permissions: %v", err)
+		s.T().Errorf("Cannot change directory permissions: %v", err)
 	}
 	defer func() { _ = os.Chmod(tempDir, 0755) }()
 	_, err = loader.extractEmbeddedLibraries()

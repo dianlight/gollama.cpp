@@ -152,6 +152,16 @@ When adding or updating tests, follow these conventions:
    - Keep unit tests fast and hermetic; avoid external downloads when possible
    - Mark slow/integration tests with clear names and guard them behind environment checks when appropriate
 
+6. **Never Use Test Skip**:
+   - Do NOT use `t.Skip()` or `s.T().Skip()` to skip tests
+   - Skipped tests create technical debt and hide broken functionality
+   - Instead:
+     - Fix broken tests or features
+     - If a test requires external resources (e.g., network, specific OS), use environment variable guards (e.g., `if os.Getenv("SKIP_INTEGRATION_TESTS") != ""`)
+     - If a test depends on pending work, document why in a comment and track in an issue
+     - Use build tags (`// +build`) for platform-specific tests
+   - Ensure all tests in a suite pass without skipping
+
 ## File-Specific Rules
 
 ### For `gollama.go` changes:

@@ -41,7 +41,7 @@ func (s *GollamaMoreSuite) TestModelAndContextBasics() {
 	params.NGpuLayers = 0
 	model, err := Model_load_from_file(modelPath, params)
 	if err != nil {
-		s.T().Skipf("Model not available at %s: %v", modelPath, err)
+		s.T().Errorf("Model not available at %s: %v", modelPath, err)
 		return
 	}
 	defer Model_free(model)
@@ -72,7 +72,7 @@ func (s *GollamaMoreSuite) TestBatchAndTokenPiece() {
 	params.NGpuLayers = 0
 	model, err := Model_load_from_file(modelPath, params)
 	if err != nil {
-		s.T().Skipf("Model not available at %s: %v", modelPath, err)
+		s.T().Errorf("Model not available at %s: %v", modelPath, err)
 		return
 	}
 	defer Model_free(model)

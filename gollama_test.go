@@ -146,13 +146,16 @@ func (s *GollamaSuite) TestTokenization() {
 	s.Require().NoError(err, "Backend_init failed")
 	defer Backend_free()
 	err = Ggml_backend_load_all()
-	s.Require().NoError(err, "ggml_backend_load not available or failed")
+	if err != nil {
+		s.T().Errorf("ggml_backend_load_all not available (may not be exported on this platform): %v", err)
+		return
+	}
 	modelPath := "./models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf"
 	params := Model_default_params()
 	params.NGpuLayers = 0
 	model, err := Model_load_from_file(modelPath, params)
 	if err != nil {
-		s.T().Skipf("Tokenization test: model not available at %s: %v", modelPath, err)
+		s.T().Errorf("Tokenization test: model not available at %s: %v", modelPath, err)
 		return
 	}
 	defer Model_free(model)

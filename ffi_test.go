@@ -184,7 +184,7 @@ func BenchmarkFFIModelDefaultParams(b *testing.B) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			b.Skipf("Skipping benchmark: library not available: %v", err)
+			b.Errorf("Skipping benchmark: library not available: %v", err)
 		}
 	}
 
@@ -199,7 +199,7 @@ func BenchmarkFFIContextDefaultParams(b *testing.B) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			b.Skipf("Skipping benchmark: library not available: %v", err)
+			b.Errorf("Skipping benchmark: library not available: %v", err)
 		}
 	}
 
@@ -214,7 +214,7 @@ func BenchmarkFFIBatchInit(b *testing.B) {
 	if !isLoaded {
 		err := loadLibrary()
 		if err != nil {
-			b.Skipf("Skipping benchmark: library not available: %v", err)
+			b.Errorf("Skipping benchmark: library not available: %v", err)
 		}
 	}
 

@@ -147,8 +147,8 @@ const (
 	LLAMA_ERR_GPU_UNAVAILABLE = -13
 )
 
-// ErrorFromCode converts a llama.cpp error code to a Go error
-func ErrorFromCode(code int) error {
+// ErrorfromCode converts a llama.cpp error code to a Go error
+func ErrorfromCode(code int) error {
 	switch code {
 	case LLAMA_ERR_SUCCESS:
 		return nil
@@ -366,7 +366,7 @@ func CheckResult(result int, function string) error {
 		return nil
 	}
 
-	err := ErrorFromCode(result)
+	err := ErrorfromCode(result)
 	if llamaErr, ok := err.(*LlamaError); ok {
 		llamaErr.Function = function
 	}

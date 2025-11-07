@@ -48,17 +48,10 @@ jobs:
           # Install OpenCL tools for GPU detection
           #sudo apt-get install -y clinfo || echo "OpenCL tools not available"
 
-      #- name: Install dependencies (macOS)
-      #  if: matrix.os == 'macos-latest'
-      #  run: |
-      #    brew install cmake
-      #    # Install Vulkan SDK for GPU detection (if available)
-      #    brew install --cask vulkan-sdk || echo "Vulkan SDK not available"
-
       - name: Install dependencies (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          choco install cmake -y
+          choco install make -y
           # Ensure Microsoft Visual C++ Redistributable is present (needed by prebuilt DLLs)
           choco install vcredist140 -y || echo "vcredist already installed"
           # Install Vulkan SDK for GPU detection (if available)

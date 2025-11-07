@@ -1,6 +1,7 @@
 package gollama
 
 import (
+	"os"
 	"testing"
 	"unsafe"
 
@@ -14,6 +15,39 @@ func (s *FFISuite) SetupSuite() {
 	if err := loadLibrary(); err != nil {
 		s.Require().Failf("SetupSuite", "Failed to load library during suite setup: %v", err)
 	}
+}
+
+// SetupTest reloads the library if it was unloaded by a previous suite and
+// snapshots environment/config using BaseSuite without causing an unload after
+// each individual test.
+func (s *FFISuite) SetupTest() {
+	s.BaseSuite.SetupTest()
+	if !isLoaded {
+		s.Require().NoError(loadLibrary(), "Failed to load library for test")
+	}
+}
+
+// TearDownTest restores environment and config but intentionally does NOT
+// unload the library (the FFI suite requires a persistent handle across tests).
+func (s *FFISuite) TearDownTest() {
+	// Restore env variables
+	for k, v := range s.savedEnv {
+		if v == "" {
+			_ = os.Unsetenv(k)
+		} else {
+			_ = os.Setenv(k, v)
+		}
+	}
+	// Restore global config
+	if s.savedConfig != nil {
+		_ = SetGlobalConfig(s.savedConfig)
+	}
+	// Intentionally skip Cleanup() here
+}
+
+// TearDownSuite performs a final cleanup after all tests have run.
+func (s *FFISuite) TearDownSuite() {
+	Cleanup()
 }
 
 // Verifies that FFI type definitions are properly structured
@@ -105,7 +139,7 @@ func (s *FFISuite) TestFFIEncode() {
 func (s *FFISuite) TestFFISamplerChainInit() {
 	params := LlamaSamplerChainParams{NoPerf: 0}
 	sampler, err := ffiSamplerChainInit(params)
-	s.Require().NoError(err, "FFI sampler chain init failed (expected if library not present)")
+	s.Require().NoError(err, "FFI sampler chain init failed")
 	s.Assert().NotZero(sampler, "FFI sampler chain init returned null sampler")
 }
 
@@ -126,7 +160,7 @@ func (s *FFISuite) TestFFIFallbackBehavior() {
 // Tests the platform-specific GetProcAddress implementation
 func (s *FFISuite) TestPlatformGetProcAddress() {
 	addr, err := getProcAddressPlatform(libHandle, "llama_backend_init")
-	s.Assert().NoError(err, "Failed to get llama_backend_init address")
+	s.Require().NoError(err, "Failed to get llama_backend_init address")
 	s.Assert().NotZero(addr, "llama_backend_init address should not be zero")
 }
 

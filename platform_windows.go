@@ -276,44 +276,44 @@ func closeLibraryPlatform(handle uintptr) error {
 // registerLibFunc registers a library function using platform-specific methods
 // For Windows, this uses GetProcAddress to resolve the function and stores it in the function pointer
 func registerLibFunc(fptr interface{}, handle uintptr, fname string) {
-	// Resolve first to provide clearer diagnostics on Windows when symbol is missing
 	procAddr, err := getProcAddressPlatform(handle, fname)
 	if err != nil {
 		slog.Warn("failed to register function", "name", fname, "error", err, "handle", fmt.Sprintf("0x%x", handle))
 		return
 	}
 
-	// Validate that fptr is a pointer to a function (the shape expected by purego)
 	if fptr == nil {
-		slog.Warn("registerLibFunc received nil function pointer", "name", fname)
+		slog.Warn("registerLibFunc nil pointer", "name", fname)
 		return
 	}
+
 	t := reflect.TypeOf(fptr)
 	if t.Kind() != reflect.Ptr || t.Elem().Kind() != reflect.Func {
-		// Provide rich type information to help diagnose casting/mismatch issues
 		elemKind := "<nil>"
 		elemType := "<nil>"
 		if t.Kind() == reflect.Ptr {
 			elemKind = t.Elem().Kind().String()
 			elemType = t.Elem().String()
 		}
-		slog.Warn("function pointer has unexpected type",
+		slog.Warn("unexpected pointer type for function",
 			"name", fname,
-			"have_kind", t.Kind().String(),
-			"have_type", t.String(),
+			"type", t.String(),
 			"elem_kind", elemKind,
 			"elem_type", elemType,
-			"expected", "pointer to func",
-			"resolved_addr", fmt.Sprintf("0x%x", procAddr),
-			"handle", fmt.Sprintf("0x%x", handle),
+			"addr", fmt.Sprintf("0x%x", procAddr),
 		)
 		return
 	}
 
-	// Delegate actual binding to purego which wires the Go func variable to the proc address
-	// Note: purego.RegisterLibFunc will use GetProcAddress semantics internally on Windows.
-	// We already confirmed the symbol exists above for better logs; now perform the binding.
-	purego.RegisterLibFunc(fptr, handle, fname)
+	// Safe registration wrapper to avoid panics from purego when symbol signatures are unsupported
+	if err := safeRegisterLibFunc(fptr, handle, fname); err != nil {
+		slog.Warn("failed binding function",
+			"name", fname,
+			"error", err,
+			"addr", fmt.Sprintf("0x%x", procAddr),
+		)
+		return
+	}
 	slog.Debug("registered function",
 		"name", fname,
 		"addr", fmt.Sprintf("0x%x", procAddr),
@@ -323,26 +323,31 @@ func registerLibFunc(fptr interface{}, handle uintptr, fname string) {
 // tryRegisterLibFunc attempts to register a library function, returning an error if it fails
 // This is useful for optional functions that may not exist in all library builds
 func tryRegisterLibFunc(fptr interface{}, handle uintptr, fname string) error {
-	// First ensure the symbol exists so we can return a helpful error
 	if _, err := getProcAddressPlatform(handle, fname); err != nil {
 		return err
 	}
-
-	// Validate fptr shape for better diagnostics in optional registration path
 	if fptr == nil {
 		return fmt.Errorf("tryRegisterLibFunc: nil function pointer for %s", fname)
 	}
 	t := reflect.TypeOf(fptr)
 	if t.Kind() != reflect.Ptr || t.Elem().Kind() != reflect.Func {
-		return fmt.Errorf("tryRegisterLibFunc: expected pointer to func for %s, got %s (elem=%s)", fname, t.String(), func() string {
-			if t.Kind() == reflect.Ptr {
-				return t.Elem().String()
-			}
-			return "<none>"
-		}())
+		return fmt.Errorf("tryRegisterLibFunc: expected pointer to func for %s, got %s", fname, t.String())
 	}
+	if err := safeRegisterLibFunc(fptr, handle, fname); err != nil {
+		return err
+	}
+	return nil
+}
 
-	// Bind using purego so the typed Go function variable can be invoked
+// safeRegisterLibFunc wraps purego.RegisterLibFunc with panic protection.
+// Some optional symbols or exotic signatures on Windows may trigger a panic inside purego.
+// We convert those to errors so callers can degrade gracefully.
+func safeRegisterLibFunc(fptr interface{}, handle uintptr, fname string) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic during RegisterLibFunc for %s: %v", fname, r)
+		}
+	}()
 	purego.RegisterLibFunc(fptr, handle, fname)
 	return nil
 }

@@ -1,6 +1,6 @@
 module github.com/dianlight/gollama.cpp
 
-go 1.21.0
+go 1.24.0
 
 toolchain go1.25.4
 
@@ -15,6 +15,7 @@ require (
 
 require (
 	github.com/google/go-github/v68 v68.0.0
+	github.com/google/go-github/v77 v77.0.0
 	github.com/jupiterrider/ffi v0.5.1
 )
 

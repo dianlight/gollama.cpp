@@ -48,3 +48,8 @@ func isPlatformSupported() bool {
 func getPlatformError() error {
 	return nil
 }
+
+// clearLoadedDllHandles is a no-op on Unix platforms (only used on Windows)
+func clearLoadedDllHandles() {
+	// No-op: Unix platforms don't maintain a sibling DLL registry
+}

@@ -396,6 +396,7 @@ func RegisterFunction(fptr interface{}, name string) error {
 // Cleanup function to be called when the program exits
 func Cleanup() {
 	_ = globalLoader.UnloadLibrary() // Ignore error during cleanup
+	_ = unloadLibrary()              // Also unload the gollama.go global state
 }
 
 // CleanLibraryCache removes cached library files to force re-download

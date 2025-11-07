@@ -41,6 +41,12 @@ func addLoadedHandle(h uintptr) {
 	loadedDllHandles = append(loadedDllHandles, h)
 }
 
+// clearLoadedDllHandles clears the registry of loaded DLL handles
+// This should be called when unloading the library to avoid stale handles
+func clearLoadedDllHandles() {
+	loadedDllHandles = nil
+}
+
 // Flags for LoadLibraryEx and SetDefaultDllDirectories
 const (
 	loadLibrarySearchDllLoadDir  = 0x00000100

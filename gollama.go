@@ -600,6 +600,41 @@ func loadLibrary() error {
 	return nil
 }
 
+// unloadLibrary unloads the library and resets global state
+// This is called by Cleanup() and is important for tests to avoid stale state
+func unloadLibrary() error {
+	libMutex.Lock()
+	defer libMutex.Unlock()
+
+	if !isLoaded {
+		return nil
+	}
+
+	// Close library handle (platform-specific behavior)
+	if libHandle != 0 {
+		if runtime.GOOS == "darwin" {
+			// Only call dlclose on Darwin where it's more stable
+			_ = closeLibraryPlatform(libHandle) // Ignore error during cleanup
+		}
+		// On Windows and Linux, we skip dlclose to avoid potential crashes
+		// but we still clear the handle and state
+
+		// On Windows, also clear the sibling DLL handles registry
+		if runtime.GOOS == "windows" {
+			clearLoadedDllHandles()
+		}
+	}
+
+	// Reset all global state
+	libHandle = 0
+	isLoaded = false
+
+	// Don't need to nil out function pointers as they'll be re-registered on next load
+	// but the isLoaded check will prevent them from being called when nil
+
+	return nil
+}
+
 // registerFunctions registers all llama.cpp function pointers
 func registerFunctions() error {
 	// Track failed registrations

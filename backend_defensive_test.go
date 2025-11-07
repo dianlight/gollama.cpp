@@ -91,20 +91,26 @@ func (s *BackendDefensiveSuite) TestGgmlBackendFreeDefensive() {
 	// Ensure library is not loaded
 	Cleanup()
 
-	// Save the current function pointer
+	// Save the current function pointer and state
 	savedFree := ggmlBackendFree
+	savedLoaded := isLoaded
+	savedHandle := libHandle
 
-	// Simulate missing symbol by setting to nil
+	// Simulate library loaded but symbol missing
+	isLoaded = true
+	libHandle = 1 // Non-zero to indicate "loaded"
 	ggmlBackendFree = nil
 
 	// Restore after test
 	defer func() {
 		ggmlBackendFree = savedFree
+		isLoaded = savedLoaded
+		libHandle = savedHandle
 	}()
 
-	// Ggml_backend_free should not return an error when the symbol is missing (safe no-op)
+	// Ggml_backend_free should return an error when the symbol is missing
 	err := Ggml_backend_free(0)
-	s.Require().EqualError(err, "ggml_backend_free function not available", "Ggml_backend_free should be a safe no-op when ggmlBackendFree is nil")
+	s.Require().EqualError(err, "ggml_backend_free function not available", "Ggml_backend_free should return error when ggmlBackendFree is nil")
 }
 
 // TestGgmlBackendBufferFreeDefensive tests that Ggml_backend_buffer_free is a safe no-op when function is missing
@@ -112,20 +118,26 @@ func (s *BackendDefensiveSuite) TestGgmlBackendBufferFreeDefensive() {
 	// Ensure library is not loaded
 	Cleanup()
 
-	// Save the current function pointer
+	// Save the current function pointer and state
 	savedFree := ggmlBackendBufferFree
+	savedLoaded := isLoaded
+	savedHandle := libHandle
 
-	// Simulate missing symbol by setting to nil
+	// Simulate library loaded but symbol missing
+	isLoaded = true
+	libHandle = 1 // Non-zero to indicate "loaded"
 	ggmlBackendBufferFree = nil
 
 	// Restore after test
 	defer func() {
 		ggmlBackendBufferFree = savedFree
+		isLoaded = savedLoaded
+		libHandle = savedHandle
 	}()
 
-	// Ggml_backend_buffer_free should not return an error when the symbol is missing (safe no-op)
+	// Ggml_backend_buffer_free should return an error when the symbol is missing
 	err := Ggml_backend_buffer_free(0)
-	s.Require().EqualError(err, "ggml_backend_buffer_free function not available", "Ggml_backend_buffer_free should be a safe no-op when ggmlBackendBufferFree is nil")
+	s.Require().EqualError(err, "ggml_backend_buffer_free function not available", "Ggml_backend_buffer_free should return error when ggmlBackendBufferFree is nil")
 }
 
 // TestGgmlBackendUnloadDefensive tests that Ggml_backend_unload is a safe no-op when function is missing
@@ -133,20 +145,26 @@ func (s *BackendDefensiveSuite) TestGgmlBackendUnloadDefensive() {
 	// Ensure library is not loaded
 	Cleanup()
 
-	// Save the current function pointer
+	// Save the current function pointer and state
 	savedUnload := ggmlBackendUnload
+	savedLoaded := isLoaded
+	savedHandle := libHandle
 
-	// Simulate missing symbol by setting to nil
+	// Simulate library loaded but symbol missing
+	isLoaded = true
+	libHandle = 1 // Non-zero to indicate "loaded"
 	ggmlBackendUnload = nil
 
 	// Restore after test
 	defer func() {
 		ggmlBackendUnload = savedUnload
+		isLoaded = savedLoaded
+		libHandle = savedHandle
 	}()
 
-	// Ggml_backend_unload should not return an error when the symbol is missing (safe no-op)
+	// Ggml_backend_unload should return an error when the symbol is missing
 	err := Ggml_backend_unload(0)
-	s.Require().EqualError(err, "ggml_backend_unload function not available", "Ggml_backend_unload should be a safe no-op when ggmlBackendUnload is nil")
+	s.Require().EqualError(err, "ggml_backend_unload function not available", "Ggml_backend_unload should return error when ggmlBackendUnload is nil")
 }
 
 // TestGgmlBackendInitFunctionsReturnErrors tests that init functions return proper errors when symbols are missing
@@ -154,11 +172,16 @@ func (s *BackendDefensiveSuite) TestGgmlBackendInitFunctionsReturnErrors() {
 	// Ensure library is not loaded
 	Cleanup()
 
-	// Save the current function pointers
+	// Save the current function pointers and state
 	savedInitBest := ggmlBackendInitBest
 	savedInitByName := ggmlBackendInitByName
 	savedInitByType := ggmlBackendInitByType
-	// Simulate missing symbols by setting to nil
+	savedLoaded := isLoaded
+	savedHandle := libHandle
+
+	// Simulate library loaded but symbols missing
+	isLoaded = true
+	libHandle = 1 // Non-zero to indicate "loaded"
 	ggmlBackendInitBest = nil
 	ggmlBackendInitByName = nil
 	ggmlBackendInitByType = nil
@@ -168,6 +191,8 @@ func (s *BackendDefensiveSuite) TestGgmlBackendInitFunctionsReturnErrors() {
 		ggmlBackendInitBest = savedInitBest
 		ggmlBackendInitByName = savedInitByName
 		ggmlBackendInitByType = savedInitByType
+		isLoaded = savedLoaded
+		libHandle = savedHandle
 	}()
 
 	// All init functions should return errors when symbols are missing
@@ -283,7 +308,7 @@ func (s *BackendDefensiveSuite) TestNoPanicOnNilFunctionPointers() {
 	// Ensure library is not loaded
 	Cleanup()
 
-	// Save all backend-related function pointers
+	// Save all backend-related function pointers and state
 	savedBackendFuncs := struct {
 		init            func()
 		free            func()
@@ -309,6 +334,12 @@ func (s *BackendDefensiveSuite) TestNoPanicOnNilFunctionPointers() {
 		ggmlLoadAll:     ggmlBackendLoadAll,
 		ggmlLoadAllPath: ggmlBackendLoadAllFromPath,
 	}
+	savedLoaded := isLoaded
+	savedHandle := libHandle
+
+	// Simulate library loaded but all symbols missing
+	isLoaded = true
+	libHandle = 1 // Non-zero to indicate "loaded"
 
 	// Set all to nil
 	llamaBackendInit = nil
@@ -336,6 +367,8 @@ func (s *BackendDefensiveSuite) TestNoPanicOnNilFunctionPointers() {
 		ggmlBackendLoad = savedBackendFuncs.ggmlLoad
 		ggmlBackendLoadAll = savedBackendFuncs.ggmlLoadAll
 		ggmlBackendLoadAllFromPath = savedBackendFuncs.ggmlLoadAllPath
+		isLoaded = savedLoaded
+		libHandle = savedHandle
 	}()
 
 	// Test that none of these cause panics

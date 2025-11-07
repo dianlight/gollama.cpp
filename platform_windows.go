@@ -7,8 +7,11 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"syscall"
 	"unsafe"
+
+	"github.com/ebitengine/purego"
 )
 
 var (
@@ -273,35 +276,74 @@ func closeLibraryPlatform(handle uintptr) error {
 // registerLibFunc registers a library function using platform-specific methods
 // For Windows, this uses GetProcAddress to resolve the function and stores it in the function pointer
 func registerLibFunc(fptr interface{}, handle uintptr, fname string) {
+	// Resolve first to provide clearer diagnostics on Windows when symbol is missing
 	procAddr, err := getProcAddressPlatform(handle, fname)
 	if err != nil {
-		// Log the error with detailed information
 		slog.Warn("failed to register function", "name", fname, "error", err, "handle", fmt.Sprintf("0x%x", handle))
 		return
 	}
 
-	// Cast the function pointer interface to a *uintptr and store the resolved address
-	// This works because purego uses *uintptr to store function addresses
-	if ptr, ok := fptr.(*uintptr); ok {
-		*ptr = procAddr
-		slog.Debug(fmt.Sprintf("debug: Successfully registered function %s at address 0x%x\n", fname, procAddr))
-	} else {
-		slog.Warn(fmt.Sprintf("warning: failed to cast function pointer for %s (type: %T)\n", fname, fptr))
+	// Validate that fptr is a pointer to a function (the shape expected by purego)
+	if fptr == nil {
+		slog.Warn("registerLibFunc received nil function pointer", "name", fname)
+		return
 	}
+	t := reflect.TypeOf(fptr)
+	if t.Kind() != reflect.Ptr || t.Elem().Kind() != reflect.Func {
+		// Provide rich type information to help diagnose casting/mismatch issues
+		elemKind := "<nil>"
+		elemType := "<nil>"
+		if t.Kind() == reflect.Ptr {
+			elemKind = t.Elem().Kind().String()
+			elemType = t.Elem().String()
+		}
+		slog.Warn("function pointer has unexpected type",
+			"name", fname,
+			"have_kind", t.Kind().String(),
+			"have_type", t.String(),
+			"elem_kind", elemKind,
+			"elem_type", elemType,
+			"expected", "pointer to func",
+			"resolved_addr", fmt.Sprintf("0x%x", procAddr),
+			"handle", fmt.Sprintf("0x%x", handle),
+		)
+		return
+	}
+
+	// Delegate actual binding to purego which wires the Go func variable to the proc address
+	// Note: purego.RegisterLibFunc will use GetProcAddress semantics internally on Windows.
+	// We already confirmed the symbol exists above for better logs; now perform the binding.
+	purego.RegisterLibFunc(fptr, handle, fname)
+	slog.Debug("registered function",
+		"name", fname,
+		"addr", fmt.Sprintf("0x%x", procAddr),
+	)
 }
 
 // tryRegisterLibFunc attempts to register a library function, returning an error if it fails
 // This is useful for optional functions that may not exist in all library builds
 func tryRegisterLibFunc(fptr interface{}, handle uintptr, fname string) error {
-	procAddr, err := getProcAddressPlatform(handle, fname)
-	if err != nil {
+	// First ensure the symbol exists so we can return a helpful error
+	if _, err := getProcAddressPlatform(handle, fname); err != nil {
 		return err
 	}
 
-	// Cast the function pointer interface to a *uintptr and store the resolved address
-	if ptr, ok := fptr.(*uintptr); ok {
-		*ptr = procAddr
+	// Validate fptr shape for better diagnostics in optional registration path
+	if fptr == nil {
+		return fmt.Errorf("tryRegisterLibFunc: nil function pointer for %s", fname)
 	}
+	t := reflect.TypeOf(fptr)
+	if t.Kind() != reflect.Ptr || t.Elem().Kind() != reflect.Func {
+		return fmt.Errorf("tryRegisterLibFunc: expected pointer to func for %s, got %s (elem=%s)", fname, t.String(), func() string {
+			if t.Kind() == reflect.Ptr {
+				return t.Elem().String()
+			}
+			return "<none>"
+		}())
+	}
+
+	// Bind using purego so the typed Go function variable can be invoked
+	purego.RegisterLibFunc(fptr, handle, fname)
 	return nil
 }
 

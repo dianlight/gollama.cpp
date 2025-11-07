@@ -619,10 +619,8 @@ func unloadLibrary() error {
 		// On Windows and Linux, we skip dlclose to avoid potential crashes
 		// but we still clear the handle and state
 
-		// On Windows, also clear the sibling DLL handles registry
-		if runtime.GOOS == "windows" {
-			clearLoadedDllHandles()
-		}
+		// Clear the sibling DLL handles registry (no-op on Unix platforms)
+		clearLoadedDllHandles()
 	}
 
 	// Reset all global state

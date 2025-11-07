@@ -13,7 +13,8 @@
 			"extensions": [
 				"golang.go",
 				"github.vscode-github-actions",
-				"ms-vscode.makefile-tools"
+				"ms-vscode.makefile-tools",
+				"SanjulaGanepola.github-local-actions"
 			]
 		}
 	},

@@ -17,7 +17,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ["1.21", "1.22", "1.24", "1.25"]
+        go-version: ["1.21"]
 
     steps:
       - name: Checkout code
@@ -223,6 +223,195 @@ jobs:
       - name: Run benchmarks
         run: go test -bench=. -benchmem ./...
 
+  test-full:
+    name: Test (full matrix)
+    # Run the full Go version matrix only for release tags
+    if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-llamacpp.')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go-version: ["1.22", "1.24", "1.25"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+
+      - name: Set up Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Cache Go modules
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ matrix.go-version }}-
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential
+
+      #- name: Install dependencies (macOS)
+      #  if: matrix.os == 'macos-latest'
+      #  run: |
+      #    brew install cmake
+
+      - name: Install dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install cmake -y
+          choco install vcredist140 -y || echo "vcredist already installed"
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Cache libllama libraries
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cache/gollama/libs
+            ~/Library/Caches/gollama/libs
+            ~\AppData\Local\gollama\libs
+          key: ${{ runner.os }}-libllama-${{ env.LLAMA_CPP_BUILD }}
+          restore-keys: |
+            ${{ runner.os }}-libllama-
+
+      - name: Download libllama libraries
+        run: go run ./cmd/gollama-download -download
+
+      - name: Cache test models
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ./models
+          key: libllama-models-${{ env.LLAMA_CPP_BUILD }}
+          enableCrossOsArchive: true
+          restore-keys: |
+            libllama-models-
+
+      - name: Download test models
+        run: make model_download
+
+      - name: Verify and setup libraries (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Write-Output "=== Windows Library Setup Debug ==="
+          $CacheDir = "$env:LOCALAPPDATA\gollama\libs"
+          Write-Output "Expected cache directory: $CacheDir"
+
+          if (Test-Path $CacheDir) {
+            Write-Output "✓ Cache directory exists"
+            Write-Output "Directory structure:"
+            Get-ChildItem -Path $CacheDir -Recurse | Select-Object -First 50 | ForEach-Object {
+              $level = ([System.IO.Path]::GetRelativePath($CacheDir, $_.FullName).Split([System.IO.Path]::DirectorySeparatorChar).Count - 1) * 2
+              $indent = " " * $level
+              Write-Output "$indent$($_.Name)"
+            }
+            $DllFiles = @(Get-ChildItem -Path $CacheDir -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue)
+            Write-Output ""
+            Write-Output "DLL files found: $($DllFiles.Count)"
+            foreach ($dll in $DllFiles) {
+              Write-Output "  - $($dll.FullName)"
+            }
+          } else {
+            Write-Output "✗ Cache directory does not exist yet (will be created on first test run)"
+          }
+
+      - name: Set library path (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          CACHE_DIR="$HOME/.cache/gollama/libs"
+          LIB_DIR=$(find "$CACHE_DIR" -type d -name "build" -o -name "bin" | grep -E "build/bin|bin$" | head -1)
+          if [ -n "$LIB_DIR" ]; then
+            echo "LD_LIBRARY_PATH=$LIB_DIR:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+            echo "Library path set to: $LIB_DIR"
+          fi
+
+      - name: Set library path (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          CACHE_DIR="$HOME/Library/Caches/gollama/libs"
+          LIB_DIR=$(find "$CACHE_DIR" -type d -name "build" -o -name "bin" | grep -E "build/bin|bin$" | head -1)
+          if [ -n "$LIB_DIR" ]; then
+            echo "DYLD_LIBRARY_PATH=$LIB_DIR:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
+            echo "Library path set to: $LIB_DIR"
+          fi
+
+      - name: Set library path (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $CacheDir = "$env:LOCALAPPDATA\gollama\libs"
+          Write-Output "Cache directory: $CacheDir"
+
+          if (Test-Path $CacheDir) {
+            Write-Output "Contents of cache directory:"
+            Get-ChildItem -Path $CacheDir -Recurse | Select-Object -First 20 | ForEach-Object { Write-Output "  $_" }
+          } else {
+            Write-Output "Cache directory does not exist yet"
+          }
+
+          $LibDir = $null
+          if (Test-Path $CacheDir) {
+            $LibDir = Get-ChildItem -Path $CacheDir -Recurse -Directory -ErrorAction SilentlyContinue | 
+              Where-Object { ($_.Name -eq "bin") -or ($_.FullName -match "\\build\\bin$") } | 
+              Select-Object -First 1 -ExpandProperty FullName
+          }
+
+          if ($LibDir) {
+            Write-Output "Library directory found: $LibDir"
+            Write-Output "Verifying DLL presence:"
+            Get-ChildItem -Path $LibDir -Filter "*.dll" | ForEach-Object { Write-Output "  Found: $($_.Name)" }
+            echo "PATH=$LibDir;$env:PATH" >> $env:GITHUB_ENV
+            echo "LD_LIBRARY_PATH=$LibDir" >> $env:GITHUB_ENV
+            Write-Output "Library path set to: $LibDir"
+          } else {
+            Write-Output "Library directory not found - tests will attempt to download libraries at runtime"
+          }
+
+      - name: Verify platform compatibility
+        run: |
+          echo "Testing platform compatibility..."
+          go build -v ./...
+          echo "Build successful for ${{ runner.os }}"
+
+      - name: Verify library availability (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Write-Output "Checking for library DLLs..."
+          $CacheDir = "$env:LOCALAPPDATA\gollama\libs"
+          $DllCount = (Get-ChildItem -Path $CacheDir -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue | Measure-Object).Count
+          Write-Output "Found $DllCount DLL files"
+          if ($DllCount -gt 0) {
+            Write-Output "DLL files:"
+            Get-ChildItem -Path $CacheDir -Recurse -Filter "*.dll" | ForEach-Object { Write-Output "  $_" }
+          }
+          Write-Output "Current PATH components (Windows relevant):"
+          $tempPath = [System.IO.Path]::GetTempPath()
+          $tempPattern = [regex]::Escape($tempPath)
+          $env:PATH.Split(";") |
+            Where-Object { $_ -match "gollama|llama" -or $_ -match $tempPattern } |
+            ForEach-Object { Write-Output "  $_" }
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Run platform-specific tests
+        run: go test -v -run TestPlatformSpecific ./...
+
+      - name: Run tests with race detection
+        if: matrix.os != 'windows-latest' # Race detector not fully supported on Windows
+        run: go test -race -v ./...
+
+      - name: Run benchmarks
+        run: go test -bench=. -benchmem ./...
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -269,7 +458,7 @@ jobs:
     name: Create Release
     if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-llamacpp.')
     runs-on: ubuntu-latest
-    needs: [examples, documentation, test, lint, security]
+    needs: [examples, documentation, test, test-full, lint, security]
     permissions:
       contents: write
       pages: write

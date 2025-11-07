@@ -107,6 +107,8 @@ jobs:
             if [ -f "$example_dir/go.mod" ]; then
               echo "Checking example: $(basename "$example_dir")"
               cd "$example_dir"
+
+              go mod tidy
               
               # Try to build the example
               if ! go build -o /tmp/example-binary .; then

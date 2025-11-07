@@ -30,6 +30,7 @@ package gollama
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"os"
 	"os/exec"
@@ -792,10 +793,8 @@ func registerFunctions() error {
 
 	// Report failed registrations
 	if len(failedRegistrations) > 0 {
-		fmt.Printf("warning: %d function(s) failed to register:\n", len(failedRegistrations))
-		for _, fname := range failedRegistrations {
-			fmt.Printf("  - %s\n", fname)
-		}
+		// Use structured logging for failed registrations. Keep list for easier debugging.
+		slog.Warn("function(s) failed to register", "count", len(failedRegistrations), "functions", failedRegistrations)
 		// Don't fail if only a few functions couldn't be registered
 		// Check critical functions explicitly
 		if llamaBackendInit == nil {

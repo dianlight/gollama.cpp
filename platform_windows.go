@@ -72,7 +72,7 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 			uintptr(loadLibrarySearchDefaultDirs | loadLibrarySearchUserDirs | loadLibrarySearchSystem32),
 		)
 		if ret == 0 {
-			fmt.Printf("warning: SetDefaultDllDirectories failed: %v\n", callErr)
+			slog.Warn("SetDefaultDllDirectories failed", "error", callErr)
 		}
 	}
 
@@ -124,7 +124,7 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 			uintptr(loadLibrarySearchDllLoadDir|loadLibrarySearchDefaultDirs|loadLibrarySearchSystem32|loadLibrarySearchUserDirs),
 		)
 		if ret != 0 {
-			fmt.Printf("debug: Successfully loaded library with LoadLibraryExW: %s (handle: 0x%x)\n", libPath, ret)
+			slog.Debug("Successfully loaded library with LoadLibraryExW", "path", libPath, "handle", fmt.Sprintf("0x%x", ret))
 			// Cleanup any directory we added
 			if addedDir && procRemoveDllDirectory.Find() == nil {
 				_, _, _ = procRemoveDllDirectory.Call(cookie)
@@ -170,7 +170,7 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 		return 0, fmt.Errorf("%s", errMsg)
 	}
 
-	fmt.Printf("debug: Successfully loaded library with LoadLibraryW: %s (handle: 0x%x)\n", libPath, ret)
+	slog.Debug("Successfully loaded library with LoadLibraryW", "path", libPath, "handle", fmt.Sprintf("0x%x", ret))
 
 	// Cleanup any directory we added
 	if addedDir && procRemoveDllDirectory.Find() == nil {
@@ -276,7 +276,7 @@ func registerLibFunc(fptr interface{}, handle uintptr, fname string) {
 	procAddr, err := getProcAddressPlatform(handle, fname)
 	if err != nil {
 		// Log the error with detailed information
-		fmt.Printf("warning: failed to register %s: %v (handle: 0x%x)\n", fname, err, handle)
+		slog.Warn("failed to register function", "name", fname, "error", err, "handle", fmt.Sprintf("0x%x", handle))
 		return
 	}
 
@@ -284,9 +284,9 @@ func registerLibFunc(fptr interface{}, handle uintptr, fname string) {
 	// This works because purego uses *uintptr to store function addresses
 	if ptr, ok := fptr.(*uintptr); ok {
 		*ptr = procAddr
-		fmt.Printf("debug: Successfully registered function %s at address 0x%x\n", fname, procAddr)
+		slog.Debug(fmt.Sprintf("debug: Successfully registered function %s at address 0x%x\n", fname, procAddr))
 	} else {
-		fmt.Printf("warning: failed to cast function pointer for %s (type: %T)\n", fname, fptr)
+		slog.Warn(fmt.Sprintf("warning: failed to cast function pointer for %s (type: %T)\n", fname, fptr))
 	}
 }
 
@@ -329,7 +329,7 @@ func getProcAddressPlatform(handle uintptr, name string) (uintptr, error) {
 		}
 		addr, _, _ := procGetProcAddress.Call(h, uintptr(unsafe.Pointer(namePtr)))
 		if addr != 0 {
-			fmt.Printf("debug: symbol %s resolved from sibling handle 0x%x\n", name, h)
+			slog.Debug("symbol resolved from sibling handle", "symbol", name, "handle", fmt.Sprintf("0x%x", h))
 			return addr, nil
 		}
 	}

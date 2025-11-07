@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"math"
 	"os"
 	"strings"
@@ -61,7 +62,7 @@ func (cb *EvalCallbackData) logOperation(tensor SimulatedTensorInfo, srcTensors 
 	// Limit logging to prevent overwhelming output
 	if cb.MaxLoggedOps > 0 && cb.OperationCount > cb.MaxLoggedOps {
 		if cb.OperationCount == cb.MaxLoggedOps+1 {
-			fmt.Printf("                              ... (limiting output to %d operations)\n", cb.MaxLoggedOps)
+			slog.Info(fmt.Sprintf("                              ... (limiting output to %d operations)", cb.MaxLoggedOps))
 		}
 		return
 	}
@@ -81,20 +82,20 @@ func (cb *EvalCallbackData) logOperation(tensor SimulatedTensorInfo, srcTensors 
 	}
 
 	// Main operation log (similar to C++ eval-callback output)
-	fmt.Printf("ggml_debug: %24s = (%s) %10s(%s) = {%s}\n",
+	slog.Info(fmt.Sprintf("ggml_debug: %24s = (%s) %10s(%s) = {%s}",
 		tensor.Name,
 		tensor.DataType,
 		tensor.Operation,
 		srcStr.String(),
-		formatDimensions(tensor.Dimensions))
+		formatDimensions(tensor.Dimensions)))
 
 	// Additional timing and size information
-	fmt.Printf("                              └─ Op #%d, %d bytes, %s memory, %.3fms since start, %.3fms since last\n",
+	slog.Info(fmt.Sprintf("                              └─ Op #%d, %d bytes, %s memory, %.3fms since start, %.3fms since last",
 		cb.OperationCount,
 		tensor.SizeBytes,
 		getMemoryLocation(tensor.IsHost),
 		timeSinceStart.Seconds()*1000,
-		timeSinceLastOp.Seconds()*1000)
+		timeSinceLastOp.Seconds()*1000))
 
 	// Simulate tensor data printing (like the C++ example does for non-quantized tensors)
 	if cb.PrintTensorData && !strings.Contains(tensor.DataType, "q") {
@@ -110,32 +111,32 @@ func (cb *EvalCallbackData) printSimulatedTensorData(tensor SimulatedTensorInfo)
 		return
 	}
 
-	fmt.Printf("                              Data preview (first few values):\n")
-	fmt.Printf("                                     [\n")
+	slog.Info(fmt.Sprintf("                              Data preview (first few values):"))
+	slog.Info(fmt.Sprintf("                                     ["))
 
 	// Simulate printing first few values of the tensor
 	rows := min(3, int(tensor.Dimensions[0]))
 	cols := min(8, int(tensor.Dimensions[len(tensor.Dimensions)-1]))
 
 	for i := 0; i < rows; i++ {
-		fmt.Printf("                                       [")
+		slog.Info(fmt.Sprintf("                                       ["))
 		for j := 0; j < cols; j++ {
 			// Generate some fake values for demonstration
 			value := float32(i*10+j) * 0.123
 			if j > 0 {
-				fmt.Printf(", ")
+				slog.Info(fmt.Sprintf(", "))
 			}
-			fmt.Printf("%8.4f", value)
+			slog.Info(fmt.Sprintf("%8.4f", value))
 		}
 		if cols < int(tensor.Dimensions[len(tensor.Dimensions)-1]) {
-			fmt.Printf(", ...")
+			slog.Info(fmt.Sprintf(", ..."))
 		}
-		fmt.Printf("]\n")
+		slog.Info(fmt.Sprintf("]"))
 	}
 	if rows < int(tensor.Dimensions[0]) {
-		fmt.Printf("                                       ...\n")
+		slog.Info(fmt.Sprintf("                                       ..."))
 	}
-	fmt.Printf("                                     ]\n")
+	slog.Info(fmt.Sprintf("                                     ]"))
 }
 
 // showProgress displays progress information
@@ -148,23 +149,23 @@ func (cb *EvalCallbackData) showProgress() {
 	avgOpsPerSec := float64(cb.OperationCount) / elapsed.Seconds()
 	avgBytesPerSec := float64(cb.BytesProcessed) / elapsed.Seconds()
 
-	fmt.Printf("\nProgress Update:\n")
-	fmt.Printf("  Operations processed: %d\n", cb.OperationCount)
-	fmt.Printf("  Tensors processed: %d\n", cb.TensorCount)
-	fmt.Printf("  Data processed: %s\n", formatBytes(cb.BytesProcessed))
-	fmt.Printf("  Elapsed time: %.2fs\n", elapsed.Seconds())
-	fmt.Printf("  Average ops/sec: %.1f\n", avgOpsPerSec)
-	fmt.Printf("  Average throughput: %s/sec\n", formatBytes(int64(avgBytesPerSec)))
+	slog.Info(fmt.Sprintf("\nProgress Update:"))
+	slog.Info(fmt.Sprintf("  Operations processed: %d", cb.OperationCount))
+	slog.Info(fmt.Sprintf("  Tensors processed: %d", cb.TensorCount))
+	slog.Info(fmt.Sprintf("  Data processed: %s", formatBytes(cb.BytesProcessed)))
+	slog.Info(fmt.Sprintf("  Elapsed time: %.2fs", elapsed.Seconds()))
+	slog.Info(fmt.Sprintf("  Average ops/sec: %.1f", avgOpsPerSec))
+	slog.Info(fmt.Sprintf("  Average throughput: %s/sec", formatBytes(int64(avgBytesPerSec))))
 	fmt.Println()
 }
 
 // simulateInferenceWithCallbacks demonstrates what eval callbacks would show during inference
 func simulateInferenceWithCallbacks(cb *EvalCallbackData, tokens []gollama.LlamaToken, model gollama.LlamaModel) {
-	fmt.Printf("=== Starting Evaluation with Callbacks ===\n")
-	fmt.Printf("Tokens to process: %d\n", len(tokens))
-	fmt.Printf("Logging enabled: %v\n", cb.EnableLogging)
-	fmt.Printf("Progress enabled: %v\n", cb.EnableProgress)
-	fmt.Printf("Tensor data printing: %v\n", cb.PrintTensorData)
+	slog.Info(fmt.Sprintf("=== Starting Evaluation with Callbacks ==="))
+	slog.Info(fmt.Sprintf("Tokens to process: %d", len(tokens)))
+	slog.Info(fmt.Sprintf("Logging enabled: %v", cb.EnableLogging))
+	slog.Info(fmt.Sprintf("Progress enabled: %v", cb.EnableProgress))
+	slog.Info(fmt.Sprintf("Tensor data printing: %v", cb.PrintTensorData))
 	fmt.Println()
 
 	// Simulate the operations that would occur during model inference
@@ -290,7 +291,7 @@ func simulateInferenceWithCallbacks(cb *EvalCallbackData, tokens []gollama.Llama
 		{Name: "output_weight", Dimensions: []int64{2048, 32000}},
 	})
 
-	fmt.Printf("=== Evaluation Complete ===\n")
+	slog.Info(fmt.Sprintf("=== Evaluation Complete ==="))
 	cb.showProgress()
 }
 
@@ -350,12 +351,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Gollama.cpp Evaluation Callback Example %s\n", gollama.FullVersion)
-	fmt.Printf("Model: %s\n", *modelPath)
-	fmt.Printf("Prompt: %s\n", *prompt)
-	fmt.Printf("Threads: %d\n", *threads)
-	fmt.Printf("Context: %d\n", *ctx)
-	fmt.Printf("Simulation only: %v\n", *simulateOnly)
+	slog.Info(fmt.Sprintf("Gollama.cpp Evaluation Callback Example %s", gollama.FullVersion))
+	slog.Info(fmt.Sprintf("Model: %s", *modelPath))
+	slog.Info(fmt.Sprintf("Prompt: %s", *prompt))
+	slog.Info(fmt.Sprintf("Threads: %d", *threads))
+	slog.Info(fmt.Sprintf("Context: %d", *ctx))
+	slog.Info(fmt.Sprintf("Simulation only: %v", *simulateOnly))
 	fmt.Println()
 
 	if *simulateOnly {
@@ -383,7 +384,7 @@ func main() {
 	fmt.Print("Initializing backend... ")
 	err := gollama.Backend_init()
 	if err != nil {
-		fmt.Printf("failed (%v)\n", err)
+		slog.Info(fmt.Sprintf("failed (%v)", err))
 		fmt.Println("Attempting to download llama.cpp libraries...")
 
 		// Try to download the library
@@ -455,7 +456,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to tokenize prompt: %v", err)
 	}
-	fmt.Printf("done (%d tokens)\n", len(tokens))
+	slog.Info(fmt.Sprintf("done (%d tokens)", len(tokens)))
 
 	// Create callback data for demonstration
 	cbData := NewEvalCallbackData(*enableLogging, *enableProgress, *printTensorData, *maxLoggedOps)
@@ -482,7 +483,7 @@ func main() {
 	}
 
 	evalTime := time.Since(startTime)
-	fmt.Printf("done (%.2fs)\n", evalTime.Seconds())
+	slog.Info(fmt.Sprintf("done (%.2fs)", evalTime.Seconds()))
 
 	// Get logits for the last token
 	tokensLen := len(tokens)
@@ -499,9 +500,9 @@ func main() {
 
 	// Print performance information
 	fmt.Println("\n=== Performance Information ===")
-	fmt.Printf("Evaluation time: %.2f ms\n", evalTime.Seconds()*1000)
-	fmt.Printf("Tokens processed: %d\n", len(tokens))
-	fmt.Printf("Processing speed: %.2f tokens/s\n", float64(len(tokens))/evalTime.Seconds())
+	slog.Info(fmt.Sprintf("Evaluation time: %.2f ms", evalTime.Seconds()*1000))
+	slog.Info(fmt.Sprintf("Tokens processed: %d", len(tokens)))
+	slog.Info(fmt.Sprintf("Processing speed: %.2f tokens/s", float64(len(tokens))/evalTime.Seconds()))
 
 	fmt.Println("\n=== Summary ===")
 	fmt.Println("This example demonstrates:")

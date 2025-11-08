@@ -15,3 +15,4 @@ examples/diffusion/diffusion
 examples/cache-directory-demo/cache-directory-demo
 coverage.out
 examples/ggml-info/ggml-info
+cmd/gollama-download/gollama-download

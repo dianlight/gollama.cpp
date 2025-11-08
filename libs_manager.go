@@ -1,8 +1,10 @@
 package gollama
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -144,4 +146,128 @@ func splitPlatform(platform string) (string, string, error) {
 		return "", "", fmt.Errorf("invalid platform string: %s", platform)
 	}
 	return parts[0], parts[1], nil
+}
+
+// MergeVariantLibraries merges library files from multiple variant directories into the
+// single target libs directory for the given platform and version. If two variants contain
+// a library with the same file name but different content, it returns an error to prevent
+// ambiguous or conflicting embeddings.
+//
+// Target layout: <libsDir>/<goos>_<goarch>_<version>/
+// Copied files: *.dylib, *.so, *.dll (base name only; subdir structure is not preserved)
+func MergeVariantLibraries(goos, goarch, version, libsDir string, variantDirs []string) error {
+	effectiveVersion := version
+	if effectiveVersion == "" {
+		effectiveVersion = LlamaCppBuild
+	}
+	if effectiveVersion != LlamaCppBuild {
+		return fmt.Errorf("only llama.cpp build %s can be embedded (requested %s)", LlamaCppBuild, effectiveVersion)
+	}
+
+	if libsDir == "" {
+		libsDir = "libs"
+	}
+
+	targetDir := filepath.Join(libsDir, fmt.Sprintf("%s_%s_%s", goos, goarch, effectiveVersion))
+
+	// Start clean for target directory
+	if err := os.RemoveAll(targetDir); err != nil {
+		return fmt.Errorf("failed to clean target directory %s: %w", targetDir, err)
+	}
+	if err := os.MkdirAll(targetDir, 0o750); err != nil {
+		return fmt.Errorf("failed to create target directory %s: %w", targetDir, err)
+	}
+
+	// Walk each variant directory and merge libraries
+	var copied bool
+	for _, srcDir := range variantDirs {
+		if srcDir == "" {
+			continue
+		}
+		err := filepath.WalkDir(srcDir, func(path string, d fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if d.IsDir() {
+				return nil
+			}
+
+			lower := strings.ToLower(d.Name())
+			switch {
+			case strings.HasSuffix(lower, ".dylib"), strings.HasSuffix(lower, ".so"), strings.HasSuffix(lower, ".dll"):
+			default:
+				return nil
+			}
+
+			destPath := filepath.Join(targetDir, d.Name())
+
+			// If destination exists, compare contents; if equal, skip; if different, error.
+			if _, err := os.Stat(destPath); err == nil {
+				same, cmpErr := filesHaveSameSHA256(path, destPath)
+				if cmpErr != nil {
+					return fmt.Errorf("failed to compare %s and %s: %w", path, destPath, cmpErr)
+				}
+				if !same {
+					return fmt.Errorf("conflicting library file detected: %s (different contents across variants)", d.Name())
+				}
+				// identical; skip copy
+				return nil
+			}
+
+			// Copy file
+			in, err := os.Open(path)
+			if err != nil {
+				return fmt.Errorf("failed to open %s: %w", path, err)
+			}
+			defer func() { _ = in.Close() }()
+
+			out, err := os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+			if err != nil {
+				return fmt.Errorf("failed to create %s: %w", destPath, err)
+			}
+			if _, err := io.Copy(out, in); err != nil {
+				_ = out.Close()
+				return fmt.Errorf("failed to write %s: %w", destPath, err)
+			}
+			if err := out.Close(); err != nil {
+				return fmt.Errorf("failed to close %s: %w", destPath, err)
+			}
+			copied = true
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("failed to merge libraries from %s: %w", srcDir, err)
+		}
+	}
+
+	if !copied {
+		return fmt.Errorf("no libraries found to copy for %s/%s", goos, goarch)
+	}
+
+	return nil
+}
+
+func filesHaveSameSHA256(p1, p2 string) (bool, error) {
+	h1, err := sha256ForFile(p1)
+	if err != nil {
+		return false, err
+	}
+	h2, err := sha256ForFile(p2)
+	if err != nil {
+		return false, err
+	}
+	return h1 == h2, nil
+}
+
+func sha256ForFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = f.Close() }()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }

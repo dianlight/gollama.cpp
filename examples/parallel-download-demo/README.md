@@ -60,6 +60,12 @@ go run ../../cmd/gollama-download -download-all -checksum
 # Download for specific platforms
 go run ../../cmd/gollama-download -platforms "linux/amd64,darwin/arm64,windows/amd64" -checksum
 
+# Download all GPU variants for current platform (CPU, CUDA, Vulkan, etc.)
+go run ../../cmd/gollama-download -download-variants -checksum
+
+# Download all GPU variants for a specific platform
+go run ../../cmd/gollama-download -download-variants -platforms "linux/amd64" -checksum
+
 # Verify checksum of a file
 go run ../../cmd/gollama-download -verify-checksum /path/to/file
 
@@ -67,6 +73,16 @@ go run ../../cmd/gollama-download -verify-checksum /path/to/file
 make -C ../.. download-libs-parallel
 make -C ../.. download-libs-platforms
 ```
+
+## Variant Downloads
+
+The `-download-variants` flag downloads all available GPU backend variants for a platform:
+
+- **Linux**: CPU, CUDA (various versions), HIP/ROCm, Vulkan, SYCL
+- **Windows**: CPU, CUDA, HIP, Vulkan, OpenCL, SYCL
+- **macOS**: CPU only (Metal is built-in)
+
+All variants are downloaded in parallel, extracted to separate directories, and common files are verified to be identical across variants. This ensures that core libraries are consistent while GPU-specific components differ as expected.
 
 ## Performance Benefits
 

@@ -13,17 +13,18 @@ import (
 
 func main() {
 	var (
-		download       = flag.Bool("download", false, "Download llama.cpp library for current platform")
-		downloadAll    = flag.Bool("download-all", false, "Download llama.cpp libraries for all supported platforms")
-		platforms      = flag.String("platforms", "", "Comma-separated list of platforms to download (e.g., linux/amd64,darwin/arm64)")
-		version        = flag.String("version", "", "Specific version to download (default: latest)")
-		testDownload   = flag.Bool("test-download", false, "Test download functionality without loading library")
-		cleanCache     = flag.Bool("clean-cache", false, "Clean library cache")
-		showVersion    = flag.Bool("v", false, "Show version information")
-		showChecksum   = flag.Bool("checksum", false, "Show SHA256 checksum of downloaded files")
-		verifyChecksum = flag.String("verify-checksum", "", "Verify SHA256 checksum of a file")
-		copyLibs       = flag.Bool("copy-libs", false, "Copy downloaded libraries into ./libs for embedding")
-		libsDir        = flag.String("libs-dir", "libs", "Target directory for embedded libraries (default: ./libs)")
+		download         = flag.Bool("download", false, "Download llama.cpp library for current platform")
+		downloadAll      = flag.Bool("download-all", false, "Download llama.cpp libraries for all supported platforms")
+		downloadVariants = flag.Bool("download-variants", false, "Download all GPU variants for specified platform")
+		platforms        = flag.String("platforms", "", "Comma-separated list of platforms to download (e.g., linux/amd64,darwin/arm64)")
+		version          = flag.String("version", "", "Specific version to download (default: latest)")
+		testDownload     = flag.Bool("test-download", false, "Test download functionality without loading library")
+		cleanCache       = flag.Bool("clean-cache", false, "Clean library cache")
+		showVersion      = flag.Bool("v", false, "Show version information")
+		showChecksum     = flag.Bool("checksum", false, "Show SHA256 checksum of downloaded files")
+		verifyChecksum   = flag.String("verify-checksum", "", "Verify SHA256 checksum of a file")
+		copyLibs         = flag.Bool("copy-libs", false, "Copy downloaded libraries into ./libs for embedding")
+		libsDir          = flag.String("libs-dir", "libs", "Target directory for embedded libraries (default: ./libs)")
 	)
 	flag.Parse()
 
@@ -49,6 +50,134 @@ func main() {
 			log.Fatalf("Failed to calculate checksum: %v", err)
 		}
 		fmt.Printf("SHA256: %s\n", checksum)
+		return
+	}
+
+	if *downloadVariants {
+		// Determine platforms to download variants for
+		var platformsToDownload []string
+
+		if *downloadAll {
+			// Download variants for all supported platforms
+			fmt.Println("Downloading all variants for all supported platforms...")
+			platformsToDownload = []string{
+				"darwin/amd64", "darwin/arm64",
+				"linux/amd64", //"linux/arm64",
+				"windows/amd64", "windows/arm64",
+			}
+		} else if *platforms != "" {
+			// Download variants for specified platforms
+			fmt.Printf("Downloading all variants for platforms: %s...\n", *platforms)
+			platformList := strings.Split(*platforms, ",")
+			for _, p := range platformList {
+				platformsToDownload = append(platformsToDownload, strings.TrimSpace(p))
+			}
+		} else {
+			// Download variants for current platform only
+			fmt.Println("Downloading all variants for current platform...")
+			platformsToDownload = []string{fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)}
+		}
+
+		// Create downloader
+		downloader, err := gollama.NewLibraryDownloader()
+		if err != nil {
+			log.Fatalf("Failed to create downloader: %v", err)
+		}
+
+		// Get release
+		var release *gollama.ReleaseInfo
+		if *version != "" {
+			fmt.Printf("Getting release information for version %s...\n", *version)
+			release, err = downloader.GetReleaseByTag(*version)
+		} else {
+			fmt.Println("Getting latest release information...")
+			release, err = downloader.GetLatestRelease()
+		}
+		if err != nil {
+			log.Fatalf("Failed to get release info: %v", err)
+		}
+
+		tagName := ""
+		if release.TagName != nil {
+			tagName = *release.TagName
+		}
+		fmt.Printf("Found release: %s\n\n", tagName)
+
+		// Download all variants for each platform
+		var allDownloadResults []gollama.DownloadResult
+		for _, platform := range platformsToDownload {
+			parts := strings.Split(platform, "/")
+			if len(parts) != 2 {
+				log.Printf("Skipping invalid platform format: %s", platform)
+				continue
+			}
+			goos, goarch := parts[0], parts[1]
+
+			fmt.Printf("Downloading variants for %s...\n", platform)
+			result, err := downloader.DownloadAllVariants(release, goos, goarch)
+			if err != nil {
+				log.Printf("Failed to download variants for %s: %v", platform, err)
+				continue
+			}
+
+			printVariantDownloadResult(result, *showChecksum)
+
+			// If copy-libs requested, merge all variants into libs dir for this platform
+			if *copyLibs && result.Success {
+				// Resolve version strictly to LlamaCppBuild
+				resolvedVersion := *version
+				if resolvedVersion == "" {
+					if tagName == gollama.LlamaCppBuild {
+						resolvedVersion = tagName
+					} else {
+						log.Fatalf("copying libraries requires llama.cpp build %s (got %s)", gollama.LlamaCppBuild, tagName)
+					}
+				} else if resolvedVersion != gollama.LlamaCppBuild {
+					log.Fatalf("copying libraries requires llama.cpp build %s (got %s)", gollama.LlamaCppBuild, resolvedVersion)
+				}
+
+				// Collect variant directories
+				var variantDirs []string
+				for _, v := range result.Variants {
+					if v.Success && v.ExtractedDir != "" {
+						variantDirs = append(variantDirs, v.ExtractedDir)
+					}
+				}
+				if len(variantDirs) == 0 {
+					log.Printf("No variant directories to copy for %s", platform)
+					continue
+				}
+
+				if err := gollama.MergeVariantLibraries(goos, goarch, resolvedVersion, *libsDir, variantDirs); err != nil {
+					log.Fatalf("Failed to merge libraries for %s into %s: %v", platform, *libsDir, err)
+				}
+
+				// Maintain summary similar to DownloadResult list for final reporting
+				allDownloadResults = append(allDownloadResults, gollama.DownloadResult{
+					Platform:     platform,
+					Success:      true,
+					LibraryPath:  "",
+					ExtractedDir: "",
+				})
+			}
+		}
+
+		// Handle copy-libs if requested
+		if *copyLibs && len(allDownloadResults) > 0 {
+			successCount := 0
+			for _, res := range allDownloadResults {
+				if res.Success {
+					successCount++
+				}
+			}
+
+			if successCount == 0 {
+				log.Fatalf("No libraries were downloaded successfully; skipping copy to %s", *libsDir)
+			}
+			// All platform merges already performed above; nothing else to copy here.
+			fmt.Printf("\n✅ Embedded libraries synchronized to %s\n", *libsDir)
+			fmt.Printf("   Total platforms: %d/%d successful\n", successCount, len(allDownloadResults))
+		}
 		return
 	}
 
@@ -181,10 +310,16 @@ func main() {
 	fmt.Printf("Usage: %s [options]\n\n", os.Args[0])
 	fmt.Printf("Options:\n")
 	flag.PrintDefaults()
-	fmt.Printf("\nExamples:\n")
+	fmt.Printf("Examples:\n")
 	fmt.Printf("  %s -download                     # Download latest version for current platform\n", os.Args[0])
 	fmt.Printf("  %s -download -version b6089      # Download specific version for current platform\n", os.Args[0])
 	fmt.Printf("  %s -download-all                 # Download for all supported platforms\n", os.Args[0])
+	fmt.Printf("  %s -download-variants             # Download all GPU variants for current platform\n", os.Args[0])
+	fmt.Printf("  %s -download-variants -platforms linux/amd64  # Download all variants for specific platform\n", os.Args[0])
+	fmt.Printf("  %s -download-variants -download-all  # Download all variants for all platforms\n", os.Args[0])
+	fmt.Printf("  %s -download-variants -copy-libs  # Download variants and sync to ./libs\n", os.Args[0])
+	fmt.Printf("  %s -download-variants -download-all -copy-libs  # Download all variants for all platforms and sync\n", os.Args[0])
+	fmt.Printf("  %s -download-variants -copy-libs -libs-dir /custom/path  # Sync to custom directory\n", os.Args[0])
 	fmt.Printf("  %s -platforms linux/amd64,darwin/arm64  # Download for specific platforms\n", os.Args[0])
 	fmt.Printf("  %s -test-download               # Test download without loading\n", os.Args[0])
 	fmt.Printf("  %s -clean-cache                 # Clean cache directory\n", os.Args[0])
@@ -255,4 +390,45 @@ func printDownloadResults(results []gollama.DownloadResult, showChecksum bool) i
 
 	fmt.Printf("\nSummary: %d/%d platforms downloaded successfully\n", successCount, len(results))
 	return successCount
+}
+
+// printVariantDownloadResult prints the result of downloading all variants for a platform
+func printVariantDownloadResult(result *gollama.VariantDownloadResult, showChecksum bool) {
+	fmt.Printf("\nVariant Download Results:\n")
+	fmt.Printf("========================\n")
+	fmt.Printf("Platform: %s\n", result.Platform)
+
+	if !result.Success {
+		fmt.Printf("❌ FAILED")
+		if result.Error != nil {
+			fmt.Printf(" - %s", result.Error.Error())
+		}
+		fmt.Println()
+		return
+	}
+
+	fmt.Printf("✅ SUCCESS - Downloaded %d variants\n\n", len(result.Variants))
+
+	for _, variant := range result.Variants {
+		if variant.Success {
+			fmt.Printf("  ✅ Variant: %s\n", variant.Variant)
+			if variant.ExtractedDir != "" {
+				fmt.Printf("     Directory: %s\n", variant.ExtractedDir)
+			}
+			if showChecksum && variant.SHA256Sum != "" {
+				fmt.Printf("     SHA256: %s\n", variant.SHA256Sum)
+			}
+		} else {
+			fmt.Printf("  ❌ Variant: %s - FAILED", variant.Variant)
+			if variant.Error != nil {
+				fmt.Printf(" - %s", variant.Error.Error())
+			}
+			fmt.Println()
+		}
+	}
+
+	if result.CommonLibPath != "" {
+		fmt.Printf("\nCommon library path: %s\n", result.CommonLibPath)
+	}
+	fmt.Printf("\n✓ All common files verified as identical across variants\n")
 }

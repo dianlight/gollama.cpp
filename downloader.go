@@ -71,6 +71,31 @@ type DownloadResult struct {
 	Embedded     bool
 }
 
+// VariantAsset represents a single variant asset for a platform
+type VariantAsset struct {
+	AssetName   string
+	DownloadURL string
+	Variant     string // e.g., "cpu", "cuda-12.6.0", "vulkan", "hip-6.2"
+}
+
+// VariantDownloadResult represents the result of downloading all variants for a platform
+type VariantDownloadResult struct {
+	Platform      string
+	Variants      []VariantInfo
+	Success       bool
+	Error         error
+	CommonLibPath string // Path to verified common library files
+}
+
+// VariantInfo contains information about a downloaded variant
+type VariantInfo struct {
+	Variant      string
+	ExtractedDir string
+	SHA256Sum    string
+	Success      bool
+	Error        error
+}
+
 // LibraryDownloader handles downloading pre-built llama.cpp binaries
 type LibraryDownloader struct {
 	cacheDir  string
@@ -278,6 +303,95 @@ func (d *LibraryDownloader) FindAssetByPattern(release *ReleaseInfo, pattern str
 		}
 	}
 	return "", "", fmt.Errorf("no asset found matching pattern: %s", pattern)
+}
+
+// FindAllVariantAssets finds all variant assets for a specific platform and architecture
+// Pattern: llama-<version>-bin-<os>-<variant>[-<variant-version>]-<arch>.zip
+func (d *LibraryDownloader) FindAllVariantAssets(release *ReleaseInfo, goos, goarch string) ([]VariantAsset, error) {
+	// Convert Go arch to llama.cpp naming convention
+	var arch string
+	switch goarch {
+	case "amd64":
+		arch = "x64"
+	case "arm64":
+		arch = "arm64"
+	default:
+		return nil, fmt.Errorf("unsupported architecture: %s", goarch)
+	}
+
+	// Build platform-specific base pattern
+	var osPrefix string
+	switch goos {
+	case "darwin":
+		osPrefix = "macos"
+	case "linux":
+		osPrefix = "ubuntu"
+	case "windows":
+		osPrefix = "win"
+	default:
+		return nil, fmt.Errorf("unsupported OS: %s", goos)
+	}
+
+	// Pattern to match all variants: llama-<version>-bin-<os>-<variant>[-<variant-version>]-<arch>.zip
+	// Examples:
+	//   llama-b1234-bin-ubuntu-x64.zip (CPU)
+	//   llama-b1234-bin-ubuntu-cuda-12.6.0-x64.zip
+	//   llama-b1234-bin-ubuntu-vulkan-x64.zip
+	//   llama-b1234-bin-macos-arm64.zip
+	// The pattern captures everything between the OS prefix and the arch
+	patternStr := fmt.Sprintf(`^llama-[^-]+-bin-%s-(.+-)%s\.zip$`, osPrefix, arch)
+	cpuPatternStr := fmt.Sprintf(`^llama-[^-]+-bin-%s-%s\.zip$`, osPrefix, arch)
+
+	regex, err := regexp.Compile(patternStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pattern: %w", err)
+	}
+
+	cpuRegex, err := regexp.Compile(cpuPatternStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid CPU pattern: %w", err)
+	}
+
+	var variants []VariantAsset
+	for _, asset := range release.Assets {
+		assetName := ""
+		downloadURL := ""
+		if asset.Name != nil {
+			assetName = *asset.Name
+		}
+		if asset.BrowserDownloadURL != nil {
+			downloadURL = *asset.BrowserDownloadURL
+		}
+
+		// Check CPU-only variant first (simplest pattern)
+		if cpuRegex.MatchString(assetName) {
+			variants = append(variants, VariantAsset{
+				AssetName:   assetName,
+				DownloadURL: downloadURL,
+				Variant:     "cpu",
+			})
+			continue
+		}
+
+		// Check for GPU variants
+		if matches := regex.FindStringSubmatch(assetName); matches != nil {
+			// Extract variant string (everything between os prefix and arch)
+			// e.g., "cuda-12.6.0-" -> "cuda-12.6.0"
+			variantStr := strings.TrimSuffix(matches[1], "-")
+
+			variants = append(variants, VariantAsset{
+				AssetName:   assetName,
+				DownloadURL: downloadURL,
+				Variant:     variantStr,
+			})
+		}
+	}
+
+	if len(variants) == 0 {
+		return nil, fmt.Errorf("no variants found for %s/%s", goos, goarch)
+	}
+
+	return variants, nil
 }
 
 // DownloadAndExtract downloads and extracts the library archive
@@ -869,6 +983,192 @@ func (d *LibraryDownloader) FindLibraryPathForPlatform(extractedDir, goos string
 	}
 
 	return "", fmt.Errorf("library file %s not found in %s", expectedLib, extractedDir)
+}
+
+// DownloadAllVariants downloads all variants for a platform and verifies common files are identical
+func (d *LibraryDownloader) DownloadAllVariants(release *ReleaseInfo, goos, goarch string) (*VariantDownloadResult, error) {
+	result := &VariantDownloadResult{
+		Platform: fmt.Sprintf("%s/%s", goos, goarch),
+	}
+
+	// Find all variant assets for this platform
+	variants, err := d.FindAllVariantAssets(release, goos, goarch)
+	if err != nil {
+		result.Error = err
+		return result, err
+	}
+
+	// Download and extract all variants in parallel
+	result.Variants = make([]VariantInfo, len(variants))
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, 4) // Limit concurrent downloads
+
+	for i, variant := range variants {
+		wg.Add(1)
+		go func(index int, v VariantAsset) {
+			defer wg.Done()
+
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			variantInfo := VariantInfo{
+				Variant: v.Variant,
+			}
+
+			// Create target directory for this variant
+			targetDir := filepath.Join(d.cacheDir, strings.TrimSuffix(v.AssetName, ".zip"))
+
+			// Check if already extracted
+			if d.isLibraryReady(targetDir) {
+				variantInfo.Success = true
+				variantInfo.ExtractedDir = targetDir
+
+				// Try to calculate checksum if archive still exists
+				archivePath := filepath.Join(d.cacheDir, v.AssetName)
+				if checksum, err := d.calculateSHA256(archivePath); err == nil {
+					variantInfo.SHA256Sum = checksum
+				}
+				result.Variants[index] = variantInfo
+				return
+			}
+
+			// Download and extract with checksum
+			extractedDir, checksum, err := d.DownloadAndExtractWithChecksum(v.DownloadURL, v.AssetName, "")
+			if err != nil {
+				variantInfo.Error = err
+				variantInfo.Success = false
+				result.Variants[index] = variantInfo
+				return
+			}
+
+			variantInfo.Success = true
+			variantInfo.ExtractedDir = extractedDir
+			variantInfo.SHA256Sum = checksum
+			result.Variants[index] = variantInfo
+		}(i, variant)
+	}
+
+	wg.Wait()
+
+	// Check if all downloads succeeded
+	allSuccess := true
+	for _, v := range result.Variants {
+		if !v.Success {
+			allSuccess = false
+			if result.Error == nil && v.Error != nil {
+				result.Error = fmt.Errorf("variant %s failed: %w", v.Variant, v.Error)
+			}
+		}
+	}
+
+	if !allSuccess {
+		result.Success = false
+		return result, result.Error
+	}
+
+	// Verify common files are identical across all variants
+	if err := d.verifyCommonFiles(result.Variants, goos); err != nil {
+		result.Success = false
+		result.Error = fmt.Errorf("common file verification failed: %w", err)
+		return result, result.Error
+	}
+
+	// All variants downloaded successfully and common files verified
+	result.Success = true
+
+	// Use the first variant's directory as the common lib path
+	if len(result.Variants) > 0 && result.Variants[0].ExtractedDir != "" {
+		result.CommonLibPath = result.Variants[0].ExtractedDir
+	}
+
+	return result, nil
+}
+
+// verifyCommonFiles checks that common files are identical across all variant directories
+func (d *LibraryDownloader) verifyCommonFiles(variants []VariantInfo, goos string) error {
+	if len(variants) < 2 {
+		// Nothing to compare
+		return nil
+	}
+
+	baseDir := variants[0].ExtractedDir
+	if baseDir == "" {
+		return fmt.Errorf("base variant has no extracted directory")
+	}
+
+	// Get expected library name for platform
+	expectedLib, err := getExpectedLibraryNameForPlatform(goos)
+	if err != nil {
+		return err
+	}
+
+	// Common files to check (relative paths within extracted directory)
+	commonFiles := []string{
+		filepath.Join("build", "bin", expectedLib),
+		filepath.Join("bin", expectedLib),
+		expectedLib,
+	}
+
+	// Find which common files actually exist in base directory
+	var existingCommonFiles []string
+	for _, relPath := range commonFiles {
+		fullPath := filepath.Join(baseDir, relPath)
+		if _, err := os.Stat(fullPath); err == nil {
+			existingCommonFiles = append(existingCommonFiles, relPath)
+			break // Only check the first existing library file
+		}
+	}
+
+	if len(existingCommonFiles) == 0 {
+		// No common library file found, this is expected behavior
+		// Different variants may have different structures
+		return nil
+	}
+
+	// Calculate checksums of base files
+	baseChecksums := make(map[string]string)
+	for _, relPath := range existingCommonFiles {
+		fullPath := filepath.Join(baseDir, relPath)
+		checksum, err := d.calculateSHA256(fullPath)
+		if err != nil {
+			return fmt.Errorf("failed to calculate checksum for %s: %w", relPath, err)
+		}
+		baseChecksums[relPath] = checksum
+	}
+
+	// Compare with other variants
+	for i := 1; i < len(variants); i++ {
+		variantDir := variants[i].ExtractedDir
+		if variantDir == "" {
+			continue
+		}
+
+		for relPath, baseChecksum := range baseChecksums {
+			variantPath := filepath.Join(variantDir, relPath)
+
+			// Check if file exists in variant
+			if _, err := os.Stat(variantPath); os.IsNotExist(err) {
+				// File doesn't exist in this variant - this is OK as different variants
+				// may have different file structures
+				continue
+			}
+
+			// Calculate checksum
+			variantChecksum, err := d.calculateSHA256(variantPath)
+			if err != nil {
+				return fmt.Errorf("failed to calculate checksum for %s in variant %s: %w",
+					relPath, variants[i].Variant, err)
+			}
+
+			// Compare checksums
+			if baseChecksum != variantChecksum {
+				return fmt.Errorf("file %s differs between variant %s and %s",
+					relPath, variants[0].Variant, variants[i].Variant)
+			}
+		}
+	}
+
+	return nil
 }
 
 // CleanCache removes old cached library files

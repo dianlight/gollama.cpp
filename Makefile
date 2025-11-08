@@ -135,13 +135,13 @@ test-download-platforms:
 .PHONY: download-libs
 download-libs: deps
 	@echo "Downloading llama.cpp libraries for $(GOOS)/$(GOARCH)"
-	env GOOS= GOARCH= $(GO) run ./cmd/gollama-download -download -version $(LLAMA_CPP_BUILD)
+	env GOOS= GOARCH= $(GO) run ./cmd/gollama-download -download -download-variants -version $(LLAMA_CPP_BUILD)
 
 # Download libraries for all platforms (for testing)
 .PHONY: download-libs-all
 download-libs-all: deps
 	@echo "Downloading llama.cpp libraries for all platforms"
-	env GOOS= GOARCH= $(GO) run ./cmd/gollama-download -download-all -version $(LLAMA_CPP_BUILD)
+	env GOOS= GOARCH= $(GO) run ./cmd/gollama-download -download-all -download-variants -version $(LLAMA_CPP_BUILD)
 
 # Download libraries for all platforms with parallel processing
 .PHONY: download-libs-parallel
@@ -159,7 +159,7 @@ download-libs-platforms: deps
 .PHONY: populate-libs
 populate-libs: deps
 	@echo "Synchronizing embedded libraries in ./libs for llama.cpp $(LLAMA_CPP_BUILD)"
-	env GOOS= GOARCH= $(GO) run ./cmd/gollama-download -download-all -version $(LLAMA_CPP_BUILD) -copy-libs -libs-dir libs
+	env GOOS= GOARCH= $(GO) run ./cmd/gollama-download -download-all -download-variants -version $(LLAMA_CPP_BUILD) -copy-libs -libs-dir libs
 
 # Test compilation for specific platform  
 .PHONY: test-compile-windows

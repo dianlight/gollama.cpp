@@ -198,19 +198,26 @@ func loadLibraryPlatform(libPath string) (uintptr, error) {
 // preloadSiblingDlls loads other DLLs from the same directory that commonly contain
 // exports used by llama.dll (e.g., ggml*.dll). This improves GetProcAddress success
 // on setups where functions are exported by a different module.
+// The allowlist ensures critical DLLs like ggml-base.dll are loaded first, before
+// searching for symbols, as they may contain core functionality like ggml_backend_cpu_buffer_type.
 func preloadSiblingDlls(dir string, mainHandle uintptr) {
 	// Track the main handle
 	addLoadedHandle(mainHandle)
 	slog.Debug("preloadSiblingDlls: starting DLL preload", "directory", dir, "mainHandle", fmt.Sprintf("0x%x", mainHandle))
 
 	// Scan directory for DLLs and load a short allowlist first, then best-effort all *.dll
-	// Priority list of likely dependencies
+	// Priority list of likely dependencies - ORDER MATTERS as some must be loaded before others
+	// ggml-base.dll is listed early because it exports core functionality like ggml_backend_cpu_buffer_type
 	allowlist := []string{
-		"ggml.dll",
-		"ggml-base.dll",
+		"ggml-base.dll",    // Core GGML functionality - MUST be loaded before other GGML modules
+		"ggml.dll",         // Main GGML library
 		"ggml-cpu-x64.dll", // Generic x64 CPU backend (replaces ggml-cpu.dll which doesn't exist)
-		"ggml-blas.dll",
-		"ggml-rpc.dll",
+		"ggml-blas.dll",    // BLAS backend
+		"ggml-rpc.dll",     // RPC backend
+		"ggml-cuda.dll",    // CUDA backend
+		"ggml-metal.dll",   // Metal backend (macOS/iOS)
+		"ggml-kompute.dll", // Kompute backend
+		"ggml-sycl.dll",    // SYCL backend
 	}
 
 	slog.Debug("preloadSiblingDlls: loading allowlisted DLLs", "count", len(allowlist))
@@ -350,10 +357,61 @@ func registerLibFunc(fptr interface{}, handle uintptr, fname string) {
 	)
 }
 
+// findSymbolHandle finds which DLL handle contains the given symbol
+// It searches the main handle first, then all loaded sibling DLLs
+// Returns the handle that contains the symbol, or an error if not found
+func findSymbolHandle(handle uintptr, name string) (uintptr, error) {
+	if handle == 0 {
+		return 0, fmt.Errorf("invalid library handle (0) when looking up %s", name)
+	}
+
+	// Try the main handle first
+	namePtr, err := syscall.BytePtrFromString(name)
+	if err != nil {
+		return 0, fmt.Errorf("failed to convert name to byte pointer: %w", err)
+	}
+
+	ret, _, lastErr := procGetProcAddress.Call(handle, uintptr(unsafe.Pointer(namePtr)))
+	if ret != 0 {
+		slog.Debug("symbol found in main library", "symbol", name, "handle", fmt.Sprintf("0x%x", handle))
+		return handle, nil
+	}
+
+	// If not found in main handle, search all loaded DLL handles
+	if len(loadedDllHandles) > 0 {
+		slog.Debug("searching for symbol in sibling DLL handles", "symbol", name, "totalHandles", len(loadedDllHandles))
+		for i, h := range loadedDllHandles {
+			if h == 0 || h == handle {
+				continue
+			}
+			namePtr, err := syscall.BytePtrFromString(name)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			addr, _, _ := procGetProcAddress.Call(h, uintptr(unsafe.Pointer(namePtr)))
+			if addr != 0 {
+				slog.Debug("symbol found in sibling DLL", "symbol", name, "handle", fmt.Sprintf("0x%x", h), "handleIndex", i)
+				return h, nil
+			}
+		}
+	}
+
+	// Not found anywhere
+	errno := syscall.Errno(0)
+	if err, ok := lastErr.(syscall.Errno); ok {
+		errno = err
+	}
+	return 0, fmt.Errorf("symbol %s not found in library handle 0x%x or %d loaded DLLs: %w (GetLastError: %d)",
+		name, handle, len(loadedDllHandles), lastErr, errno)
+}
+
 // tryRegisterLibFunc attempts to register a library function, returning an error if it fails
 // This is useful for optional functions that may not exist in all library builds
 func tryRegisterLibFunc(fptr interface{}, handle uintptr, fname string) error {
-	if _, err := getProcAddressPlatform(handle, fname); err != nil {
+	// Find which handle actually has this symbol (might be in a sibling DLL)
+	actualHandle, err := findSymbolHandle(handle, fname)
+	if err != nil {
 		return err
 	}
 	if fptr == nil {
@@ -363,7 +421,8 @@ func tryRegisterLibFunc(fptr interface{}, handle uintptr, fname string) error {
 	if t.Kind() != reflect.Ptr || t.Elem().Kind() != reflect.Func {
 		return fmt.Errorf("tryRegisterLibFunc: expected pointer to func for %s, got %s", fname, t.String())
 	}
-	if err := safeRegisterLibFunc(fptr, handle, fname); err != nil {
+	// Register using the actual handle where the symbol was found
+	if err := safeRegisterLibFunc(fptr, actualHandle, fname); err != nil {
 		return err
 	}
 	return nil
@@ -388,42 +447,60 @@ func getProcAddressPlatform(handle uintptr, name string) (uintptr, error) {
 		return 0, fmt.Errorf("invalid library handle (0) when looking up %s", name)
 	}
 
+	// Log all available DLL handles for debugging
+	if len(loadedDllHandles) > 0 {
+		slog.Debug("getProcAddressPlatform: searching for symbol", "symbol", name, "mainHandle", fmt.Sprintf("0x%x", handle), "totalSiblingHandles", len(loadedDllHandles))
+	}
+
+	// Try the name on the provided handle first
 	namePtr, err := syscall.BytePtrFromString(name)
 	if err != nil {
 		return 0, fmt.Errorf("failed to convert name to byte pointer: %w", err)
 	}
 
-	// Try on the provided handle first
-	ret, _, err := procGetProcAddress.Call(handle, uintptr(unsafe.Pointer(namePtr)))
+	ret, _, lastErr := procGetProcAddress.Call(handle, uintptr(unsafe.Pointer(namePtr)))
 	if ret != 0 {
 		slog.Debug("symbol resolved from main library", "symbol", name, "handle", fmt.Sprintf("0x%x", handle))
 		return ret, nil
 	}
+	slog.Debug("symbol not found in main handle", "symbol", name, "handle", fmt.Sprintf("0x%x", handle), "error", fmt.Sprintf("%v", lastErr))
 
-	slog.Debug("symbol not found in main library", "symbol", name, "handle", fmt.Sprintf("0x%x", handle), "error", fmt.Sprintf("%v", err))
-
-	// If not found, try on any sibling DLLs we preloaded from the same directory
+	// If not found in main handle, try ALL loaded DLL handles (not just non-main ones)
+	// This is important because some symbols may only be in specific dlls like ggml-base.dll
 	if len(loadedDllHandles) > 0 {
-		slog.Debug("searching in sibling DLLs", "symbol", name, "siblingCount", len(loadedDllHandles))
+		slog.Debug("searching in all loaded DLL handles", "symbol", name, "totalHandles", len(loadedDllHandles))
 		for i, h := range loadedDllHandles {
-			if h == 0 || h == handle {
+			if h == 0 {
+				continue
+			}
+			// Skip the main handle since we already tried it, but be exhaustive with siblings
+			if h == handle {
+				continue
+			}
+			namePtr, err := syscall.BytePtrFromString(name)
+			if err != nil {
+				lastErr = err
 				continue
 			}
 			addr, _, _ := procGetProcAddress.Call(h, uintptr(unsafe.Pointer(namePtr)))
 			if addr != 0 {
-				slog.Debug("symbol resolved from sibling handle", "symbol", name, "handle", fmt.Sprintf("0x%x", h), "siblingIndex", i)
+				slog.Debug("symbol resolved from sibling DLL", "symbol", name, "handle", fmt.Sprintf("0x%x", h), "handleIndex", i)
 				return addr, nil
 			}
 		}
+		slog.Debug("symbol not found in any loaded DLL handle", "symbol", name, "totalHandlesSearched", len(loadedDllHandles))
 	} else {
 		slog.Debug("no sibling DLL handles available for symbol lookup", "symbol", name)
 	}
 
 	// Not found anywhere; return the original error context
-	errno := err.(syscall.Errno)
-	return 0, fmt.Errorf("GetProcAddress failed for %s in library handle 0x%x and %d sibling DLLs: %w (GetLastError: %d). "+
+	errno := syscall.Errno(0)
+	if err, ok := lastErr.(syscall.Errno); ok {
+		errno = err
+	}
+	return 0, fmt.Errorf("GetProcAddress failed for %s in library handle 0x%x and %d loaded DLLs: %w (GetLastError: %d). "+
 		"The symbol may not be exported by this build.",
-		name, handle, len(loadedDllHandles), err, errno)
+		name, handle, len(loadedDllHandles), lastErr, errno)
 }
 
 // isPlatformSupported returns whether the current platform is supported

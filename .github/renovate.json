@@ -104,6 +104,17 @@
         ],
         "executionMode": "branch"
       }
+    },
+    {
+      "description": "Pin go-github to v68.x - last version supporting Go 1.21",
+      "matchPackageNames": [
+        "github.com/google/go-github/v68"
+      ],
+      "allowedVersions": "<=68.999.999",
+      "addLabels": [
+        "go",
+        "dependencies"
+      ]
     }
   ],
   "vulnerabilityAlerts": {

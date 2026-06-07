@@ -436,7 +436,6 @@ func main() {
 	ctxParams.NBatch = 512
 	ctxParams.NSeqMax = 1
 	ctxParams.NThreads = int32(*threads)
-	ctxParams.Logits = 1
 
 	// NOTE: In a real implementation, we would set eval callbacks here:
 	// ctxParams.CbEval = callbackFunctionPointer

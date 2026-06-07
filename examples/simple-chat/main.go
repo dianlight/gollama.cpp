@@ -101,7 +101,6 @@ func main() {
 	// ctxParams.NUbatch = 512   // Keep default value
 	ctxParams.NSeqMax = 1 // Set max sequences to 1 for simple use case
 	ctxParams.NThreads = int32(*threads)
-	ctxParams.Logits = 1 // true as uint8
 
 	fmt.Printf("Setting context size to: %d\n", *ctx)
 	fmt.Printf("Context params NCtx: %d\n", ctxParams.NCtx)

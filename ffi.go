@@ -27,15 +27,16 @@ var (
 			&ffi.TypeUint8,   // use_mlock
 			&ffi.TypeUint8,   // check_tensors
 			&ffi.TypeUint8,   // use_extra_bufts
+			&ffi.TypeUint8,   // no_host
 			nil,
 		}[0],
 	}
 
 	// LlamaContextParams FFI type
+	// Layout MUST match struct llama_context_params in llama.h (b6862).
 	ffiTypeLlamaContextParams = ffi.Type{
 		Type: ffi.Struct,
 		Elements: &[]*ffi.Type{
-			&ffi.TypeUint32,  // seed
 			&ffi.TypeUint32,  // n_ctx
 			&ffi.TypeUint32,  // n_batch
 			&ffi.TypeUint32,  // n_ubatch
@@ -45,6 +46,7 @@ var (
 			&ffi.TypeSint32,  // rope_scaling_type
 			&ffi.TypeSint32,  // pooling_type
 			&ffi.TypeSint32,  // attention_type
+			&ffi.TypeSint32,  // flash_attn_type
 			&ffi.TypeFloat,   // rope_freq_base
 			&ffi.TypeFloat,   // rope_freq_scale
 			&ffi.TypeFloat,   // yarn_ext_factor
@@ -59,11 +61,12 @@ var (
 			&ffi.TypeSint32,  // type_v
 			&ffi.TypePointer, // abort_callback
 			&ffi.TypePointer, // abort_callback_data
-			&ffi.TypeUint8,   // logits
 			&ffi.TypeUint8,   // embeddings
 			&ffi.TypeUint8,   // offload_kqv
-			&ffi.TypeUint8,   // flash_attn
 			&ffi.TypeUint8,   // no_perf
+			&ffi.TypeUint8,   // op_offload
+			&ffi.TypeUint8,   // swa_full
+			&ffi.TypeUint8,   // kv_unified
 			nil,
 		}[0],
 	}

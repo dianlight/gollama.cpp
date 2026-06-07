@@ -98,10 +98,10 @@ func (s *FFISuite) TestFFIContextDefaultParams() {
 		return
 	}
 
-	s.Assert().NotZero(params.Seed, "Seed should not be zero in default params")
 	s.Assert().NotZero(params.NBatch, "NBatch should not be zero in default params")
-	s.T().Logf("FFI Context default params: Seed=%d, NCtx=%d, NBatch=%d, NThreads=%d",
-		params.Seed, params.NCtx, params.NBatch, params.NThreads)
+	s.Assert().NotZero(params.NUbatch, "NUbatch should not be zero in default params")
+	s.T().Logf("FFI Context default params: NCtx=%d, NBatch=%d, NUbatch=%d, NSeqMax=%d, NThreads=%d, FlashAttnType=%d",
+		params.NCtx, params.NBatch, params.NUbatch, params.NSeqMax, params.NThreads, params.FlashAttnType)
 }
 
 // Tests FFI-based sampler chain parameter retrieval

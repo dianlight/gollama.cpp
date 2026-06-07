@@ -132,7 +132,6 @@ func main() {
 	ctxParamsTgt.NCtx = uint32(*ctx)
 	ctxParamsTgt.NThreads = int32(*threads)
 	ctxParamsTgt.NThreadsBatch = int32(*threads)
-	ctxParamsTgt.Logits = 1
 
 	ctxTgt, err := gollama.Init_from_model(modelTgt, ctxParamsTgt)
 	if err != nil {
@@ -156,7 +155,6 @@ func main() {
 	ctxParamsDft.NCtx = uint32(*ctx)
 	ctxParamsDft.NThreads = int32(*threads)
 	ctxParamsDft.NThreadsBatch = int32(*threads)
-	ctxParamsDft.Logits = 1
 
 	ctxDft, err := gollama.Init_from_model(modelDft, ctxParamsDft)
 	if err != nil {

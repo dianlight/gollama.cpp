@@ -190,6 +190,14 @@ const (
 	LLAMA_ATTENTION_TYPE_NON_CAUSAL LlamaAttentionType = 1
 )
 
+type LlamaFlashAttnType int32
+
+const (
+	LLAMA_FLASH_ATTN_TYPE_AUTO     LlamaFlashAttnType = -1
+	LLAMA_FLASH_ATTN_TYPE_DISABLED LlamaFlashAttnType = 0
+	LLAMA_FLASH_ATTN_TYPE_ENABLED  LlamaFlashAttnType = 1
+)
+
 type LlamaSplitMode int32
 
 const (
@@ -282,11 +290,15 @@ type LlamaModelParams struct {
 	UseMlock                 uint8          // force system to keep model in RAM (bool as uint8)
 	CheckTensors             uint8          // validate model tensor data (bool as uint8)
 	UseExtraBufts            uint8          // use extra buffer types (bool as uint8)
+	NoHost                   uint8          // bypass host buffer allowing extra buffers to be used (bool as uint8)
 }
 
 // Context parameters
+//
+// Layout MUST match struct llama_context_params in llama.h for the bundled
+// llama.cpp build (b6862). The struct is passed/returned BY VALUE across the
+// FFI boundary, so any drift silently lands fields on the wrong C offsets.
 type LlamaContextParams struct {
-	Seed              uint32               // RNG seed, -1 for random
 	NCtx              uint32               // text context, 0 = from model
 	NBatch            uint32               // logical maximum batch size
 	NUbatch           uint32               // physical maximum batch size
@@ -296,6 +308,7 @@ type LlamaContextParams struct {
 	RopeScalingType   LlamaRopeScalingType // RoPE scaling type
 	PoolingType       LlamaPoolingType     // pooling type for embeddings
 	AttentionType     LlamaAttentionType   // attention type
+	FlashAttnType     LlamaFlashAttnType   // when to enable Flash Attention
 	RopeFreqBase      float32              // RoPE base frequency
 	RopeFreqScale     float32              // RoPE frequency scaling factor
 	YarnExtFactor     float32              // YaRN extrapolation mix factor
@@ -303,18 +316,19 @@ type LlamaContextParams struct {
 	YarnBetaFast      float32              // YaRN low correction dim
 	YarnBetaSlow      float32              // YaRN high correction dim
 	YarnOrigCtx       uint32               // YaRN original context size
-	DefragThold       float32              // defragment the KV cache if holes/size > thold
+	DefragThold       float32              // [DEPRECATED] defragment the KV cache if holes/size > thold
 	CbEval            uintptr              // evaluation callback
 	CbEvalUserData    uintptr              // user data for evaluation callback
 	TypeK             int32                // data type for K cache
 	TypeV             int32                // data type for V cache
 	AbortCallback     uintptr              // abort callback
 	AbortCallbackData uintptr              // user data for abort callback
-	Logits            uint8                // whether to compute and return logits (bool as uint8)
-	Embeddings        uint8                // whether to compute and return embeddings (bool as uint8)
-	Offload_kqv       uint8                // whether to offload K, Q, V to GPU (bool as uint8)
-	FlashAttn         uint8                // whether to use flash attention (bool as uint8)
-	NoPerf            uint8                // whether to measure performance (bool as uint8)
+	Embeddings        uint8                // whether to extract embeddings, together with logits (bool as uint8)
+	Offload_kqv       uint8                // whether to offload KQV ops (incl. KV cache) to GPU (bool as uint8)
+	NoPerf            uint8                // whether to skip performance timings (bool as uint8)
+	OpOffload         uint8                // offload host tensor operations to device (bool as uint8)
+	SwaFull           uint8                // use full-size SWA cache (bool as uint8)
+	KvUnified         uint8                // use a unified KV buffer across input sequences (bool as uint8)
 }
 
 // Model quantize parameters
@@ -929,7 +943,6 @@ func Context_default_params() LlamaContextParams {
 
 	// Last resort: return hardcoded defaults
 	return LlamaContextParams{
-		Seed:            LLAMA_DEFAULT_SEED,
 		NCtx:            0, // Auto-detect from model
 		NBatch:          2048,
 		NUbatch:         512,
@@ -939,12 +952,14 @@ func Context_default_params() LlamaContextParams {
 		RopeScalingType: LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED,
 		PoolingType:     LLAMA_POOLING_TYPE_UNSPECIFIED,
 		AttentionType:   LLAMA_ATTENTION_TYPE_CAUSAL,
+		FlashAttnType:   LLAMA_FLASH_ATTN_TYPE_AUTO,
 		DefragThold:     -1.0, // Disabled by default
-		Logits:          0,    // Disabled by default
 		Embeddings:      0,    // Disabled by default
 		Offload_kqv:     1,    // Enable by default
-		FlashAttn:       0,    // Disabled by default
 		NoPerf:          0,    // Enable performance measurement by default
+		OpOffload:       1,    // Enable by default (matches llama.cpp)
+		SwaFull:         1,    // Enable by default (matches llama.cpp)
+		KvUnified:       0,    // Disabled by default (matches llama.cpp)
 	}
 }
 
@@ -1507,7 +1522,6 @@ func ContextDefaultParams() LlamaContextParams {
 	}
 	// Return default values for non-Darwin platforms - blocks ROADMAP "wait for purego struct support"
 	return LlamaContextParams{
-		Seed:            LLAMA_DEFAULT_SEED,
 		NCtx:            0, // 0 = from model
 		NBatch:          2048,
 		NUbatch:         512,
@@ -1517,6 +1531,7 @@ func ContextDefaultParams() LlamaContextParams {
 		RopeScalingType: LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED,
 		PoolingType:     LLAMA_POOLING_TYPE_UNSPECIFIED,
 		AttentionType:   LLAMA_ATTENTION_TYPE_CAUSAL,
+		FlashAttnType:   LLAMA_FLASH_ATTN_TYPE_AUTO,
 		RopeFreqBase:    0.0, // 0.0 = from model
 		RopeFreqScale:   0.0, // 0.0 = from model
 		YarnExtFactor:   -1.0,
@@ -1527,11 +1542,12 @@ func ContextDefaultParams() LlamaContextParams {
 		DefragThold:     -1.0,
 		TypeK:           -1,
 		TypeV:           -1,
-		Logits:          0,
 		Embeddings:      0,
 		Offload_kqv:     1,
-		FlashAttn:       0,
 		NoPerf:          0,
+		OpOffload:       1,
+		SwaFull:         1,
+		KvUnified:       0,
 	}
 }
 
